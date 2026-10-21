@@ -170,19 +170,6 @@ bash ../fixpad.sh      # builds leftseat.vpk; use this instead of plain make
 
 The result is `build/leftseat.vpk`.
 
-### Building without VitaSDK on your machine
-
-GitHub can build it for you, from a PC or an iPad:
-
-- **GitHub Actions.** Every push builds `leftseat.vpk`. Open the repository's **Actions** tab, open the latest
-  run and download the `leftseat-vpk` artifact (a zip containing the VPK). Pushing a tag such as `v1.0` also
-  attaches the VPK to a Release.
-- **Edit in the browser.** Press `.` on the repository page (or change `github.com` to `github.dev` in the
-  address) for a lightweight editor. Commit your change and Actions does the build.
-- **Terminal in the browser.** Choose **Code > Codespaces > Create codespace**. The `.devcontainer` folder installs
-  VitaSDK for you, so the commands above work as written.
-
-See `GITHUB_GUIDE.md` for a step-by-step walkthrough.
 
 ### Troubleshooting
 
