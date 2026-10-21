@@ -1,0 +1,12 @@
+build/
+*.vpk
+*.self
+*.velf
+*.o
+*.elf
+*.sfo
+*.bin
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
