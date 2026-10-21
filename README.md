@@ -1,4 +1,8 @@
-# Left Seat
+<p align="center">
+  <img src="sce_sys/icon0.png" alt="Left Seat icon" width="128">
+</p>
+
+<h1 align="center">Left Seat</h1>
 
 A flight simulator for the PS Vita in the spirit of the early-90s Microsoft Flight Simulator games: flat-shaded
 3D, a working instrument panel and a flight model based on a classic four-seat light trainer.
@@ -161,7 +165,7 @@ You need [VitaSDK](https://vitasdk.org/) (with the `vita2d` package), CMake and,
 the PNG icons before packaging).
 
 ```sh
-git clone https://github.com/av8t4/leftseat.git
+git clone https://github.com/Av8t4/leftseat.git
 cd leftseat
 mkdir build && cd build
 cmake ..
@@ -170,6 +174,12 @@ bash ../fixpad.sh      # builds leftseat.vpk; use this instead of plain make
 
 The result is `build/leftseat.vpk`.
 
+### Building on GitHub
+
+You do not need VitaSDK on your own machine. Every push builds `leftseat.vpk` with GitHub Actions: open the
+repository's **Actions** tab, open the latest run and download the `leftseat-vpk` artifact (a zip containing the
+VPK). Pushing a tag such as `v1.0` also attaches the VPK to a Release. See `GITHUB_GUIDE.md` for a step-by-step
+walkthrough.
 
 ### Troubleshooting
 
