@@ -1,0 +1,57 @@
+# Builds leftseat.vpk on GitHub every time you push, and attaches it to a Release when you push a tag like v1.0.
+name: Build VPK
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: vitasdk/vitasdk:latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check VitaSDK and libraries
+        run: |
+          export VITASDK="${VITASDK:-/usr/local/vitasdk}"
+          export PATH="$VITASDK/bin:$PATH"
+          echo "VITASDK = $VITASDK"
+          if [ ! -f "$VITASDK/arm-vita-eabi/include/vita2d.h" ]; then
+            echo "vita2d is missing from this image, installing it with vdpm"
+            git clone --depth 1 https://github.com/vitasdk/vdpm /tmp/vdpm
+            (cd /tmp/vdpm && ./vdpm vita2d freetype libpng libjpeg-turbo zlib)
+          fi
+          ls "$VITASDK/arm-vita-eabi/include/vita2d.h"
+
+      - name: Build leftseat.vpk
+        run: |
+          export VITASDK="${VITASDK:-/usr/local/vitasdk}"
+          export PATH="$VITASDK/bin:$PATH"
+          mkdir build
+          cd build
+          cmake ..
+          bash ../fixpad.sh
+          ls -l leftseat.vpk
+
+      - name: Upload the VPK (Actions tab -> the run -> Artifacts)
+        uses: actions/upload-artifact@v4
+        with:
+          name: leftseat-vpk
+          path: build/leftseat.vpk
+          if-no-files-found: error
+
+      - name: Attach the VPK to the Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/leftseat.vpk
