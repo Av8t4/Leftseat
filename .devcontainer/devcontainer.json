@@ -1,0 +1,8 @@
+{
+  "name": "Left Seat (VitaSDK)",
+  "image": "vitasdk/vitasdk:latest",
+  "remoteEnv": {
+    "VITASDK": "/usr/local/vitasdk",
+    "PATH": "${containerEnv:PATH}:/usr/local/vitasdk/bin"
+  }
+}
