@@ -161,7 +161,7 @@ You need [VitaSDK](https://vitasdk.org/) (with the `vita2d` package), CMake and,
 the PNG icons before packaging).
 
 ```sh
-git clone https://github.com/<your-username>/leftseat.git
+git clone https://github.com/av8t4/leftseat.git
 cd leftseat
 mkdir build && cd build
 cmake ..
