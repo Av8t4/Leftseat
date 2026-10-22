@@ -66,14 +66,6 @@ static void draw_overlays(vita2d_pgf *pgf) {
     if (pl.fuel <= 0.0f && ((frame_count / 30) & 1))
         vita2d_pgf_draw_text(pgf, 350, 200, RGBA8(255, 150, 60, 255), 1.2f, "OUT OF FUEL");
 
-    if (pl.on_ground && pl.gs < 1.0f) {
-        vita2d_pgf_draw_text(pgf, 20, 30,  white, 0.85f, "Left stick: pitch / roll    Right stick: throttle (up/down), rudder (left/right)    D-pad left / right: trim");
-        vita2d_pgf_draw_text(pgf, 20, 56,  white, 0.85f, "Circle / Cross: flaps down / up    D-pad down: brakes    D-pad up: fast forward (free flight)    L / R: look left / right    Triangle: reset");
-        vita2d_pgf_draw_text(pgf, 20, 82,  white, 0.85f, "Select: change camera (cockpit / chase)    L + R + Select: invert pitch    START: menu");
-        if (spec->retract) vita2d_pgf_draw_text(pgf, 20, 108, white, 0.85f, "Square: landing gear up / down (raise it once you are climbing, lower it before you land).");
-        else               vita2d_pgf_draw_text(pgf, 20, 108, white, 0.85f, "Takeoff: flaps 10, full throttle, hold right rudder, rotate at 55 kt, climb at 74 kt.");
-        vita2d_pgf_draw_text(pgf, 20, 134, white, 0.85f, "Trim: tap D-pad left / right for a fine step, hold for more. In the air, D-pad down trims for level flight at this speed.");
-    }
 }
 
 /* ------------------------------------------------------------------ */
