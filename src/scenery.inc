@@ -99,7 +99,7 @@ static void draw_roads(int i0, int j0, int tr) {
 }
 
 // ---- trees -------------------------------------------------------------------------------
-typedef struct { float x, z, r, h, d; float shade; unsigned char cr, cg, cb; } Tree;
+typedef struct { float x, z, r, h, d, y0; float shade; unsigned char cr, cg, cb; } Tree;     // y0: the ground the tree stands on
 static Tree trees[256];
 static int  ntrees;
 static int cmp_tree_near(const void *a, const void *b) {
@@ -122,11 +122,14 @@ static bool tree_ok(float x, float z) {
     return !in_lake(x, z, 1.30f);
 }
 
-static void draw_trees(void) {
+// Trees are collected once a frame and then drawn in the same far-to-near order as the buildings and mountains (see
+// draw_scene), so a mountain behind them no longer paints over them. They stand on a hill's slope, and not on the
+// bare rock of the tall mountains.
+static void collect_trees(void) {
+    ntrees = 0;
     if (TREE_LIMIT <= 0) return;
     const int R = 4, MAXT = TREE_LIMIT;
     int i0 = (int)floorf(cam.pos.x / TILE), j0 = (int)floorf(cam.pos.z / TILE);
-    ntrees = 0;
     for (int dj = -R; dj <= R; dj++)
         for (int di = -R; di <= R; di++) {
             int i = i0 + di, j = j0 + dj;
@@ -140,28 +143,36 @@ static void draw_trees(void) {
                 if (vdot(d, cam.f) < -80.0f) continue;                         // behind us
                 float dist = sqrtf(d.x * d.x + d.z * d.z);
                 if (dist > 1700.0f) continue;
+                float y0 = 0.0f;
+                bool rock = false;
+                for (int m = 0; m < nmounts && !rock; m++) {
+                    float sh = mountain_surface(&mounts[m], x, z);
+                    if (sh <= 0.0f) continue;
+                    if (mounts[m].h >= 200.0f) rock = true;                     // no trees on the tall mountains
+                    else if (sh > y0) y0 = sh;                                  // on a hill: stand on its slope
+                }
+                for (int m = 0; m < nmesas && !rock; m++) if (mesa_surface(&mesas[m], x, z) > 0.0f) rock = true;
+                if (rock) continue;
                 Tree *tr = &trees[ntrees++];
-                tr->x = x; tr->z = z; tr->r = 4.5f + 4.0f * hf(h, 2); tr->h = 11.0f + 9.0f * hf(h, 3); tr->d = dist;
+                tr->x = x; tr->z = z; tr->y0 = y0; tr->r = 4.5f + 4.0f * hf(h, 2); tr->h = 11.0f + 9.0f * hf(h, 3); tr->d = dist;
                 float g = hf(h, 2);
                 tr->cr = (unsigned char)(30 + 24 * g); tr->cg = (unsigned char)(84 + 40 * hf(h, 3)); tr->cb = (unsigned char)(34 + 20 * g);
             }
         }
     if (ntrees > MAXT) { qsort(trees, ntrees, sizeof(Tree), cmp_tree_near); ntrees = MAXT; }
-    qsort(trees, ntrees, sizeof(Tree), cmp_tree_far);                          // far to near
-    for (int n = 0; n < ntrees; n++) {
-        const Tree *t = &trees[n];
-        V3 apex = v3(t->x, t->h, t->z), b[4];
-        for (int k = 0; k < 4; k++) {
-            float a = PI_F / 4.0f + k * PI_F / 2.0f;
-            b[k] = v3(t->x + t->r * cosf(a), 0.0f, t->z + t->r * sinf(a));
-        }
-        for (int k = 0; k < 4; k++) {
-            V3 tri[3] = { b[k], b[(k + 1) & 3], apex };
-            V3 nrm = vcross(vsub(tri[1], tri[0]), vsub(tri[2], tri[0]));
-            float len = sqrtf(vdot(nrm, nrm));
-            float shade = 0.55f + 0.45f * fabsf(len > 1e-4f ? vdot(nrm, SUN) / len : 0.7f);
-            draw_world_poly(tri, 3, RGBA8((int)(t->cr * shade), (int)(t->cg * shade), (int)(t->cb * shade), 255));
-        }
+}
+static void draw_tree(const Tree *t) {
+    V3 apex = v3(t->x, t->y0 + t->h, t->z), b[4];
+    for (int k = 0; k < 4; k++) {
+        float a = PI_F / 4.0f + k * PI_F / 2.0f;
+        b[k] = v3(t->x + t->r * cosf(a), t->y0, t->z + t->r * sinf(a));
+    }
+    for (int k = 0; k < 4; k++) {
+        V3 tri[3] = { b[k], b[(k + 1) & 3], apex };
+        V3 nrm = vcross(vsub(tri[1], tri[0]), vsub(tri[2], tri[0]));
+        float len = sqrtf(vdot(nrm, nrm));
+        float shade = 0.55f + 0.45f * fabsf(len > 1e-4f ? vdot(nrm, SUN) / len : 0.7f);
+        draw_world_poly(tri, 3, RGBA8((int)(t->cr * shade), (int)(t->cg * shade), (int)(t->cb * shade), 255));
     }
 }
 
