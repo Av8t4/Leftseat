@@ -1,0 +1,30 @@
+name: Bug report
+description: Something in Left Seat is wrong or crashed
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Game version
+      description: The release you installed, for example v0.1
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Vita model and firmware
+      placeholder: PS Vita 1000, firmware 3.65 with HENkaku
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Aircraft, airport, weather, time of day and where in the world. What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log file
+      description: Drag `ux0:data/skyhawk.log` onto this box, or paste its contents.
