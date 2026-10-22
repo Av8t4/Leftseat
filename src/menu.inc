@@ -64,7 +64,7 @@ static int  menu_popup_t;
 static int  menu_quit_t;           // frames left to confirm quitting
 static int  menu_stick;            // left-stick latch so one push moves one step
 static int  flight_world = -1;   // which world the flight in progress is in (-1 = none)
-static const char *MENU_ITEMS[7] = { "OPEN WORLD", "AIRPORT", "CHALLENGES", "HANGAR", "WEATHER", "TIME", "SOUND" };
+static const char *MENU_ITEMS[8] = { "OPEN WORLD", "AIRPORT", "CHALLENGES", "HANGAR", "WEATHER", "TIME", "SOUND", "CONTROLS" };
 static int  menu_chopen;            // the challenge list is showing
 static int  menu_chsel;             // highlighted row in that list
 static int  menu_ch_pick = -1;      // result: -1 = resume the running challenge, otherwise the kind to start
@@ -72,11 +72,12 @@ static bool ch_running(void) { return ch_state == CH_FLYING || ch_state == CH_TO
 static int  menu_ap;                // airport picked for the open world (start and Triangle reset)
 static int  menu_ac;                // aircraft picked in the hangar for the next flight
 static int  menu_hopen, menu_hsel;  // the hangar list is showing, and its highlighted row
+static int  menu_kopen;             // the controls window is showing
 static int  menu_tod;              // time of day for the next flight: day, dusk or night
 static int  menu_wx;               // starting weather: 0..WX_COUNT-1, or WX_COUNT for random
 static bool wx_dirty;              // the weather choice changed since the flight started
 
-static int menu_count(void) { return 7; }
+static int menu_count(void) { return 8; }
 
 // Returns 0 = nothing, 1 = start / resume the flight, 2 = quit the game.
 static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
@@ -91,6 +92,10 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
         if (mv) { menu_hsel = (menu_hsel + mv + AC_COUNT) % AC_COUNT; snd_event(EV_CLICK, 1.0f); }
         if (pressed & SCE_CTRL_CIRCLE) { menu_hopen = 0; snd_event(EV_CLICK, 1.0f); }
         if (pressed & SCE_CTRL_CROSS)  { menu_ac = menu_hsel; menu_hopen = 0; snd_event(EV_CONFIRM, 1.0f); }
+        return 0;
+    }
+    if (menu_kopen) {                                         // controls window: X or O closes it
+        if (pressed & (SCE_CTRL_CIRCLE | SCE_CTRL_CROSS)) { menu_kopen = 0; snd_event(EV_CLICK, 1.0f); }
         return 0;
     }
     if (menu_chopen) {                                        // challenge list
@@ -158,6 +163,10 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
         if (menu_sel == 3) {                                  // hangar: open the list of aircraft
             menu_hopen = 1;
             menu_hsel = menu_ac;
+            return 0;
+        }
+        if (menu_sel == 7) {                                  // controls: open the window
+            menu_kopen = 1;
             return 0;
         }
         if (menu_sel == 4) {                                  // X also steps through the weather
@@ -267,11 +276,11 @@ static void draw_menu(vita2d_pgf *pgf) {
 
     // Menu items.
     for (int i = 0; i < menu_count(); i++) {
-        int step = 40;
-        int y = 232 + i * step;
+        int step = 37;
+        int y = 204 + i * step;
         int sel = (i == menu_sel);
-        vita2d_draw_rectangle(52, y - 34, 420, step - 4, sel ? RGBA8(22, 46, 104, 255) : RGBA8(12, 26, 62, 255));
-        if (sel) vita2d_draw_rectangle(52, y - 34, 8, step - 4, gold);
+        vita2d_draw_rectangle(52, y - 33, 420, step - 3, sel ? RGBA8(22, 46, 104, 255) : RGBA8(12, 26, 62, 255));
+        if (sel) vita2d_draw_rectangle(52, y - 33, 8, step - 3, gold);
         vita2d_pgf_draw_text(pgf, 80, y, sel ? white : RGBA8(150, 172, 215, 255), 1.5f, MENU_ITEMS[i]);
         if (i == 0) {
             if (flight_world == 0 && game_mode == MODE_FREE && ac_flying == menu_ac && start_ap == menu_ap)
@@ -316,7 +325,8 @@ static void draw_menu(vita2d_pgf *pgf) {
                          menu_sel == 1 ? "Left / Right: choose the starting airport     Up / Down: move"
                        : (menu_sel == 4 ? "Left / Right: change weather     Up / Down: move"
                        : (menu_sel == 5 ? "Left / Right: change time of day     Up / Down: move"
-                       : (menu_sel == 6 ? "Left / Right: change the volume     Up / Down: move" : "D-pad / left stick: move     X: select"))));
+                       : (menu_sel == 6 ? "Left / Right: change the volume     Up / Down: move"
+                       : (menu_sel == 7 ? "X: show the controls     Up / Down: move" : "D-pad / left stick: move     X: select")))));
     if (menu_quit_t > 0) vita2d_pgf_draw_text(pgf, 640, 528, gold, 0.8f, "Press START again to quit");
     else                 vita2d_pgf_draw_text(pgf, 770, 528, RGBA8(190, 205, 235, 255), 0.8f, "START: quit");
 
@@ -339,6 +349,41 @@ static void draw_menu(vita2d_pgf *pgf) {
             vita2d_pgf_draw_text(pgf, 778 - vita2d_pgf_text_width(pgf, 0.6f, "KNOWLES AIRCRAFT CO."), ry + 67, RGBA8(176, 150, 96, 255), 0.6f, "KNOWLES AIRCRAFT CO.");
         }
         vita2d_pgf_draw_text(pgf, 194, top + h - 12, RGBA8(190, 205, 235, 255), 0.8f, "Up / Down: choose     X: select     O: back");
+    }
+
+    // The controls window.
+    if (menu_kopen) {
+        static const char *const KEYS[][2] = {
+            { "Left stick",                "Pitch and roll" },
+            { "Right stick up / down",     "Throttle" },
+            { "Right stick left / right",  "Rudder" },
+            { "L / R",                     "Look left / right (chase view: both swing the camera to the front)" },
+            { "Circle / Cross",            "Flaps down / up" },
+            { "D-pad left / right",        "Pitch trim: a tap is a fine step, hold for more" },
+            { "D-pad down (in the air)",   "Trim for level flight at your current airspeed" },
+            { "D-pad down (on the ground)", "Wheel brakes" },
+            { "D-pad up",                  "Fast forward x2 / x5 / normal (free flight only)" },
+            { "Square",                    "Landing gear up / down (K-30 only)" },
+            { "Triangle",                  "Reset the aircraft (restart the attempt in a challenge)" },
+            { "Select (tap)",              "Switch camera: cockpit / chase" },
+            { "Select (hold)",             "Chart of the whole area" },
+            { "L + R + Select",            "Invert the pitch axis" },
+            { "START",                     "Pause and return to the menu" } };
+        const int nk = (int)(sizeof(KEYS) / sizeof(KEYS[0])), rowh = 22;
+        int h = 52 + nk * rowh + 88, top = (SCREEN_H - h) / 2;
+        vita2d_draw_rectangle(60, top, 840, h, gold);
+        vita2d_draw_rectangle(64, top + 4, 832, h - 8, RGBA8(10, 22, 56, 255));
+        vita2d_pgf_draw_text(pgf, 90, top + 38, white, 1.3f, "CONTROLS");
+        for (int i = 0; i < nk; i++) {
+            int ry = top + 66 + i * rowh;
+            if (i & 1) vita2d_draw_rectangle(80, ry - 16, 800, rowh, RGBA8(14, 30, 70, 255));
+            vita2d_pgf_draw_text(pgf, 94, ry, gold, 0.75f, KEYS[i][0]);
+            vita2d_pgf_draw_text(pgf, 340, ry, RGBA8(210, 222, 245, 255), 0.75f, KEYS[i][1]);
+        }
+        int ty = top + 66 + nk * rowh + 14;
+        vita2d_pgf_draw_text(pgf, 94, ty, RGBA8(190, 205, 235, 255), 0.72f, "Takeoff (K-4): flaps 10, full throttle, hold right rudder, rotate at 55 kt, climb at 74 kt.");
+        vita2d_pgf_draw_text(pgf, 94, ty + 22, RGBA8(190, 205, 235, 255), 0.72f, "Landing: about 65 kt with full flaps, and flare just above the runway.");
+        vita2d_pgf_draw_text(pgf, 94, top + h - 14, RGBA8(190, 205, 235, 255), 0.8f, "X or O: close");
     }
 
     // The challenge list.
