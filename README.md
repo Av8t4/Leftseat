@@ -47,6 +47,7 @@ about 55 kt and climb at about 74 kt. Approach at about 65 kt with full flaps an
 In the menu, use the D-pad or left stick to move, ✕ to select and left / right on a row to change it. Press START
 twice to quit.
 Controls
+The same list is in the game: choose CONTROLS on the start menu.
 Input	Action
 Left stick	Pitch and roll
 Right stick up / down	Throttle
