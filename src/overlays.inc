@@ -46,6 +46,10 @@ static void draw_overlays(vita2d_pgf *pgf) {
         vita2d_draw_rectangle(SCREEN_W - fw - 32, 8, fw + 24, 34, RGBA8(0, 0, 0, 120));
         vita2d_pgf_draw_text(pgf, SCREEN_W - fw - 20, 33, RGBA8(255, 210, 90, 255), 1.0f, ff);
     }
+    if (!pl.crashed && trim_msg_t > 0) {                                 // D-pad left + right: "trimmed for this attitude"
+        int tw = vita2d_pgf_text_width(pgf, 0.8f, "TRIMMED");
+        vita2d_pgf_draw_text(pgf, (SCREEN_W - tw) / 2, 68, RGBA8(230, 190, 60, 255), 0.8f, "TRIMMED");
+    }
     if (spec->retract && !pl.crashed && gear_msg_t > 0) {                 // gear refusals ("too fast" etc.): top right
         int mw = vita2d_pgf_text_width(pgf, 0.8f, gear_msg);
         vita2d_pgf_draw_text(pgf, SCREEN_W - mw - 20, 68, RGBA8(255, 150, 60, 255), 0.8f, gear_msg);
@@ -68,6 +72,7 @@ static void draw_overlays(vita2d_pgf *pgf) {
         vita2d_pgf_draw_text(pgf, 20, 82,  white, 0.85f, "Select: change camera (cockpit / chase)    L + R + Select: invert pitch    START: menu");
         if (spec->retract) vita2d_pgf_draw_text(pgf, 20, 108, white, 0.85f, "Square: landing gear up / down (raise it once you are climbing, lower it before you land).");
         else               vita2d_pgf_draw_text(pgf, 20, 108, white, 0.85f, "Takeoff: flaps 10, full throttle, hold right rudder, rotate at 55 kt, climb at 74 kt.");
+        vita2d_pgf_draw_text(pgf, 20, 134, white, 0.85f, "Trim: tap D-pad left / right for a fine step, hold for more. In the air, D-pad down trims for level flight at this speed.");
     }
 }
 
