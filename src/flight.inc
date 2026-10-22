@@ -90,8 +90,10 @@ static void reset_plane(void)  { reset_plane_at(AP_HOME); }       // challenges 
 static void reset_free(void)   { reset_plane_at(start_ap); }      // open world: the airport picked on the menu
 
 static float stick(unsigned char v) {
-    float f = ((int)v - 128) / 128.0f;
-    return (fabsf(f) < 0.12f) ? 0.0f : f;
+    float f = ((int)v - 128) / 128.0f, a = fabsf(f);
+    if (a < 0.12f) return 0.0f;                          // dead zone, with the response starting from zero at its edge
+    a = (a - 0.12f) / 0.88f;                             // (so there is no sudden step as the stick leaves the centre)
+    return f < 0.0f ? -a : a;
 }
 
 // Response curve: gentle near centre for fine control, full range at the ends.
