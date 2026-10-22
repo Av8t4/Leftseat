@@ -26,9 +26,10 @@ aircraft and every sound are generated in code.
 8. [Weather, time of day and sound](#weather-time-of-day-and-sound)
 9. [Cockpit and cameras](#cockpit-and-cameras)
 10. [Building from source](#building-from-source)
-11. [Project layout](#project-layout)
-12. [Tuning and roadmap](#tuning-and-roadmap)
-13. [License](#license)
+11. [Reporting a problem](#reporting-a-problem)
+12. [Project layout](#project-layout)
+13. [Tuning and roadmap](#tuning-and-roadmap)
+14. [License](#license)
 
 ## Screenshots
 
@@ -42,9 +43,15 @@ aircraft and every sound are generated in code.
 
 ## Install
 
-Download `leftseat.vpk` from the [Releases](../../releases) page (or from the `leftseat-vpk` artifact on the
-Actions tab, see [Building from source](#building-from-source)), copy it to the Vita and install it with
-VitaShell.
+**You need** a PS Vita running custom firmware (for example HENkaku), with VitaShell installed. Left Seat is homebrew
+and will not install on an unmodified console. It has been tested on a PS Vita 1000-series.
+
+1. Download `leftseat.vpk` from the [Releases](../../releases) page (or from the `leftseat-vpk` artifact on the
+   Actions tab, see [Building from source](#building-from-source)).
+2. Copy it to your Vita, for example with VitaShell's USB or FTP mode.
+3. Open it in VitaShell and install it. Left Seat then appears on the LiveArea screen.
+
+Left Seat saves your best challenge scores and sound volume in `ux0:data/skyhawk_scores.txt`, so updating the game keeps them.
 
 ## Quick start
 
@@ -165,7 +172,7 @@ You need [VitaSDK](https://vitasdk.org/) (with the `vita2d` package), CMake and,
 the PNG icons before packaging).
 
 ```sh
-git clone https://github.com/Av8t4/leftseat.git
+git clone https://github.com/<your-username>/leftseat.git
 cd leftseat
 mkdir build && cd build
 cmake ..
@@ -191,6 +198,17 @@ walkthrough.
   By hand: `python3 tools/strip_png.py in.png out.png`.
 - **Logs.** The game writes `ux0:data/skyhawk.log` with a few startup lines, a crash reason after a crash, and
   frame timings every 300 frames.
+
+## Reporting a problem
+
+Found a bug? Open an issue on the repository's **Issues** tab and say:
+
+- what you were doing (aircraft, airport, weather, time of day, and where in the world);
+- what you expected and what happened;
+- your Vita model and firmware version;
+- the game version (shown on the release you installed);
+- the log file `ux0:data/skyhawk.log`, attached to the issue. It holds a few startup lines, a crash reason and
+  frame timings.
 
 ## Project layout
 
