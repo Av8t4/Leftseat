@@ -82,8 +82,8 @@ Three airports and the country between them. Hold Select for a chart of the whol
 your position and heading, your track so far, and the bearing and distance to each airport.
 Airport	Where	Description
 Knowles Field (KAK)	Home	Runway with numbers and aiming-point markings, edge and end lights, glide-slope (PAPI) lights, taxiway and apron, a terminal and hangars
-Redrock Municipal (RDR)	About 29 km north-north-east of KAK	Runway 07/25, apron, terminal, tower and hangars, and a beacon you can see from far away at night. The farmland turns to red desert with buttes around it
-Pinecrest Airstrip (PNC)	About 21 km west-north-west of KAK	A 650 m mown-grass strip (runway 12/30, no markings) with a small hangar and cabin, in a forested valley between two ridges. After dark it has low runway lights; from far away you need the chart
+Redrock Municipal (RDR)	About 16 NM north-north-east of KAK	Runway 07/25, apron, terminal, tower and hangars, and a beacon you can see from far away at night. The farmland turns to red desert with buttes around it
+Pinecrest Airstrip (PNC)	About 11 NM west-north-west of KAK	A 650 m mown-grass strip (runway 12/30, no markings) with a small hangar and cabin, in a forested valley between two ridges. After dark it has low runway lights; from far away you need the chart
 Between KAK and RDR there is a mountain pass, low hills, towns, a highway, and a river that runs on to a lake at
 its mouth. Roads wind through the countryside and some of them cross the river on bridges. The towns have
 streets and a central plaza. Elsewhere there are patchwork fields, more lakes with sandy shores and patches of
@@ -94,8 +94,8 @@ Pick one from the menu. Each is scored out of 100 on the touchdown: sink rate (4
 A crash scores 0. Your best score for each is saved to `ux0:data/skyhawk_scores.txt`. The weather and time of day
 chosen on the menu apply to all of them.
 Challenge	What happens
-Landing	You start about 4.5 km out on final approach, a little off line and height. The chosen weather stays fixed during the attempt
-Engine out	The engine fails at about 1,500 ft, 3 to 3.7 km from the runway and off to one side. Glide at about 70 kt, use flaps to lose height, and land. The scoring window for the touchdown point is wider
+Landing	You start about 2.4 NM out on final approach, a little off line and height. The chosen weather stays fixed during the attempt
+Engine out	The engine fails at about 1,500 ft, 1.6 to 2 NM from the runway and off to one side. Glide at about 70 kt, use flaps to lose height, and land. The scoring window for the touchdown point is wider
 Crosswind	A strong wind (about 11 kt at the ground, 27 kt higher up, with gusts) blows across the runway from the left or right. Crab into it, then straighten with rudder before touchdown
 Cross-country	Take off from Knowles Field, fly to Redrock and land on its runway from either end. The HUD shows bearing and distance. The result card also shows trip time and fuel used. Landing anywhere else scores 0
 Backcountry	The same trip, but to Pinecrest: find the grass strip in the mountains and put it down in the first few hundred feet. The scoring area shrinks with the runway, so touching down early matters more
