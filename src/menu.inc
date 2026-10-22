@@ -347,8 +347,8 @@ static void draw_menu(vita2d_pgf *pgf) {
             "Final approach. Land smoothly on the aiming point.",
             "The engine fails at 1,500 ft. Glide in and land.",
             "Strong wind across the runway. Crab in, then straighten up.",
-            "Fly 29 km to Redrock Municipal and land. Hold SELECT for the chart.",
-            "Fly 21 km to a short grass strip in the mountains. Touch down early." };
+            "Fly 16 NM to Redrock Municipal and land. Hold SELECT for the chart.",
+            "Fly 11 NM to a short grass strip in the mountains. Touch down early." };
         bool run = ch_running();
         int n = CK_COUNT + (run ? 1 : 0);
         bool tight = (n >= 6);                                    // with the RESUME row the list gets a little more compact
