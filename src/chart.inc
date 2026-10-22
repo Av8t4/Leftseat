@@ -90,8 +90,8 @@ static void draw_chart(vita2d_pgf *pgf) {
         vita2d_pgf_draw_text(pgf, (int)x + 8, (int)y - 6, white, 0.8f, AIRPORTS[k].id);
     }
     vita2d_pgf_draw_text(pgf, MX + 8, MY + 26, dim, 0.7f, "N");
-    vita2d_draw_rectangle(MX + 12, MY + MH - 14, 10000.0f * S, 2, white);          // 10 km scale
-    vita2d_pgf_draw_text(pgf, MX + 18 + (int)(10000.0f * S), MY + MH - 8, white, 0.7f, "10 KM");
+    vita2d_draw_rectangle(MX + 12, MY + MH - 14, 18520.0f * S, 2, white);          // 10 NM scale
+    vita2d_pgf_draw_text(pgf, MX + 18 + (int)(18520.0f * S), MY + MH - 8, white, 0.7f, "10 NM");
 
     // The side column.
     float gs = sqrtf(pl.vel.x * pl.vel.x + pl.vel.z * pl.vel.z);
@@ -104,7 +104,7 @@ static void draw_chart(vita2d_pgf *pgf) {
         ap_bearing(&AIRPORTS[k], &brg, &dist);
         float y = 120.0f + (AP_COUNT - 1 - k) * 74.0f;
         vita2d_pgf_draw_textf(pgf, x0, y, gold, 0.95f, "%s  %s", AIRPORTS[k].id, AIRPORTS[k].name);
-        vita2d_pgf_draw_textf(pgf, x0, y + 24, white, 0.85f, "BEARING %03d    %.1f KM  (%.1f NM)", (int)(brg + 0.5f) % 360, dist / 1000.0f, dist / 1852.0f);
+        vita2d_pgf_draw_textf(pgf, x0, y + 24, white, 0.85f, "BEARING %03d    %.1f NM", (int)(brg + 0.5f) % 360, dist / 1852.0f);
         if (gs > 8.0f) vita2d_pgf_draw_textf(pgf, x0, y + 46, dim, 0.8f, "%d:%02d to go at this speed", (int)(dist / gs / 60.0f), (int)(dist / gs) % 60);
         else           vita2d_pgf_draw_textf(pgf, x0, y + 46, dim, 0.8f, "Runway %02d / %02d", ((int)(AIRPORTS[k].hdg * 57.2958f / 10.0f + 0.5f) + 36) % 36 == 0 ? 36 : ((int)(AIRPORTS[k].hdg * 57.2958f / 10.0f + 0.5f) + 36) % 36, ((int)(AIRPORTS[k].hdg * 57.2958f / 10.0f + 0.5f) + 18) % 36 == 0 ? 36 : ((int)(AIRPORTS[k].hdg * 57.2958f / 10.0f + 0.5f) + 18) % 36);
     }
