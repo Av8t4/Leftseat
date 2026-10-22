@@ -60,7 +60,19 @@ static void add_building(float x, float z, float w, float d, float h,
 #define MT_STEP 0.65f   // fraction of height where rock turns to snow
 #define MT_TOP  0.35f   // half-width of the snow base relative to hb
 
-static void add_mountain2(Mount m, float r, float g, float b, float cr, float cg, float cb) {
+// Mountains are built in two steps: the callers below only record a mountain and its colours; once the rivers, roads
+// and towns exist, settle_mountains() moves any mountain that sits on top of one of them and then builds the faces.
+static float mt_col[MAX_MOUNTS][6];
+static bool  mt_has[MAX_MOUNTS];
+static int   mt_pine_first = MAX_MOUNTS;                       // mountains from here on belong to Pinecrest's valley and stay put
+
+static void add_mountain2(const Mount *mp, float r, float g, float b, float cr, float cg, float cb) {
+    int i = (int)(mp - mounts);
+    if (i < 0 || i >= MAX_MOUNTS) return;
+    mt_col[i][0] = r; mt_col[i][1] = g; mt_col[i][2] = b; mt_col[i][3] = cr; mt_col[i][4] = cg; mt_col[i][5] = cb;
+    mt_has[i] = true;
+}
+static void emit_mountain(Mount m, float r, float g, float b, float cr, float cg, float cb) {
     float hb = m.hb, ht = m.hb * MT_TOP, yh = m.h * MT_STEP;
     V3 bs[4] = { v3(m.x-hb,0,m.z-hb), v3(m.x+hb,0,m.z-hb), v3(m.x+hb,0,m.z+hb), v3(m.x-hb,0,m.z+hb) };
     V3 ts[4] = { v3(m.x-ht,yh,m.z-ht), v3(m.x+ht,yh,m.z-ht), v3(m.x+ht,yh,m.z+ht), v3(m.x-ht,yh,m.z+ht) };
@@ -73,7 +85,7 @@ static void add_mountain2(Mount m, float r, float g, float b, float cr, float cg
         add_face(3, cap, cr, cg, cb);
     }
 }
-static void add_mountain(Mount m, float r, float g, float b) { add_mountain2(m, r, g, b, 245, 245, 250); }   // rock with a snow cap
+static void add_mountain(const Mount *mp, float r, float g, float b) { add_mountain2(mp, r, g, b, 245, 245, 250); }   // rock with a snow cap
 
 // A flat-topped butte (mesa): the sides slope up to a flat top.
 static void add_mesa(Mesa m, float r, float g, float b) {
@@ -254,6 +266,7 @@ static void build_pinecrest(void) {
 // paths along the runway are kept clear.
 static void build_pinecrest_country(void) {
     const Airport *P = &AIRPORTS[AP_PINECREST];
+    mt_pine_first = nmounts;
     for (int side = -1; side <= 1; side += 2)
         for (int k = 0; k < 5 && nmounts < MAX_MOUNTS; k++) {
             float lat = side * (2300.0f + frand(-150.0f, 350.0f)), along = (k - 2) * 1500.0f + frand(-250.0f, 250.0f);
@@ -261,7 +274,7 @@ static void build_pinecrest_country(void) {
             V3 p = ap_pt(P, lat, 0.0f, along);
             mounts[nmounts] = (Mount){ p.x, p.z, hb, h };
             bool tall = h > 950.0f;
-            add_mountain2(mounts[nmounts], 108, 98, 88, tall ? 240.0f : 96.0f, tall ? 240.0f : 120.0f, tall ? 246.0f : 74.0f);
+            add_mountain2(&mounts[nmounts], 108, 98, 88, tall ? 240.0f : 96.0f, tall ? 240.0f : 120.0f, tall ? 246.0f : 74.0f);
             nmounts++;
         }
     for (int k = 0; k < 6 && nmounts < MAX_MOUNTS; k++) {                            // wooded hills, well to the sides of the approaches
@@ -270,14 +283,14 @@ static void build_pinecrest_country(void) {
         float hb = frand(380.0f, 620.0f), h = frand(70.0f, 150.0f);
         V3 p = ap_pt(P, lat, 0.0f, along);
         mounts[nmounts] = (Mount){ p.x, p.z, hb, h };
-        add_mountain2(mounts[nmounts], 44, 86, 48, 54, 100, 56);
+        add_mountain2(&mounts[nmounts], 44, 86, 48, 54, 100, 56);
         nmounts++;
     }
     for (int end = -1; end <= 1; end += 2)                                           // a peak at each end of the valley, off the approach line
         if (nmounts < MAX_MOUNTS) {
             V3 p = ap_pt(P, end * 1900.0f, 0.0f, end * 5600.0f);
             mounts[nmounts] = (Mount){ p.x, p.z, 1250.0f, 1050.0f };
-            add_mountain2(mounts[nmounts], 108, 98, 88, 240, 240, 246);
+            add_mountain2(&mounts[nmounts], 108, 98, 88, 240, 240, 246);
             nmounts++;
         }
 }
@@ -300,12 +313,12 @@ static void build_countryside(void) {
             float lat = side * (2100.0f + k * 900.0f + frand(-150, 150)), along = frand(-700.0f, 700.0f) + (k & 1) * 500.0f;
             float hb = frand(650, 1050), h = frand(520, 1250) + k * 120.0f;
             mounts[nmounts] = (Mount){ mx + ux * along + px * lat, mz + uz * along + pz * lat, hb, h };
-            add_mountain2(mounts[nmounts], 116, 102, 92, h > 950.0f ? 240.0f : 150.0f, h > 950.0f ? 240.0f : 138.0f, h > 950.0f ? 246.0f : 122.0f);
+            add_mountain2(&mounts[nmounts], 116, 102, 92, h > 950.0f ? 240.0f : 150.0f, h > 950.0f ? 240.0f : 138.0f, h > 950.0f ? 246.0f : 122.0f);
             nmounts++;
         }
 
     // Low rolling hills along the route.
-    static const unsigned char HILL[4][3] = { {84,122,60}, {98,120,62}, {110,112,70}, {72,108,58} };
+    static const unsigned char HILL[4][3] = { {104,96,62}, {116,100,66}, {96,88,58}, {122,106,72} };   // earthy browns and olives, so a hill never looks like a flat green field
     for (int k = 0, placed = 0; k < 120 && placed < 28 && nmounts < MAX_MOUNTS; k++) {
         float t = frand(0.04f, 0.97f), lat = frand(-4200.0f, 4200.0f);
         float x = ux * L * t + px * lat, z = uz * L * t + pz * lat;
@@ -313,7 +326,7 @@ static void build_countryside(void) {
         float hb = frand(380, 850), h = frand(55, 150);
         const unsigned char *c = HILL[k & 3];
         mounts[nmounts] = (Mount){ x, z, hb, h };
-        add_mountain2(mounts[nmounts], c[0], c[1], c[2], c[0] * 1.12f, c[1] * 1.10f, c[2] * 1.05f);
+        add_mountain2(&mounts[nmounts], c[0], c[1], c[2], c[0] * 1.10f, c[1] * 1.10f, c[2] * 1.06f);
         nmounts++; placed++;
     }
 #if WORLD_DETAIL >= 2
@@ -387,10 +400,62 @@ static void build_countryside(void) {
 }
 #endif
 
+// Does a square mountain footprint (centre x,z, half width hb) sit on a river, road, highway, town or airport?
+static bool seg_hits_square(float ax, float az, float bx, float bz, float cx, float cz, float h) {
+    float t0 = 0.0f, t1 = 1.0f, dx = bx - ax, dz = bz - az;
+    float p[4] = { -dx, dx, -dz, dz }, q[4] = { ax - (cx - h), (cx + h) - ax, az - (cz - h), (cz + h) - az };
+    for (int k = 0; k < 4; k++) {
+        if (fabsf(p[k]) < 1e-6f) { if (q[k] < 0.0f) return false; continue; }
+        float t = q[k] / p[k];
+        if (p[k] < 0.0f) { if (t > t1) return false; if (t > t0) t0 = t; }
+        else             { if (t < t0) return false; if (t < t1) t1 = t; }
+    }
+    return t0 <= t1;
+}
+static bool mt_conflict(float x, float z, float hb, bool near_ap) {
+    const float M = 100.0f;
+    if (fabsf(x - 700.0f) < hb + M || fabsf(z + 1700.0f) < hb + M) return true;          // the two long roads past the airfield
+    for (int j = 0; j + 1 < nriver; j++)
+        if (seg_hits_square(river_x[j], river_z[j], river_x[j + 1], river_z[j + 1], x, z, hb + M + 40.0f)) return true;
+    for (int i = 0; i + 1 < nroadp; i++)
+        if (!road_new[i + 1] && seg_hits_square(road_x[i], road_z[i], road_x[i + 1], road_z[i + 1], x, z, hb + M)) return true;
+    {
+        V3 he = ap_pt(&AIRPORTS[AP_REDROCK], 330.0f, 0.0f, -220.0f);
+        if (seg_hits_square(704.0f, -300.0f, he.x, he.z, x, z, hb + M)) return true;      // the highway
+    }
+    for (int n = 0; n < ntowns; n++)
+        if (fmaxf(fabsf(x - town_x[n]), fabsf(z - town_z[n])) < hb + 520.0f) return true;
+    if (near_ap)
+        for (int k = 0; k < AP_COUNT; k++)
+            if (sat_dist(x, z, AIRPORTS[k].cx, AIRPORTS[k].cz) < hb + 1200.0f) return true;
+    return false;
+}
+static void settle_mountains(void) {
+    for (int i = 0; i < nmounts; i++) {
+        if (!mt_has[i]) continue;
+        Mount *m = &mounts[i];
+        bool valley = (i >= mt_pine_first);                                  // Pinecrest's ridges are placed by hand: only nudge them a little
+        bool hill = m->h < 200.0f;
+        if (!mt_conflict(m->x, m->z, m->hb, !valley)) continue;
+        float out = atan2f(m->x, m->z), maxr = valley ? 1200.0f : 9000.0f;
+        bool found = false;
+        for (float r = 250.0f; r <= maxr && !found; r += 250.0f)
+            for (int a = 0; a < 16 && !found; a++) {
+                float ang = out + ((a & 1) ? -1.0f : 1.0f) * ((a + 1) >> 1) * (PI_F / 8.0f);
+                float nx = m->x + sinf(ang) * r, nz = m->z + cosf(ang) * r;
+                if (!mt_conflict(nx, nz, m->hb, !valley)) { m->x = nx; m->z = nz; found = true; }
+            }
+        if (!found && hill) { m->hb = 0.0f; m->h = 0.0f; mt_has[i] = false; }   // no room for a little hill: leave it out
+    }
+    for (int i = 0; i < nmounts; i++)
+        if (mt_has[i] && mounts[i].hb > 0.0f)
+            emit_mountain(mounts[i], mt_col[i][0], mt_col[i][1], mt_col[i][2], mt_col[i][3], mt_col[i][4], mt_col[i][5]);
+}
+
 static void build_world(void) {
     srand(1990);
     nfaces = 0; nboxes = 0; nmesas = 0; ntowns = 0; ntown_lights = 0; nriver = 0;
-    nmounts = NUM_MOUNTS; nbridges = 0; nroadp = 0;
+    nmounts = NUM_MOUNTS; nbridges = 0; nroadp = 0; mt_pine_first = MAX_MOUNTS; memset(mt_has, 0, sizeof mt_has);
     vita2d_set_clear_color(RGBA8(118, 176, 236, 255));   // sky
 
     // Airport: hangars along the west side, control tower on the east.
@@ -419,7 +484,7 @@ static void build_world(void) {
         float dist = frand(7000, 11000);
         mounts[k] = (Mount){ sinf(a) * dist, cosf(a) * dist,
                              frand(1500, 2700), frand(1200, 2500) };
-        add_mountain(mounts[k], 118, 104, 92);
+        add_mountain(&mounts[k], 118, 104, 92);
     }
 
     // The second airport and the country around the route to it.
@@ -429,5 +494,6 @@ static void build_world(void) {
     build_countryside();
     build_pinecrest_country();
 #endif
+    settle_mountains();
 }
 
