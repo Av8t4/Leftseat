@@ -17,17 +17,17 @@ static void draw_overlays(vita2d_pgf *pgf) {
             char place[24];
             snprintf(place, sizeof(place), "%s", AIRPORTS[ch_dest_ap()].place);
             for (char *c = place; *c; c++) if (*c >= 'a' && *c <= 'z') *c -= 32;
-            vita2d_pgf_draw_textf(pgf, 480, 28, gold, 0.8f, "%s    %s %03d   %.1f KM", CK_NAMES[ch_kind], place, (int)(brg + 0.5f) % 360, dist / 1000.0f);
+            vita2d_pgf_draw_textf(pgf, 480, 28, gold, 0.8f, "%s    %s %03d   %.1f NM", CK_NAMES[ch_kind], place, (int)(brg + 0.5f) % 360, dist / 1852.0f);
         }
-        else if (to_thr > 0.0f) vita2d_pgf_draw_textf(pgf, 540, 28, gold, 0.8f, "%s CHALLENGE    RUNWAY %.1f KM", CK_NAMES[ch_kind], to_thr);
+        else if (to_thr > 0.0f) vita2d_pgf_draw_textf(pgf, 540, 28, gold, 0.8f, "%s CHALLENGE    RUNWAY %.1f NM", CK_NAMES[ch_kind], to_thr * (1000.0f / 1852.0f));
         else                    vita2d_pgf_draw_textf(pgf, 540, 28, gold, 0.8f, "%s CHALLENGE", CK_NAMES[ch_kind]);
         if (ch_state == CH_FLYING && ch_t < (ch_trip() ? 14.0f : 10.0f)) {
             static const char *const L1[CK_COUNT] = {
                 "Land smoothly near the aiming-point markings, on the centre line.",
                 "The engine has failed! Hold about 70 kt and glide to the runway.",
                 "Strong crosswind: point the nose into the wind to track the runway.",
-                "Take off and fly to Redrock Municipal, about 29 km to the north-north-east.",
-                "Take off and fly west-northwest to Pinecrest, a short grass strip 21 km away." };
+                "Take off and fly to Redrock Municipal, about 16 NM to the north-north-east.",
+                "Take off and fly west-northwest to Pinecrest, a short grass strip 11 NM away." };
             static const char *const L2[CK_COUNT] = {
                 "Use the glide-slope lights beside the runway. Triangle restarts.",
                 "Keep the flaps for the last part of the approach. Triangle restarts.",
