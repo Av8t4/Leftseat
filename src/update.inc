@@ -7,10 +7,13 @@ static const int FF_MULT[3] = { 1, 2, 5 };
 
 static int         gear_msg_t = 0;                  // a short message about the gear (top right)
 static const char *gear_msg   = "";
+static int         trim_msg_t = 0;                  // "TRIMMED" flashes in the middle of the top edge
+
 static void gear_say(const char *m) { gear_msg = m; gear_msg_t = 150; }
 
 static void update(const SceCtrlData *pad, unsigned int pressed) {
     if (gear_msg_t > 0 && !ff_sub) gear_msg_t--;
+    if (trim_msg_t > 0 && !ff_sub) trim_msg_t--;
     if (!ff_sub) {                                                  // Select: a tap changes the camera, holding it shows the chart
         static int  sel_hold;
         static bool sel_used;
@@ -66,9 +69,33 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
     }
     if (pressed & SCE_CTRL_CIRCLE) { if (pl.flaps < 3) pl.flaps++; }
     if (pressed & SCE_CTRL_CROSS)  { if (pl.flaps > 0) pl.flaps--; }
-    if (pad->buttons & SCE_CTRL_LEFT)  pl.trim -= 0.25f * DT;
-    if (pad->buttons & SCE_CTRL_RIGHT) pl.trim += 0.25f * DT;
-    pl.trim = clampf(pl.trim, -0.5f, 0.5f);
+    {   // Pitch trim. Everything is measured in degrees of angle of attack, so it feels the same in every aircraft:
+        // a tap on D-pad left / right nudges the trim by a tenth of a degree and holding it speeds up after a moment.
+        // D-pad down in the air (the wheel brake, which does nothing up there) trims for level flight at the airspeed
+        // you have right now.
+        static int trim_hold;
+        bool tl = (pad->buttons & SCE_CTRL_LEFT) != 0, tr = (pad->buttons & SCE_CTRL_RIGHT) != 0;
+        float per_deg = (PI_F / 180.0f) * PITCH_MA / PITCH_MD;                 // trim units per degree of angle of attack
+        if (tl != tr) {
+            float dir = tr ? 1.0f : -1.0f;
+            if (trim_hold == 0) pl.trim += dir * 0.1f * per_deg;                 // a tap
+            trim_hold++;
+            if (trim_hold > 20) {                                                // held: 0.8 deg/s, rising to 10 deg/s over a second and a half
+                float k = fminf(1.0f, (trim_hold - 20) / 90.0f);
+                pl.trim += dir * (0.8f + k * 9.2f) * per_deg * DT;
+            }
+        } else trim_hold = 0;
+        if ((pressed & SCE_CTRL_DOWN) && !pl.on_ground && pl.pos.y > 30.0f) {   // the angle of attack that holds the weight at this airspeed
+            V3 va = vsub(pl.vel, wx_wind_at(pl.pos));
+            float V = fmaxf(sqrtf(vdot(va, va)), 20.0f);
+            float mfl = WEIGHT_FULL / (WEIGHT_FULL - spec->lb_per_gal * (FUEL_FULL - pl.fuel));
+            float cl = G_ACC / (KL * mfl * V * V);
+            float a_level = clampf((cl - FLAP_CL[pl.flaps]) / CLA + ALPHA0, -0.1f, ALPHA_S - 0.04f);
+            pl.trim = clampf((a_level - ALPHA_TRIM) * PITCH_MA / PITCH_MD, -0.5f, 0.5f);   // (whatever the stick is doing: let go and it stays level)
+            trim_msg_t = 90;
+        }
+        pl.trim = clampf(pl.trim, -0.5f, 0.5f);
+    }
     float ry = stick(pad->ry);                              // right stick up/down: throttle
     if (fabsf(ry) > 0.2f) pl.throttle -= ry * 0.6f * DT;
     pl.throttle = clampf(pl.throttle, 0.0f, 1.0f);
