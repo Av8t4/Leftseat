@@ -2,14 +2,15 @@
 // Part of Left Seat's single translation unit: this file is #included by main.c, in order.
 
 typedef struct { float dist; int idx; } DrawItem;
-static DrawItem items[MAX_FACES + MAX_PFACES];
+#define TREE_IDX0 (MAX_FACES + MAX_PFACES)      // items from here on are trees (index = TREE_IDX0 + position in trees[])
+static DrawItem items[MAX_FACES + MAX_PFACES + 256];
 static int cmp_item(const void *a, const void *b) {
     float da = ((const DrawItem *)a)->dist, db = ((const DrawItem *)b)->dist;
     return (da < db) - (da > db);          // far to near
 }
 // Far-to-near order for the painter's algorithm. A radix sort on the float bits (distances are never negative, so their bit
 // patterns sort the same way the numbers do): linear time and stable, where qsort was about a third of the CPU time of a busy frame.
-static DrawItem items_tmp[MAX_FACES + MAX_PFACES];
+static DrawItem items_tmp[MAX_FACES + MAX_PFACES + 256];
 static void sort_items(int n) {
     DrawItem *src = items, *dst = items_tmp;
     for (int pass = 0; pass < 4; pass++) {
@@ -109,7 +110,7 @@ static void draw_scene(void) {
         draw_plane_shadow();
     }
 
-    draw_trees();
+    collect_trees();
 
     // 4. Solid objects and the aircraft, sorted far to near (painter's algorithm).
     int ni = 0;
@@ -122,6 +123,10 @@ static void draw_scene(void) {
         if (d2 > (cull + rad) * (cull + rad)) continue;                    // lost in the haze
         if (f->top * f->top * FOCAL * FOCAL < 6.25f * d2) continue;        // too low or too far to show even a few pixels
         items[ni].dist = d2; items[ni].idx = i; ni++;
+    }
+    for (int k = 0; k < ntrees; k++) {                                         // trees take their place in the same order
+        V3 d = v3(trees[k].x - cam.pos.x, trees[k].y0 + trees[k].h * 0.4f - cam.pos.y, trees[k].z - cam.pos.z);
+        items[ni].dist = vdot(d, d); items[ni].idx = TREE_IDX0 + k; ni++;
     }
     npf = 0; pf_last = -1;
     if (view_mode != 0) build_plane();
@@ -150,7 +155,9 @@ static void draw_scene(void) {
     sort_items(ni);
     for (int i = 0; i < ni; i++) {
         int idx = items[i].idx;
-        if (idx < MAX_FACES) {
+        if (idx >= TREE_IDX0) {
+            draw_tree(&trees[idx - TREE_IDX0]);
+        } else if (idx < MAX_FACES) {
             const Face *f = &faces[idx];
             draw_world_poly(f->p, f->n, f->color);
         } else {
