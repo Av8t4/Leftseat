@@ -19,7 +19,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check VitaSDK and libraries
         run: |
@@ -44,7 +44,7 @@ jobs:
           ls -l leftseat.vpk
 
       - name: Upload the VPK (Actions tab -> the run -> Artifacts)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: leftseat-vpk
           path: build/leftseat.vpk
