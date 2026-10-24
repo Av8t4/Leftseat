@@ -11,12 +11,13 @@ static int         trim_msg_t = 0;                  // "TRIMMED" flashes in the 
 
 static void gear_say(const char *m) { gear_msg = m; gear_msg_t = 150; }
 
+static bool sel_used;                                              // SELECT was used for something else this press (no camera change when it is released)
+
 static void update(const SceCtrlData *pad, unsigned int pressed) {
     if (gear_msg_t > 0 && !ff_sub) gear_msg_t--;
     if (trim_msg_t > 0 && !ff_sub) trim_msg_t--;
     if (!ff_sub) {                                                  // Select: a tap changes the camera, holding it shows the chart
         static int  sel_hold;
-        static bool sel_used;
         bool sel = (pad->buttons & SCE_CTRL_SELECT) != 0;
         if (pressed & SCE_CTRL_SELECT) {
             sel_hold = 0; sel_used = false;

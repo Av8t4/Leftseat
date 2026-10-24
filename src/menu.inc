@@ -368,7 +368,8 @@ static void draw_menu(vita2d_pgf *pgf) {
             { "Select (tap)",              "Switch camera: cockpit / chase" },
             { "Select (hold)",             "Chart of the whole area" },
             { "L + R + Select",            "Invert the pitch axis" },
-            { "START",                     "Pause and return to the menu" } };
+            { "START",                     "Pause and return to the menu" },
+            { "Select + START",            "Save a screenshot (ux0:data/leftseat_001.png, 002, ...)" } };
         const int nk = (int)(sizeof(KEYS) / sizeof(KEYS[0])), rowh = 22;
         int h = 52 + nk * rowh + 88, top = (SCREEN_H - h) / 2;
         vita2d_draw_rectangle(60, top, 840, h, gold);
@@ -431,5 +432,6 @@ static void draw_menu(vita2d_pgf *pgf) {
         vita2d_pgf_draw_text(pgf, 256, 308, RGBA8(200, 214, 240, 255), 0.8f, "Not implemented yet - coming in a later version.");
         vita2d_pgf_draw_text(pgf, 256, 334, RGBA8(150, 172, 215, 255), 0.75f, "Press X to close");
     }
+    draw_shot_msg(pgf);
 }
 

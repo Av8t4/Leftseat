@@ -39,6 +39,7 @@
 #include "airports.inc"
 #include "scene.inc"
 #include "panel.inc"
+#include "screenshot.inc"
 #include "overlays.inc"
 #include "chart.inc"
 #include "menu.inc"
@@ -88,6 +89,10 @@ int main(void) {
     for (;;) {
         sceCtrlPeekBufferPositive(0, &pad, 1);
         unsigned int pressed = pad.buttons & ~prev.buttons;
+        if ((pad.buttons & SCE_CTRL_SELECT) && (pressed & SCE_CTRL_START)) {       // SELECT + START: save a screenshot
+            shot_pending = true;
+            pressed &= ~SCE_CTRL_START;                                            // (not a "back to the menu")
+        }
 
         if (game_state == ST_MENU) {
             int act = menu_update(&pad, pressed);
@@ -177,6 +182,13 @@ int main(void) {
             }
         }
 
+        if (shot_pending) {                                           // the frame is drawn: save it
+            shot_pending = false;
+            take_screenshot();
+            shot_msg_t = 150;
+            sel_used = true;                                          // and let go of SELECT without switching the camera
+            if (logfile) { fprintf(logfile, "screenshot: %s\n", shot_msg); fflush(logfile); }
+        }
         snd_game_update(&pad);
         prev = pad;
         frame_count++;

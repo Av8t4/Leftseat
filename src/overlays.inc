@@ -50,6 +50,7 @@ static void draw_overlays(vita2d_pgf *pgf) {
         int tw = vita2d_pgf_text_width(pgf, 0.8f, "TRIMMED");
         vita2d_pgf_draw_text(pgf, (SCREEN_W - tw) / 2, 68, RGBA8(230, 190, 60, 255), 0.8f, "TRIMMED");
     }
+    draw_shot_msg(pgf);
     if (spec->retract && !pl.crashed && gear_msg_t > 0) {                 // gear refusals ("too fast" etc.): top right
         int mw = vita2d_pgf_text_width(pgf, 0.8f, gear_msg);
         vita2d_pgf_draw_text(pgf, SCREEN_W - mw - 20, 68, RGBA8(255, 150, 60, 255), 0.8f, gear_msg);
