@@ -84,6 +84,7 @@ The same list is in the game: choose **CONTROLS** on the start menu.
 | Select (hold) | Chart of the whole area |
 | L + R + Select | Invert the pitch axis |
 | START | Pause and return to the menu |
+| Select + START | Save a screenshot as a PNG in ux0:data/ (leftseat_001.png, leftseat_002.png, ...). Copy the files off the Vita with VitaShell |
 
 ## Aircraft
 
