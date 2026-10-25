@@ -81,10 +81,10 @@ The same list is in the game: choose **CONTROLS** on the start menu.
 | □ | Landing gear up / down (K-30 only). Refused on the ground and above about 200 kt; takes about 4.5 seconds; landing with it up is a crash |
 | △ | Reset the aircraft (restarts the attempt in a challenge) |
 | Select (tap) | Switch camera (cockpit / chase) |
-| Select (hold) | Chart of the whole area |
+| Select (hold) | Chart of the whole area. While it is open, L / R scroll the airport list |
 | L + R + Select | Invert the pitch axis |
 | START | Pause and return to the menu |
-| Select + START | Save a screenshot as a PNG in ux0:data/ (leftseat_001.png, leftseat_002.png, ...). Copy the files off the Vita with VitaShell |
+| Select + START | Save a screenshot as a PNG in `ux0:data/` (`leftseat_001.png`, `leftseat_002.png`, ...). Copy the files off the Vita with VitaShell |
 
 ## Aircraft
 
@@ -109,7 +109,7 @@ strike) is a crash.
 
 ## The world
 
-Three airports and the country between them. Hold **Select** for a chart of the whole area showing the airports,
+The airports and the country between them. Hold **Select** for a chart of the whole area showing the airports,
 your position and heading, your track so far, and the bearing and distance to each airport.
 
 | Airport | Where | Description |
@@ -117,6 +117,7 @@ your position and heading, your track so far, and the bearing and distance to ea
 | **Knowles Field (KAK)** | Home | Runway with numbers and aiming-point markings, edge and end lights, glide-slope (PAPI) lights, taxiway and apron, a terminal and hangars |
 | **Redrock Municipal (RDR)** | About 16 NM north-north-east of KAK | Runway 07/25, apron, terminal, tower and hangars, and a beacon you can see from far away at night. The farmland turns to red desert with buttes around it |
 | **Pinecrest Airstrip (PNC)** | About 11 NM west-north-west of KAK | A 650 m mown-grass strip (runway 12/30, no markings) with a small hangar and cabin, in a forested valley between two ridges. After dark it has low runway lights; from far away you need the chart |
+| **Lana Lake Regional (LLK)** | About 8 NM south of KAK | Runway 16/34 with markings, PAPI lights, a parallel taxiway, apron, terminal, tower and three hangars, on the shore of a lake. Edge, threshold and taxiway lights and a beacon after dark |
 
 Between KAK and RDR there is a mountain pass, low hills, towns, a highway, and a river that runs on to a lake at
 its mouth. Roads wind through the countryside and some of them cross the river on bridges. The towns have
