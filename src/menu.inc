@@ -226,6 +226,32 @@ static void draw_menu_plane(float cx, float cy, float s, float ang, float spin, 
     fill_poly_panel(pr, 4, dark);
 }
 
+// Block-letter title built from plain rectangles, so it stays crisp at any size
+// (scaled PGF text smears into boxes at this size).
+static void draw_title_block(float x, float y, unsigned int col) {
+    const float w = 36, h = 52, t = 10, gap = 8;
+    const char *s = "LEFT SEAT";
+    for (; *s; s++) {
+        char c = *s;
+        if (c == ' ') { x += 28; continue; }
+        float m = y + h / 2 - t / 2;
+        switch (c) {
+        case 'L': vita2d_draw_rectangle(x, y, t, h, col); vita2d_draw_rectangle(x, y + h - t, w, t, col); break;
+        case 'E': vita2d_draw_rectangle(x, y, t, h, col); vita2d_draw_rectangle(x, y, w, t, col);
+                  vita2d_draw_rectangle(x, m, w - 4, t, col); vita2d_draw_rectangle(x, y + h - t, w, t, col); break;
+        case 'F': vita2d_draw_rectangle(x, y, t, h, col); vita2d_draw_rectangle(x, y, w, t, col);
+                  vita2d_draw_rectangle(x, m, w - 4, t, col); break;
+        case 'T': vita2d_draw_rectangle(x, y, w, t, col); vita2d_draw_rectangle(x + (w - t) / 2, y, t, h, col); break;
+        case 'S': vita2d_draw_rectangle(x, y, w, t, col); vita2d_draw_rectangle(x, y, t, h / 2 + t / 2, col);
+                  vita2d_draw_rectangle(x, m, w, t, col); vita2d_draw_rectangle(x + w - t, m, t, h / 2 + t / 2, col);
+                  vita2d_draw_rectangle(x, y + h - t, w, t, col); break;
+        case 'A': vita2d_draw_rectangle(x, y, t, h, col); vita2d_draw_rectangle(x + w - t, y, t, h, col);
+                  vita2d_draw_rectangle(x, y, w, t, col); vita2d_draw_rectangle(x, m, w, t, col); break;
+        }
+        x += w + gap;
+    }
+}
+
 static void draw_menu(vita2d_pgf *pgf) {
     float t = frame_count / 60.0f;
     unsigned int gold = RGBA8(255, 206, 130, 255), white = RGBA8(255, 255, 255, 255);
@@ -270,8 +296,8 @@ static void draw_menu(vita2d_pgf *pgf) {
     draw_menu_plane(cx, cy, 118.0f, ang, t * 30.0f, 0);
 
     // Title.
-    vita2d_pgf_draw_text(pgf, 63, 123, RGBA8(8, 16, 44, 255), 3.0f, "LEFT SEAT");
-    vita2d_pgf_draw_text(pgf, 60, 120, white, 3.0f, "LEFT SEAT");
+    draw_title_block(63, 73, RGBA8(8, 16, 44, 255));
+    draw_title_block(60, 70, white);
     vita2d_pgf_draw_text(pgf, 64, 160, gold, 1.05f, "A KYLE KNOWLES FLIGHT SIMULATOR");
 
     // Menu items.
