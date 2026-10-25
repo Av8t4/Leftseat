@@ -140,11 +140,12 @@ static void add_lathe(float cx, float cz, const float *rad, const float *hgt, in
 /* ------------------------------------------------------------------ */
 
 typedef struct { float cx, cz, hdg, s, c; const char *name, *id; float hl, hw; const char *place; } Airport;      // s, c: sine and cosine of the runway heading; hl, hw: half length and half width of the runway
-enum { AP_HOME = 0, AP_REDROCK, AP_PINECREST, AP_COUNT };
+enum { AP_HOME = 0, AP_REDROCK, AP_PINECREST, AP_LANA, AP_COUNT };
 static const Airport AIRPORTS[AP_COUNT] = {
     {     0.0f,     0.0f, 0.0f,       0.0f,       1.0f,       "KNOWLES FIELD",       "KAK", 1000.0f, 22.0f, "Knowles Field" },
     { 14500.0f, 25500.0f, 1.2217305f, 0.9396926f, 0.3420201f, "REDROCK MUNICIPAL",  "RDR", 1000.0f, 22.0f, "Redrock" },        // runway 07 / 25
     {-19000.0f,  8900.0f, 2.0943951f, 0.8660254f, -0.5f,      "PINECREST AIRSTRIP", "PNC",  325.0f, 12.0f, "Pinecrest" },      // grass, runway 12 / 30
+    {  4200.0f,-14800.0f, 2.7925268f, 0.3420201f,-0.9396926f, "LANA LAKE REGIONAL", "LLK",  800.0f, 18.0f, "Lana Lake" },     // 8 NM south of home, runway 16 / 34, the lake to its left
 };
 static V3 ap_pt(const Airport *a, float lx, float y, float lz) {
     return v3(a->cx + lx * a->c + lz * a->s, y, a->cz - lx * a->s + lz * a->c);
@@ -259,6 +260,20 @@ static void build_pinecrest(void) {
     ap_building(a, 34.0f, -40.0f, 14.0f, 18.0f, 6.0f, 150, 108, 70);          // open hangar
     ap_building(a, 52.0f,  20.0f,  8.0f,  6.0f, 3.6f, 122, 84, 56);           // cabin
     ap_building(a, 40.0f,  72.0f,  3.0f,  3.0f, 2.4f, 178, 62, 48);           // fuel store
+}
+
+// Lana Lake Regional: a small paved airport with a terminal, tower and three hangars on the right of the runway.
+static void build_lana(void) {
+    const Airport *a = &AIRPORTS[AP_LANA];
+    ap_building(a, 165.0f, -160.0f, 30.0f, 70.0f,  8.0f, 205, 196, 170);      // terminal
+    ap_building(a, 160.0f,  -40.0f,  7.0f,  7.0f, 20.0f, 214, 208, 198);      // tower
+    {
+        V3 c0 = ap_pt(a, 160.0f, 0.0f, -40.0f);
+        add_box_rot(c0.x, c0.z, 12.0f, 12.0f, 20.0f, 25.0f, a, 80.0f, 120.0f, 172.0f);   // tower cab
+    }
+    for (int k = 0; k < 3; k++)                                                 // hangars
+        ap_building(a, 135.0f, 170.0f + 75.0f * k, 50.0f, 60.0f, 12.0f, 150 + 14 * k, 156 + 10 * k, 172 + 6 * k);
+    ap_building(a, 165.0f,  -8.0f, 8.0f, 8.0f, 9.0f, 224, 224, 228);          // fuel tank
 }
 
 #if WORLD_DETAIL >= 1
@@ -490,6 +505,7 @@ static void build_world(void) {
     // The second airport and the country around the route to it.
     build_redrock();
     build_pinecrest();
+    build_lana();
 #if WORLD_DETAIL >= 1
     build_countryside();
     build_pinecrest_country();

@@ -140,13 +140,14 @@ static void draw_ap_night(const Airport *a) {
 }
 
 // The rotating airport beacon on the tower: visible from far away at night.
-static void draw_beacon(const Airport *a) {
+static void draw_beacon_at(const Airport *a, float lx, float lz, float hy) {
     bool on = ((frame_count / 24) & 1) != 0;
-    V3 b = ap_pt(a, -80.0f, 38.0f, -100.0f);
+    V3 b = ap_pt(a, lx, hy, lz);
     light_far = 45000.0f;
     draw_light(b.x, b.y, b.z, 3.2f, on ? RGBA8(255, 246, 214, 255) : RGBA8(80, 245, 120, 255));
     light_far = 9000.0f;
 }
+static void draw_beacon(const Airport *a) { draw_beacon_at(a, -80.0f, -100.0f, 38.0f); }
 
 static void draw_town_lights(void) {
     unsigned int win = RGBA8(255, 214, 130, 255);
@@ -204,10 +205,70 @@ static void draw_pinecrest_all(void) {
     }
 }
 
-// Windsocks at the two outlying airports, when you are near enough to see them.
+
+/* ------------------------------------------------------------------ */
+/* Lana Lake Regional: a small paved airport beside a lake              */
+/* ------------------------------------------------------------------ */
+
+static void draw_lana_all(void) {
+    const Airport *a = &AIRPORTS[AP_LANA];
+    const float hl = a->hl, hw = a->hw;
+    const unsigned int wht = RGBA8(235, 235, 235, 255), tw = RGBA8(92, 88, 88, 255), apron = RGBA8(150, 146, 138, 255);
+    float dc = sat_dist(cam.pos.x, cam.pos.z, a->cx, a->cz);
+    if (dc > 14000.0f) return;
+    ap_quad(a, -hw, -hl, hw, hl, RGBA8(72, 72, 78, 255));                    // runway
+    ap_quad(a, -hw, -hl, -hw + 1.5f, hl, wht);
+    ap_quad(a, hw - 1.5f, -hl, hw, hl, wht);
+    for (float z = -hl + 60.0f; z < hl - 60.0f; z += 60.0f) ap_quad(a, -1.0f, z, 1.0f, z + 30.0f, wht);
+    for (int e = 0; e < 2; e++) {
+        float z0 = e ? hl - 40.0f : -hl + 10.0f;
+        for (float x = -13.0f; x <= 13.0f; x += 6.0f) ap_quad(a, x - 1.0f, z0, x + 1.0f, z0 + 30.0f, wht);
+    }
+    if (dc < 3800.0f) {
+        ap_quad(a, 38.0f, -hl + 20.0f, 50.0f, hl - 20.0f, tw);              // parallel taxiway, connectors and aprons
+        ap_quad(a, 18.0f, -hl + 8.0f, 38.0f, -hl + 26.0f, tw);
+        ap_quad(a, 18.0f, hl - 26.0f, 38.0f, hl - 8.0f, tw);
+        ap_quad(a, 18.0f, -6.0f, 38.0f, 6.0f, tw);
+        ap_quad(a, 50.0f, -250.0f, 150.0f, -60.0f, apron);
+        ap_quad(a, 50.0f, 130.0f, 110.0f, 420.0f, apron);
+        ap_quad(a, 43.7f, -hl + 20.0f, 44.3f, hl - 20.0f, RGBA8(232, 202, 64, 255));
+        static const int NUM[2][2] = { { 1, 6 }, { 3, 4 } };                   // runway 16 at the north end of the frame, 34 at the other
+        for (int north = 0; north < 2; north++) {
+            ap_digit(a, NUM[north][0], north, -9.0f, wht);
+            ap_digit(a, NUM[north][1], north,  2.0f, wht);
+            for (int s = -1; s <= 1; s += 2) ap_rwy_rect(a, north, s * 4.0f, s * 6.0f, 280.0f, 302.0f, wht);
+        }
+    }
+    if (dc < 4500.0f) draw_ap_papi(a);
+    if (tod != TOD_DAY) {
+        unsigned int lw = RGBA8(255, 246, 214, 255), red = RGBA8(255, 62, 44, 255), grn = RGBA8(80, 245, 120, 255);
+        unsigned int blu = RGBA8(80, 140, 255, 255), win = RGBA8(255, 224, 140, 255);
+        if (dc < 9000.0f) {
+            for (float z = -hl; z <= hl + 0.1f; z += 60.0f) {
+                V3 l = ap_pt(a, -hw - 1.0f, 0.5f, z), r = ap_pt(a, hw + 1.0f, 0.5f, z);
+                draw_light(l.x, l.y, l.z, 1.5f, lw);
+                draw_light(r.x, r.y, r.z, 1.5f, lw);
+            }
+            for (int i = 0; i < 6; i++) {
+                float x = -14.0f + i * 5.6f;
+                V3 g = ap_pt(a, x, 0.5f, -hl - 4.0f), rr = ap_pt(a, x, 0.5f, hl + 4.0f);
+                draw_light(g.x, g.y, g.z, 1.8f, grn);
+                draw_light(rr.x, rr.y, rr.z, 1.8f, red);
+            }
+            for (float z = -hl + 20.0f; z <= hl - 20.0f; z += 80.0f) { V3 t = ap_pt(a, 51.0f, 0.4f, z); draw_light(t.x, t.y, t.z, 1.4f, blu); }
+            for (float z = -230.0f; z <= -80.0f; z += 50.0f) { V3 t = ap_pt(a, 151.0f, 0.6f, z); draw_light(t.x, t.y, t.z, 1.6f, lw); }
+            for (int i = 0; i < 6; i++) { V3 w = ap_pt(a, 149.8f, 4.5f, -190.0f + i * 10.0f); draw_light(w.x, w.y, w.z, 1.8f, win); }
+            for (int i = 0; i < 3; i++) { V3 w = ap_pt(a, 156.0f, 22.0f, -43.0f + i * 3.0f); draw_light(w.x, w.y, w.z, 1.8f, win); }
+        }
+        draw_beacon_at(a, 160.0f, -40.0f, 28.0f);
+    }
+}
+
+// Windsocks at the outlying airports, when you are near enough to see them.
 static void build_outlying_windsocks(void) {
-    V3 p[2] = { ap_pt(&AIRPORTS[AP_REDROCK], -34.0f, 0.0f, -700.0f), ap_pt(&AIRPORTS[AP_PINECREST], 24.0f, 0.0f, -110.0f) };
-    for (int i = 0; i < 2; i++) {
+    V3 p[3] = { ap_pt(&AIRPORTS[AP_REDROCK], -34.0f, 0.0f, -700.0f), ap_pt(&AIRPORTS[AP_PINECREST], 24.0f, 0.0f, -110.0f),
+                ap_pt(&AIRPORTS[AP_LANA], -34.0f, 0.0f, -560.0f) };
+    for (int i = 0; i < 3; i++) {
         float dx = p[i].x - cam.pos.x, dz = p[i].z - cam.pos.z;
         if (dx * dx + dz * dz < 3000.0f * 3000.0f) build_windsock_at(p[i].x, p[i].z);
     }

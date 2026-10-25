@@ -103,6 +103,7 @@ static void draw_scene(void) {
     draw_night_lights();
     draw_redrock_all();
     draw_pinecrest_all();
+    draw_lana_all();
     draw_landing_light();
 
     // 3b. The aircraft's shadow (not needed in the cockpit).

@@ -1,12 +1,12 @@
 // Left Seat: the chart you see while holding Select - both airports, the mountains, towns, river, your track and your position.
 // Part of Left Seat's single translation unit: this file is #included by main.c, in order.
 
-// North is up. The chart is a fixed window of about 51 x 42 km: both airports, the western and southern mountains, everything.
+// North is up. The chart is a fixed window of about 60 x 48 km: all the airports, the western and southern mountains, everything.
 static void draw_chart(vita2d_pgf *pgf) {
     const float PX = 100.0f, PY = 14.0f, PW = 760.0f, PH = 350.0f;               // the card (kept inside the windscreen opening: clear of the posts, roof, sill and glareshield)
     const float MX = 116.0f, MY = 28.0f, MW = 400.0f, MH = 324.0f;               // the map inside it
-    const float S = MH / 42100.0f;                                               // pixels per metre
-    const float WX0 = -1700.0f, WZ0 = 10050.0f;                                   // world point at the middle of the map
+    const float S = MH / 48600.0f;                                               // pixels per metre
+    const float WX0 = -1700.0f, WZ0 = 7000.0f;                                    // world point at the middle of the map
     const unsigned int gold = RGBA8(255, 206, 130, 255), white = RGBA8(255, 255, 255, 255), dim = RGBA8(170, 184, 214, 255);
     #define CH_SX(x) (MX + MW * 0.5f + ((x) - WX0) * S)
     #define CH_SY(z) (MY + MH * 0.5f - ((z) - WZ0) * S)
@@ -99,16 +99,30 @@ static void draw_chart(vita2d_pgf *pgf) {
     vita2d_pgf_draw_text(pgf, x0, 52, gold, 1.2f, "CHART");
     vita2d_pgf_draw_textf(pgf, x0, 82, white, 0.8f, "HDG %03d    ALT %d FT    GS %d KT", ((int)(pl.hdg * 57.2958f + 0.5f)) % 360,
                           (int)(fmaxf(0.0f, pl.pos.y) * 3.281f), (int)(gs * 1.944f));
-    for (int k = AP_COUNT - 1; k >= 0; k--) {
+    // The airport list scrolls with the L and R triggers (they don't turn your head while the chart is open). A line is drawn only
+    // when it fits completely inside the window, so nothing spills over the heading or the footer.
+    const float LT = 96.0f, LB = 338.0f, STEP = 78.0f;
+    for (int k = 0; k < AP_COUNT; k++) {
         float brg, dist;
         ap_bearing(&AIRPORTS[k], &brg, &dist);
-        float y = 120.0f + (AP_COUNT - 1 - k) * 74.0f;
-        vita2d_pgf_draw_textf(pgf, x0, y, gold, 0.95f, "%s  %s", AIRPORTS[k].id, AIRPORTS[k].name);
-        vita2d_pgf_draw_textf(pgf, x0, y + 24, white, 0.85f, "BEARING %03d    %.1f NM", (int)(brg + 0.5f) % 360, dist / 1852.0f);
-        if (gs > 8.0f) vita2d_pgf_draw_textf(pgf, x0, y + 46, dim, 0.8f, "%d:%02d to go at this speed", (int)(dist / gs / 60.0f), (int)(dist / gs) % 60);
-        else           vita2d_pgf_draw_textf(pgf, x0, y + 46, dim, 0.8f, "Runway %02d / %02d", ((int)(AIRPORTS[k].hdg * 57.2958f / 10.0f + 0.5f) + 36) % 36 == 0 ? 36 : ((int)(AIRPORTS[k].hdg * 57.2958f / 10.0f + 0.5f) + 36) % 36, ((int)(AIRPORTS[k].hdg * 57.2958f / 10.0f + 0.5f) + 18) % 36 == 0 ? 36 : ((int)(AIRPORTS[k].hdg * 57.2958f / 10.0f + 0.5f) + 18) % 36);
+        float y = 122.0f + k * STEP - chart_scroll;
+        if (y - 20.0f >= LT && y <= LB)
+            vita2d_pgf_draw_textf(pgf, x0, y, gold, 0.95f, "%s  %s", AIRPORTS[k].id, AIRPORTS[k].name);
+        if (y + 24.0f - 18.0f >= LT && y + 24.0f <= LB)
+            vita2d_pgf_draw_textf(pgf, x0, y + 24, white, 0.85f, "BEARING %03d    %.1f NM", (int)(brg + 0.5f) % 360, dist / 1852.0f);
+        if (y + 46.0f - 18.0f >= LT && y + 46.0f <= LB) {
+            int r1 = ((int)(AIRPORTS[k].hdg * 57.2958f / 10.0f + 0.5f) + 36) % 36, r2 = ((int)(AIRPORTS[k].hdg * 57.2958f / 10.0f + 0.5f) + 18) % 36;
+            if (gs > 8.0f) vita2d_pgf_draw_textf(pgf, x0, y + 46, dim, 0.8f, "%d:%02d to go at this speed", (int)(dist / gs / 60.0f), (int)(dist / gs) % 60);
+            else           vita2d_pgf_draw_textf(pgf, x0, y + 46, dim, 0.8f, "Runway %02d / %02d", r1 == 0 ? 36 : r1, r2 == 0 ? 36 : r2);
+        }
     }
-    vita2d_pgf_draw_text(pgf, x0, 346, dim, 0.8f, "Release SELECT to close");
+    {                                                                              // scroll bar
+        float full = AP_COUNT * STEP, view = LB - LT, th = fmaxf(24.0f, view * view / full);
+        float ty = LT + (view - th) * (chart_scroll / CHART_SCROLL_MAX);
+        vita2d_draw_rectangle(PX + PW - 10.0f, LT, 3.0f, view, RGBA8(40, 56, 90, 255));
+        vita2d_draw_rectangle(PX + PW - 10.0f, ty, 3.0f, th, gold);
+    }
+    vita2d_pgf_draw_text(pgf, x0, 356, dim, 0.7f, "L / R: scroll    Release SELECT");
     #undef CH_SX
     #undef CH_SY
 }

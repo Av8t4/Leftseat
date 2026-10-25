@@ -58,10 +58,11 @@ static unsigned int field_color(int i, int j, bool dark) {
 
 // Lakes: irregular octagons with a sandy shore.
 typedef struct { float x, z, rx, rz; } Lake;
-#define NLAKES 4
+#define NLAKES 5
 static const Lake LAKES[NLAKES] = { { -1800.0f, 2300.0f, 520.0f, 380.0f }, { 2600.0f, 1200.0f, 700.0f, 450.0f },
                                     { -2600.0f, -2600.0f, 600.0f, 500.0f },
-                                    { 18450.0f, -1400.0f, 850.0f, 620.0f } };      // the river ends in this one
+                                    { 18450.0f, -1400.0f, 850.0f, 620.0f },       // the river ends in this one
+                                    { 5234.0f, -14424.0f, 600.0f, 420.0f } };      // Lana Lake, 1100 m to the left of Lana Lake Regional's runway
 
 static void lake_outline(int n, float k, V3 *out) {
     const Lake *L = &LAKES[n];
@@ -114,6 +115,11 @@ static bool tree_ok(float x, float z) {
         float lx, lz;
         ap_local(&AIRPORTS[AP_PINECREST], x, z, &lx, &lz);
         if (lx > -50.0f && lx < 90.0f && fabsf(lz) < AIRPORTS[AP_PINECREST].hl + 70.0f) return false;
+    }
+    {                                                                         // keep Lana Lake Regional clear
+        float lx, lz;
+        ap_local(&AIRPORTS[AP_LANA], x, z, &lx, &lz);
+        if (lx > -120.0f && lx < 260.0f && fabsf(lz) < AIRPORTS[AP_LANA].hl + 150.0f) return false;
     }
     if (fabsf(x) < 320.0f && fabsf(z) < 1400.0f) return false;              // airport
     if (fabsf(x - 150.0f) < 120.0f && fabsf(z) < 500.0f) return false;      // terminal area

@@ -392,7 +392,7 @@ static void draw_menu(vita2d_pgf *pgf) {
             { "Square",                    "Landing gear up / down (K-30 only)" },
             { "Triangle",                  "Reset the aircraft (restart the attempt in a challenge)" },
             { "Select (tap)",              "Switch camera: cockpit / chase" },
-            { "Select (hold)",             "Chart of the whole area" },
+            { "Select (hold)",             "Chart (L / R scroll the list)" },
             { "L + R + Select",            "Invert the pitch axis" },
             { "START",                     "Pause and return to the menu" },
             { "Select + START",            "Save a screenshot (ux0:data/leftseat_001.png, 002, ...)" } };

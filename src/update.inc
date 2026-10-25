@@ -37,6 +37,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
             }
             sel_hold = 0;
             chart_open = false;
+            chart_scroll = 0.0f;
         }
     }
     if (pressed & SCE_CTRL_TRIANGLE) { if (game_mode == MODE_LANDING) challenge_begin(); else reset_free(); return; }
@@ -51,7 +52,9 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
         static float look_side = 1.0f;
         bool lb = (pad->buttons & SCE_CTRL_LTRIGGER) != 0, rb = (pad->buttons & SCE_CTRL_RTRIGGER) != 0;
         float lt = 0.0f;
-        if (lb && rb)  lt = (view_mode == 1) ? PI_F * look_side : 0.0f;       // chase view: swing round to the front; cockpit: stay ahead
+        if (chart_open) {                              // chart open: L / R scroll the airport list instead of looking round
+            chart_scroll = clampf(chart_scroll + ((rb ? 1.0f : 0.0f) - (lb ? 1.0f : 0.0f)) * 240.0f * DT, 0.0f, CHART_SCROLL_MAX);
+        } else if (lb && rb)  lt = (view_mode == 1) ? PI_F * look_side : 0.0f;       // chase view: swing round to the front; cockpit: stay ahead
         else if (lb)   { lt = -0.5f * PI_F; look_side = -1.0f; }
         else if (rb)   { lt =  0.5f * PI_F; look_side =  1.0f; }
         look_ang += (lt - look_ang) * 0.22f;
