@@ -18,6 +18,8 @@ typedef struct {
     bool  nose_first, crashed, new_best;
     int   p_sink, p_line, p_point, p_att, penalty, total;
     float trip_s, fuel_used;              // cross-country: time in the air and fuel burned
+    int   rings_hit, p_rings, p_time;     // lake rings: rings flown through, and the points for them and for speed
+    float par_s;                          // lake rings: the time that earns the full speed bonus
     char  note[56];
 } ChResult;
 
@@ -28,12 +30,13 @@ static bool     ch_air_after;
 static int      ch_land_ap;                 // which airport you touched down at
 static bool     ch_xc_up;                   // cross-country: the aircraft has been well off the ground
 static float    ch_fuel0;
-enum { CK_LANDING = 0, CK_ENGINE, CK_XWIND, CK_XCOUNTRY, CK_BUSH, CK_COUNT };
-static const char *const CK_NAMES[CK_COUNT] = { "LANDING", "ENGINE OUT", "CROSSWIND", "CROSS-COUNTRY", "BACKCOUNTRY" };
-static const char *const CK_KEYS[CK_COUNT]  = { "landing", "engine", "xwind", "xcountry", "bush" };
+enum { CK_LANDING = 0, CK_ENGINE, CK_XWIND, CK_XCOUNTRY, CK_BUSH, CK_RINGS, CK_COUNT };
+static const char *const CK_NAMES[CK_COUNT] = { "LANDING", "ENGINE OUT", "CROSSWIND", "CROSS-COUNTRY", "BACKCOUNTRY", "LAKE RINGS" };
+static const char *const CK_KEYS[CK_COUNT]  = { "landing", "engine", "xwind", "xcountry", "bush", "rings" };
 static int      ch_kind;                    // which challenge is running (or was run last)
 // The trip challenges start on the home runway and finish on a runway somewhere else.
 static bool ch_trip(void)    { return ch_kind == CK_XCOUNTRY || ch_kind == CK_BUSH; }
+static bool ch_rings(void)   { return ch_kind == CK_RINGS; }
 static int  ch_dest_ap(void) { return ch_kind == CK_BUSH ? AP_PINECREST : AP_REDROCK; }
 static int      ch_best_a[AC_COUNT][CK_COUNT], ch_att_a[AC_COUNT][CK_COUNT];     // best score and attempts, for each aircraft and challenge
 #define ch_best     ch_best_a[ac_flying][ch_kind]
@@ -86,6 +89,56 @@ static void challenge_begin_approach(bool crosswind) {
     pl.on_ground = false; pl.touched = false; pl.rpm = 2000.0f; pl.gamma_prev = V;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Lake rings: fly through a course of rings over and around Lana Lake  */
+/* ------------------------------------------------------------------ */
+
+// The course in Lana Lake Regional's frame: across the runway (left is negative), height above the ground, along the
+// runway. It starts on the north side, bends round the lake and runs on to the south. Every leg turns less than 25 degrees.
+// (world.inc keeps mountains and hills off this course, using a copy of these points: change both together.)
+#define NRINGS 7
+static const float RING_PT[NRINGS + 1][3] = {
+    { -250.0f, 130.0f, -3100.0f },                                  // where you start (not a ring)
+    { -420.0f, 110.0f, -2200.0f }, { -720.0f,  90.0f, -1250.0f }, { -1050.0f, 75.0f, -350.0f }, { -1300.0f, 65.0f,  550.0f },
+    { -1250.0f, 70.0f, 1500.0f }, { -900.0f,  90.0f,  2400.0f }, {  -450.0f, 110.0f, 3200.0f } };
+static int     ch_ring_i;                   // the ring you are flying to
+static int     ch_ring_hit;                 // rings flown through so far
+static V3      ch_ring_prev;                // where the aircraft was last frame
+static bool    ch_ring_prev_ok;
+static float   ch_ring_r;                   // hole radius (bigger for the faster aircraft)
+static float   ch_ring_par;                 // par time for the whole course
+static V3 ring_wpos(int k) { return ap_pt(&AIRPORTS[AP_LANA], RING_PT[k][0], RING_PT[k][1], RING_PT[k][2]); }   // k = 0 is the start, 1.. the rings
+static V3 ring_pos(int i)  { return ring_wpos(i + 1); }
+static V3 ring_nrm(int i) {                                         // the way the course runs through ring i
+    V3 a = ring_wpos(i), b = ring_wpos(i + 2 > NRINGS ? NRINGS : i + 2);
+    V3 d = vsub(b, a);
+    d.y = 0.0f;
+    float l = sqrtf(vdot(d, d));
+    return l > 1.0f ? vscale(d, 1.0f / l) : v3(0.0f, 0.0f, 1.0f);
+}
+
+static void challenge_begin_rings(void) {
+    const float V = spec->appr_kt * 1.35f / 1.944f;
+    V3 p0 = ring_wpos(0), p1 = ring_pos(0);
+    float psi = atan2f(p1.x - p0.x, p1.z - p0.z);
+    float cl = G_ACC / (KL * V * V);
+    float alpha = (cl - FLAP_CL[0]) / CLA + ALPHA0;
+    pl.pos = p0;
+    set_axes(psi, alpha, 0.0f);
+    pl.vel = vadd(v3(sinf(psi) * V, 0.0f, cosf(psi) * V), wx_wind_at(pl.pos));
+    pl.flaps = 0;
+    pl.trim = clampf((alpha - ALPHA_TRIM) * PITCH_MA / PITCH_MD, -0.5f, 0.5f);
+    float drag = (KD0 + KD_WINDMILL * 0.7f) * V * V + KDI * V * V * cl * cl;
+    pl.throttle = throttle_for_thrust(drag, V);
+    pl.on_ground = false; pl.touched = false; pl.rpm = 2000.0f; pl.gamma_prev = V;
+    ch_ring_i = 0; ch_ring_hit = 0; ch_ring_prev_ok = false;
+    ch_ring_r = clampf(V * 1.1f, 45.0f, 90.0f);
+    float len = 0.0f;
+    for (int k = 0; k < NRINGS; k++) { V3 a = ring_wpos(k), b = ring_wpos(k + 1); len += sqrtf((b.x - a.x) * (b.x - a.x) + (b.z - a.z) * (b.z - a.z)); }
+    ch_ring_par = len / V * 1.3f;
+}
+
 // Engine failure at about 1,500 ft, 3 to 3.7 km from the runway and off to one side, gliding at about 70 kt.
 // Flat out the aircraft glides about 9.5 : 1 (7 : 1 with full flaps), so it arrives a little high and flaps or S-turns are needed.
 static void challenge_begin_engine(void) {
@@ -107,6 +160,7 @@ static void challenge_begin_engine(void) {
 static void challenge_begin(void) {
     reset_plane();                                                     // (cross-country starts on the runway at home)
     if (ch_kind == CK_ENGINE)            challenge_begin_engine();
+    else if (ch_rings())                 challenge_begin_rings();
     else if (!ch_trip())                 challenge_begin_approach(ch_kind == CK_XWIND);
     ch_state = CH_FLYING; ch_t = 0.0f; ch_td_t = 0.0f; ch_air_after = false;
     ch_xc_up = false; ch_fuel0 = pl.fuel;
@@ -117,7 +171,7 @@ static void challenge_begin(void) {
 
 // Called the moment a wheel first touches the runway.
 static void challenge_touchdown(void) {
-    if (game_mode != MODE_LANDING || ch_state != CH_FLYING) return;
+    if (game_mode != MODE_LANDING || ch_state != CH_FLYING || ch_rings()) return;
     if (ch_trip() && !ch_xc_up) return;                                // still taking off at home
     ch_state = CH_TOUCHED; ch_td_t = 0.0f; ch_air_after = false;
     chr.sink = fmaxf(0.0f, -pl.vel.y);
@@ -165,6 +219,15 @@ static void challenge_score(void) {
     chr.total = t < 0 ? 0 : (t > 100 ? 100 : t);
 }
 
+// Lake rings: 80 points for the rings you flew through and 20 for being quick, in proportion to the rings you got.
+static void challenge_score_rings(void) {
+    chr.rings_hit = ch_ring_hit;
+    chr.par_s = ch_ring_par;
+    chr.p_rings = (int)(80.0f * ch_ring_hit / NRINGS + 0.5f);
+    chr.p_time  = (int)(20.0f * clampf(1.0f - (ch_t - ch_ring_par) / ch_ring_par, 0.0f, 1.0f) * ch_ring_hit / NRINGS + 0.5f);
+    chr.total = chr.p_rings + chr.p_time;
+}
+
 static void challenge_finish(bool crashed, const char *why) {
     ch_state = CH_DONE;
     chr.trip_s = ch_t;
@@ -181,6 +244,7 @@ static void challenge_finish(bool crashed, const char *why) {
     }
     chr.crashed = crashed;
     if (crashed) { chr.total = 0; snprintf(chr.note, sizeof(chr.note), "%s", why); }
+    else if (ch_rings()) challenge_score_rings();
     else         challenge_score();
     if (crashed) { if (!pl.crashed) snd_event(EV_CHIME_BAD, 1.0f); }          // (a crash has its own sound)
     else         snd_event(chr.total >= 80 ? EV_CHIME_GOOD : (chr.total >= 50 ? EV_CHIME_OK : EV_CHIME_BAD), 1.0f);
@@ -197,14 +261,38 @@ static void ap_bearing(const Airport *a, float *brg_deg, float *dist_m) {
     *brg_deg = b < 0.0f ? b + 360.0f : b;
 }
 
+// Lake rings: look for the aircraft crossing the plane of the ring it is flying to.
+static void rings_update(void) {
+    V3 C = ring_pos(ch_ring_i), N = ring_nrm(ch_ring_i);
+    float s = vdot(vsub(pl.pos, C), N);
+    if (ch_ring_prev_ok) {
+        float sp = vdot(vsub(ch_ring_prev, C), N);
+        if (sp < 0.0f && s >= 0.0f) {
+            float t = sp / (sp - s);
+            V3 cp = vadd(ch_ring_prev, vscale(vsub(pl.pos, ch_ring_prev), t));
+            V3 d = vsub(cp, C);
+            bool hit = sqrtf(vdot(d, d)) < ch_ring_r;
+            if (hit) ch_ring_hit++;
+            snd_event(hit ? EV_CHIME_GOOD : EV_CHIME_BAD, 1.0f);
+            ch_ring_i++;
+            ch_ring_prev_ok = false;
+            if (ch_ring_i >= NRINGS) challenge_finish(false, "");
+            return;
+        }
+    }
+    ch_ring_prev = pl.pos; ch_ring_prev_ok = true;
+}
+
 // Called once per flying frame while a landing challenge is running.
 static void challenge_update(void) {
     if (game_mode != MODE_LANDING) return;
     if (ch_state == CH_FLYING) {
         ch_t += DT;
-        if (pl.crashed)                         challenge_finish(true, last_crash[0] ? last_crash : "Crashed");
+        if (ch_rings() && !pl.crashed) { rings_update(); if (ch_state != CH_FLYING) return; }
+        if (ch_rings() && !pl.crashed && ch_t > 300.0f) challenge_finish(false, "");      // time up: you keep the rings you got
+        else if (pl.crashed)                    challenge_finish(true, last_crash[0] ? last_crash : "Crashed");
         else if (ch_t > (ch_trip() ? 2700.0f : 420.0f))          challenge_finish(true, "Out of time");
-        else if (!ch_trip() && pl.pos.z > 1100.0f)               challenge_finish(true, "Flew past the runway");
+        else if (!ch_trip() && !ch_rings() && pl.pos.z > 1100.0f)               challenge_finish(true, "Flew past the runway");
         else if (pl.pos.y > (ch_trip() ? 6000.0f : 2500.0f))     challenge_finish(true, "Left the area");
         if (pl.pos.y > 120.0f) ch_xc_up = true;
     } else if (ch_state == CH_TOUCHED) {

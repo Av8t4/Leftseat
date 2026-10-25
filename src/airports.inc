@@ -274,6 +274,29 @@ static void build_outlying_windsocks(void) {
     }
 }
 
+// The rings of the lake-rings challenge: the one you are flying to is gold, the next two paler. Flat glowing bands, with a
+// little thickness so a ring is still there when you see it edge-on.
+static void build_rings(void) {
+    if (game_mode != MODE_LANDING || !ch_rings() || (ch_state != CH_FLYING && ch_state != CH_TOUCHED)) return;
+    for (int i = ch_ring_i; i < NRINGS && i <= ch_ring_i + 2; i++) {
+        V3 C = ring_pos(i), N = ring_nrm(i);
+        float dx = C.x - cam.pos.x, dz = C.z - cam.pos.z;
+        if (dx * dx + dz * dz > 7000.0f * 7000.0f) continue;
+        V3 R = vnorm(vcross(v3(0.0f, 1.0f, 0.0f), N)), U = vcross(N, R);
+        float rin = ch_ring_r - 1.0f, rout = ch_ring_r + 4.0f, hh = 1.5f;
+        int cr = i == ch_ring_i ? 255 : 190, cg = i == ch_ring_i ? 206 : 226, cb = i == ch_ring_i ? 50 : 255;
+        for (int j = 0; j < 20; j++) {
+            float a0 = j * 2.0f * PI_F / 20.0f, a1 = (j + 1) * 2.0f * PI_F / 20.0f;
+            V3 d0 = vadd(vscale(R, cosf(a0)), vscale(U, sinf(a0))), d1 = vadd(vscale(R, cosf(a1)), vscale(U, sinf(a1)));
+            V3 q[4] = { vadd(C, vscale(d0, rin)), vadd(C, vscale(d0, rout)), vadd(C, vscale(d1, rout)), vadd(C, vscale(d1, rin)) };
+            pf_poly(4, q, NULL, cr, cg, cb, PF_TWO | PF_EMIT, 255);
+            V3 o0 = vadd(C, vscale(d0, rout)), o1 = vadd(C, vscale(d1, rout));
+            V3 s[4] = { vsub(o0, vscale(N, hh)), vadd(o0, vscale(N, hh)), vadd(o1, vscale(N, hh)), vsub(o1, vscale(N, hh)) };
+            pf_poly(4, s, NULL, cr * 0.8f, cg * 0.8f, cb * 0.8f, PF_TWO | PF_EMIT, 255);
+        }
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /* The highway between the airports and the river                       */
 /* ------------------------------------------------------------------ */

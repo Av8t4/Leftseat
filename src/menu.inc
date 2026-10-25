@@ -12,7 +12,7 @@ static void draw_result(vita2d_pgf *pgf) {
     vita2d_draw_rectangle(170, 26, 620, 356, gold);
     vita2d_draw_rectangle(174, 30, 612, 348, RGBA8(10, 22, 56, 255));
     char title[40];
-    if (chr.crashed) snprintf(title, sizeof(title), "NO LANDING");
+    if (chr.crashed) snprintf(title, sizeof(title), ch_rings() ? "NO SCORE" : "NO LANDING");
     else             snprintf(title, sizeof(title), "%s RESULT", CK_NAMES[ch_kind]);
     vita2d_pgf_draw_text(pgf, 204, 72, gold, 1.2f, title);
 
@@ -20,6 +20,8 @@ static void draw_result(vita2d_pgf *pgf) {
     snprintf(big, sizeof(big), "%d", chr.total);
     vita2d_pgf_draw_text(pgf, 204, 150, chr.crashed ? bad : white, 3.2f, big);
     const char *grade = chr.crashed ? chr.note
+                      : ch_rings() ? (chr.total >= 90 ? "PERFECT RUN" : (chr.total >= 75 ? "GREAT RUN"
+                      : (chr.total >= 50 ? "GOOD RUN" : (chr.total >= 25 ? "KEEP PRACTISING" : "THE RINGS WIN"))))
                       : (chr.total >= 90 ? "PERFECT LANDING" : (chr.total >= 75 ? "GREAT LANDING"
                       : (chr.total >= 60 ? "GOOD LANDING" : (chr.total >= 40 ? "ROUGH LANDING" : "HARD LANDING"))));
     vita2d_pgf_draw_text(pgf, 330, 112, chr.crashed ? bad : good, 1.2f, grade);
@@ -28,7 +30,23 @@ static void draw_result(vita2d_pgf *pgf) {
     if (ch_trip())
         vita2d_pgf_draw_textf(pgf, 204, 192, dim, 0.8f, "Trip time %d:%02d      Fuel used %.1f gal", (int)(chr.trip_s / 60.0f), (int)chr.trip_s % 60, chr.fuel_used);
 
-    if (!chr.crashed) {
+    if (!chr.crashed && ch_rings()) {
+        char v[2][56];
+        snprintf(v[0], 56, "%d of %d flown through", chr.rings_hit, NRINGS);
+        snprintf(v[1], 56, "%d:%02d (par %d:%02d)", (int)(chr.trip_s / 60.0f), (int)chr.trip_s % 60, (int)(chr.par_s / 60.0f), (int)chr.par_s % 60);
+        static const char *label[2] = { "Rings", "Speed" };
+        int pts[2] = { chr.p_rings, chr.p_time }, mx[2] = { 80, 20 };
+        for (int i = 0; i < 2; i++) {
+            float y = 214.0f + i * 30.0f;
+            vita2d_pgf_draw_text(pgf, 204, y, white, 0.9f, label[i]);
+            vita2d_pgf_draw_text(pgf, 340, y, dim, 0.85f, v[i]);
+            char p[24];
+            snprintf(p, sizeof(p), "%d / %d", pts[i], mx[i]);
+            int tw = vita2d_pgf_text_width(pgf, 0.9f, p);
+            vita2d_pgf_draw_text(pgf, 756 - tw, y, pts[i] >= mx[i] * 0.8f ? good : white, 0.9f, p);
+        }
+        vita2d_pgf_draw_text(pgf, 204, 300, dim, 0.85f, "Beat the par time for the full speed bonus.");
+    } else if (!chr.crashed) {
         float d = chr.z + 1000.0f;
         char v[5][56];
         snprintf(v[0], 56, "%.1f m/s (%d fpm)", chr.sink, (int)(chr.sink * 196.85f));
@@ -50,8 +68,8 @@ static void draw_result(vita2d_pgf *pgf) {
             vita2d_pgf_draw_text(pgf, 756 - tw, y, (mx[i] > 0 && pts[i] >= mx[i] * 0.8f) ? good : (pts[i] < 0 ? bad : white), 0.9f, p);
         }
     } else {
-        vita2d_pgf_draw_text(pgf, 204, 230, dim, 0.9f, "Try again: aim for the aiming-point markings and");
-        vita2d_pgf_draw_text(pgf, 204, 258, dim, 0.9f, "use the glide-slope lights beside the runway.");
+        vita2d_pgf_draw_text(pgf, 204, 230, dim, 0.9f, ch_rings() ? "Try again: keep the aircraft low and smooth, and" : "Try again: aim for the aiming-point markings and");
+        vita2d_pgf_draw_text(pgf, 204, 258, dim, 0.9f, ch_rings() ? "line up each ring a good way before you reach it." : "use the glide-slope lights beside the runway.");
     }
     vita2d_pgf_draw_text(pgf, 204, 366, dim, 0.85f, "X: try again          O: menu");
 }
@@ -420,7 +438,8 @@ static void draw_menu(vita2d_pgf *pgf) {
             "The engine fails at 1,500 ft. Glide in and land.",
             "Strong wind across the runway. Crab in, then straighten up.",
             "Fly 16 NM to Redrock Municipal and land. Hold SELECT for the chart.",
-            "Fly 11 NM to a short grass strip in the mountains. Touch down early." };
+            "Fly 11 NM to a short grass strip in the mountains. Touch down early.",
+            "Fly through a course of rings over and around Lana Lake." };
         bool run = ch_running();
         int n = CK_COUNT + (run ? 1 : 0);
         bool tight = (n >= 6);                                    // with the RESUME row the list gets a little more compact

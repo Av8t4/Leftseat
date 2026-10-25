@@ -11,7 +11,13 @@ static void draw_overlays(vita2d_pgf *pgf) {
     if (game_mode == MODE_LANDING && (ch_state == CH_FLYING || ch_state == CH_TOUCHED)) {
         unsigned int gold = RGBA8(255, 206, 130, 255);
         float to_thr = (-1000.0f - pl.pos.z) / 1000.0f;
-        if (ch_trip()) {
+        if (ch_rings()) {
+            V3 rp = ring_pos(ch_ring_i < NRINGS ? ch_ring_i : NRINGS - 1);
+            float dx = rp.x - pl.pos.x, dz = rp.z - pl.pos.z, b = atan2f(dx, dz) * 57.2958f;
+            vita2d_pgf_draw_textf(pgf, 380, 28, gold, 0.8f, "%s    RING %d / %d   HIT %d   NEXT %03d  %.1f NM", CK_NAMES[ch_kind], ch_ring_i + 1 > NRINGS ? NRINGS : ch_ring_i + 1,
+                                  NRINGS, ch_ring_hit, (int)(b < 0.0f ? b + 360.0f : b + 0.5f) % 360, sqrtf(dx * dx + dz * dz) / 1852.0f);
+        }
+        else if (ch_trip()) {
             float brg, dist;
             ap_bearing(&AIRPORTS[ch_dest_ap()], &brg, &dist);
             char place[24];
@@ -27,13 +33,15 @@ static void draw_overlays(vita2d_pgf *pgf) {
                 "The engine has failed! Hold about 70 kt and glide to the runway.",
                 "Strong crosswind: point the nose into the wind to track the runway.",
                 "Take off and fly to Redrock Municipal, about 16 NM to the north-north-east.",
-                "Take off and fly west-northwest to Pinecrest, a short grass strip 11 NM away." };
+                "Take off and fly west-northwest to Pinecrest, a short grass strip 11 NM away.",
+                "Fly through the gold rings over Lana Lake, one after another." };
             static const char *const L2[CK_COUNT] = {
                 "Use the glide-slope lights beside the runway. Triangle restarts.",
                 "Keep the flaps for the last part of the approach. Triangle restarts.",
                 "Straighten up with rudder just before touchdown. Triangle restarts.",
                 "Hold SELECT to see the chart. Land on the Redrock runway. Triangle restarts.",
-                "Hold SELECT for the chart. The strip is short: touch down near the start. Triangle restarts." };
+                "Hold SELECT for the chart. The strip is short: touch down near the start. Triangle restarts.",
+                "A ring you miss is skipped. Fly low and smooth. Triangle restarts." };
             vita2d_pgf_draw_text(pgf, 20, 60, white, 0.85f, L1[ch_kind]);
             vita2d_pgf_draw_text(pgf, 20, 86, white, 0.85f, L2[ch_kind]);
         }

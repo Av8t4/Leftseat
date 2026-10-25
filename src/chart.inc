@@ -83,6 +83,11 @@ static void draw_chart(vita2d_pgf *pgf) {
                (P2){ x - sx * 6.0f + sy * 6.0f, y - sy * 6.0f - sx * 6.0f }, RGBA8(255, 220, 60, 255));
     }
     pb_flush();
+    if (game_mode == MODE_LANDING && ch_rings() && ch_state == CH_FLYING)                  // the rings still to fly
+        for (int i = ch_ring_i; i < NRINGS; i++) {
+            V3 rp = ring_pos(i);
+            vita2d_draw_fill_circle(CH_SX(rp.x), CH_SY(rp.z), i == ch_ring_i ? 3.5f : 2.2f, i == ch_ring_i ? gold : dim);
+        }
     vita2d_draw_rectangle(MX, MY, MW, 1, gold); vita2d_draw_rectangle(MX, MY + MH - 1, MW, 1, gold);   // frame round the map
     vita2d_draw_rectangle(MX, MY, 1, MH, gold); vita2d_draw_rectangle(MX + MW - 1, MY, 1, MH, gold);
     for (int k = 0; k < AP_COUNT; k++) {                                           // labels

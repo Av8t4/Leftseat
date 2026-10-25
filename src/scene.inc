@@ -140,6 +140,7 @@ static void draw_scene(void) {
     build_clouds();
     build_windsock();
     build_outlying_windsocks();
+    build_rings();
     for (int k = 0; k < npf; k++) {
         const PFace *pf = &pfaces[k];
         if (pf->isdecal) continue;

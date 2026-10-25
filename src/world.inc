@@ -440,6 +440,16 @@ static bool mt_conflict(float x, float z, float hb, bool near_ap) {
     }
     for (int n = 0; n < ntowns; n++)
         if (fmaxf(fabsf(x - town_x[n]), fabsf(z - town_z[n])) < hb + 520.0f) return true;
+    {                                                                                      // the lake-rings course (see challenge.inc) and the way in to it
+        const Airport *L = &AIRPORTS[AP_LANA];
+        V3 a = ap_pt(L, -250.0f, 0.0f, -3100.0f);
+        for (int k = 0; k < 7; k++) {
+            static const float P[7][2] = { { -420, -2200 }, { -720, -1250 }, { -1050, -350 }, { -1300, 550 }, { -1250, 1500 }, { -900, 2400 }, { -450, 3200 } };
+            V3 b = ap_pt(L, P[k][0], 0.0f, P[k][1]);
+            if (seg_hits_square(a.x, a.z, b.x, b.z, x, z, hb + 350.0f)) return true;
+            a = b;
+        }
+    }
     if (near_ap)
         for (int k = 0; k < AP_COUNT; k++)
             if (sat_dist(x, z, AIRPORTS[k].cx, AIRPORTS[k].cz) < hb + 1200.0f) return true;
