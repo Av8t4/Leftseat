@@ -138,6 +138,7 @@ chosen on the menu apply to all of them.
 | **Crosswind** | A strong wind (about 11 kt at the ground, 27 kt higher up, with gusts) blows across the runway from the left or right. Crab into it, then straighten with rudder before touchdown |
 | **Cross-country** | Take off from Knowles Field, fly to Redrock and land on its runway from either end. The HUD shows bearing and distance. The result card also shows trip time and fuel used. Landing anywhere else scores 0 |
 | **Backcountry** | The same trip, but to Pinecrest: find the grass strip in the mountains and put it down in the first few hundred feet. The scoring area shrinks with the runway, so touching down early matters more |
+| **Lake rings** | Not a landing: you start in the air north of Lana Lake Regional and fly through a course of 7 gold rings that bends over and around the lake. 80 points for the rings you fly through, plus up to 20 for beating the par time. A ring you miss is skipped. A crash scores 0. The chart shows the rings still to fly |
 
 ## Weather, time of day and sound
 
