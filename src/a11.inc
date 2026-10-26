@@ -41,11 +41,11 @@ static const KS KS_A11_B[] = {                                                  
 };
 static const float Z_A11_B[] = { 0.80f, 0.35f, -0.60f, -2.50f, -5.30f };
 static const KS KS_A11_TF[] = {                                                     // narrow fairing where each stabiliser meets its fin: swells round the join, then tapers to a point behind it
-    { -4.45f, 0.10f, 2.98f, 3.14f, 3.06f, 2.3f, 2.3f, 2.3f },
-    { -4.80f, 0.17f, 2.88f, 3.24f, 3.06f, 2.3f, 2.3f, 2.3f },
-    { -5.25f, 0.19f, 2.86f, 3.26f, 3.06f, 2.3f, 2.3f, 2.3f },
-    { -5.65f, 0.13f, 2.93f, 3.20f, 3.06f, 2.3f, 2.3f, 2.3f },
-    { -6.00f, 0.025f, 3.02f, 3.12f, 3.07f, 2.3f, 2.3f, 2.3f },
+    { -4.45f, 0.10f, 3.14f, 3.34f, 3.24f, 2.3f, 2.3f, 2.3f },                       // (raised so it covers the top of the fin and the rudder's top edge)
+    { -4.80f, 0.17f, 3.04f, 3.44f, 3.24f, 2.3f, 2.3f, 2.3f },
+    { -5.25f, 0.19f, 3.02f, 3.46f, 3.24f, 2.3f, 2.3f, 2.3f },
+    { -5.65f, 0.13f, 3.08f, 3.42f, 3.25f, 2.3f, 2.3f, 2.3f },
+    { -6.00f, 0.025f, 3.19f, 3.31f, 3.25f, 2.3f, 2.3f, 2.3f },
 };
 static const float Z_A11_TF[] = { -4.45f, -4.65f, -4.90f, -5.15f, -5.40f, -5.65f, -5.85f, -6.00f };
 static AWingS AW_A11;                                                               // swept-back wing
