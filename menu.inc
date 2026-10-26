@@ -82,7 +82,7 @@ static int  menu_popup_t;
 static int  menu_quit_t;           // frames left to confirm quitting
 static int  menu_stick;            // left-stick latch so one push moves one step
 static int  flight_world = -1;   // which world the flight in progress is in (-1 = none)
-static const char *MENU_ITEMS[8] = { "OPEN WORLD", "AIRPORT", "CHALLENGES", "HANGAR", "WEATHER", "TIME", "OPTIONS", "CONTROLS" };
+static const char *MENU_ITEMS[9] = { "OPEN WORLD", "AIRPORT", "CHALLENGES", "HANGAR", "WEATHER", "TIME", "OPTIONS", "CONTROLS", "QUIT" };
 static int  menu_chopen;            // the challenge list is showing
 static int  menu_chsel;             // highlighted row in that list
 static int  menu_ch_pick = -1;      // result: -1 = resume the running challenge, otherwise the kind to start
@@ -116,7 +116,26 @@ static int  menu_tod;              // time of day for the next flight: day, dusk
 static int  menu_wx;               // starting weather: 0..WX_COUNT-1, or WX_COUNT for random
 static bool wx_dirty;              // the weather choice changed since the flight started
 
-static int menu_count(void) { return 8; }
+static int menu_count(void) { return 9; }                                   // 0 open world, 1 airport, 2 challenges, 3 hangar, 4 weather, 5 time, 6 options, 7 controls, 8 quit
+
+// The main menu is a big OPEN WORLD button over a grid of 4 x 2 tiles. GRID[g] is the menu item in grid slot g.
+static const int MT_GRID[8] = { 1, 3, 4, 5, 2, 6, 7, 8 };
+static int  menu_col;                // the grid column to come back to when moving between the big button and the grid
+static int  menu_stickx;             // left-stick latch for left / right
+static void mt_rect(int i, float *x, float *y, float *w, float *h) {
+    if (i == 0) { *x = 40.0f; *y = 176.0f; *w = 460.0f; *h = 92.0f; return; }
+    int g = 0; for (int k = 0; k < 8; k++) if (MT_GRID[k] == i) g = k;
+    *x = 40.0f + (g % 4) * 225.0f; *y = 286.0f + (g / 4) * 108.0f; *w = 205.0f; *h = 94.0f;
+}
+static int mt_move(int sel, int dx, int dy) {
+    if (sel == 0) { if (dy > 0) return MT_GRID[menu_col]; if (dy < 0) return MT_GRID[4 + menu_col]; return 0; }
+    int g = 0; for (int k = 0; k < 8; k++) if (MT_GRID[k] == sel) g = k;
+    int col = g % 4, row = g / 4;
+    if (dx) { col = (col + dx + 4) % 4; menu_col = col; return MT_GRID[row * 4 + col]; }
+    row += dy; menu_col = col;
+    if (row < 0 || row > 1) return 0;
+    return MT_GRID[row * 4 + col];
+}
 
 // ---- The pickers: Airport, Weather, Time and Sound open a list like the hangar's ----
 static int pk_count(int kind) {
@@ -213,12 +232,10 @@ static unsigned int menu_touch_taps(void) {
                     if (tx >= 172.0f && tx <= 788.0f && ty >= ry && ty < ry + rh) { menu_chsel = i; vp = SCE_CTRL_CROSS; }
                 }
             } else {
-                if (tx >= 760.0f && ty >= 505.0f) vp = SCE_CTRL_START;                          // "START: quit"
                 for (int i = 0; i < menu_count(); i++) {
-                    float top = 171.0f + 37.0f * i;
-                    if (tx < 52.0f || tx > 472.0f || ty < top || ty >= top + 34.0f) continue;
-                    menu_sel = i;
-                    vp = SCE_CTRL_CROSS;                                                          // rows with a list open it
+                    float x, y, w, h; mt_rect(i, &x, &y, &w, &h);
+                    if (tx < x - 6.0f || tx > x + w + 6.0f || ty < y - 6.0f || ty > y + h + 6.0f) continue;
+                    menu_sel = i; vp = SCE_CTRL_CROSS;
                 }
             }
         }
@@ -350,28 +367,22 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
         if ((pressed & (SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)) || menu_popup_t == 0) menu_popup = -1;
         return 0;
     }
-    int move = 0;
-    if (pressed & SCE_CTRL_UP)   move = -1;
-    if (pressed & SCE_CTRL_DOWN) move = 1;
-    int sy = pad->ly < 64 ? -1 : (pad->ly > 192 ? 1 : 0);
-    if (sy != 0 && menu_stick == 0) move = sy;
-    menu_stick = sy;
-    if (move) { menu_sel = (menu_sel + move + menu_count()) % menu_count(); snd_event(EV_CLICK, 1.0f); }
-    if (menu_sel == 1) {                                      // airport row: left / right picks where the open world starts
-        if (pressed & SCE_CTRL_RIGHT) { menu_ap = ap_next(menu_ap, 1); snd_event(EV_CLICK, 1.0f); }
-        if (pressed & SCE_CTRL_LEFT)  { menu_ap = ap_next(menu_ap, -1); snd_event(EV_CLICK, 1.0f); }
-    }
-    if (menu_sel == 4) {                                      // weather row: left / right picks the starting weather
-        if (pressed & SCE_CTRL_RIGHT) { menu_wx = (menu_wx + 1) % (WX_COUNT + 1); wx_dirty = true; }
-        if (pressed & SCE_CTRL_LEFT)  { menu_wx = (menu_wx + WX_COUNT) % (WX_COUNT + 1); wx_dirty = true; }
-    }
-
-    if (menu_sel == 5) {                                      // time row: left / right picks day, dusk or night
-        if (pressed & SCE_CTRL_RIGHT) menu_tod = (menu_tod + 1) % TOD_COUNT;
-        if (pressed & SCE_CTRL_LEFT)  menu_tod = (menu_tod + TOD_COUNT - 1) % TOD_COUNT;
-    }
+    int dy = 0, dx = 0;
+    if (pressed & SCE_CTRL_UP)    dy = -1;
+    if (pressed & SCE_CTRL_DOWN)  dy = 1;
+    if (pressed & SCE_CTRL_LEFT)  dx = -1;
+    if (pressed & SCE_CTRL_RIGHT) dx = 1;
+    int sy = pad->ly < 64 ? -1 : (pad->ly > 192 ? 1 : 0), sx = pad->lx < 64 ? -1 : (pad->lx > 192 ? 1 : 0);
+    if (sy != 0 && menu_stick == 0) dy = sy;
+    if (sx != 0 && menu_stickx == 0) dx = sx;
+    menu_stick = sy; menu_stickx = sx;
+    if (dy || dx) { int ns = mt_move(menu_sel, dx, dy); if (ns != menu_sel) { menu_sel = ns; snd_event(EV_CLICK, 1.0f); } }
 
     if (pressed & SCE_CTRL_CROSS) {
+        if (menu_sel == 8) {                                  // quit: press twice
+            if (menu_quit_t > 0) return 2;
+            menu_quit_t = 150; snd_event(EV_CLICK, 1.0f); return 0;
+        }
         snd_event(EV_CONFIRM, 1.0f);
         if (menu_sel == 1 || menu_sel == 4 || menu_sel == 5 || menu_sel == 6) {   // airport, weather, time, options: open the list
             menu_popen = (menu_sel == 6) ? 8 : menu_sel; menu_psel = pk_cur(menu_popen); if (menu_psel < 0) menu_psel = 0; menu_psnd = snd_level & 3; menu_pparent = 0;
@@ -556,7 +567,7 @@ static void draw_menu(vita2d_pgf *pgf) {
     vita2d_draw_rectangle(0, 506, SCREEN_W, 38, RGBA8(12, 26, 56, 255));
 
     // Compass with a slowly turning aircraft.
-    const float cx = 712.0f, cy = 232.0f, R = 160.0f;
+    const float cx = 730.0f, cy = 148.0f, R = 108.0f;
     vita2d_draw_fill_circle(cx, cy, R + 5, gold);
     vita2d_draw_fill_circle(cx, cy, R, RGBA8(12, 26, 62, 255));
     for (int k = 0; k < 72; k++) {
@@ -569,69 +580,54 @@ static void draw_menu(vita2d_pgf *pgf) {
     static const char *CARD[4] = { "N", "E", "S", "W" };
     for (int k = 0; k < 4; k++) {
         float a = k * PI_F / 2.0f, rr = R * 0.70f;
-        int tw = vita2d_pgf_text_width(pgf, 1.3f, CARD[k]);
-        vita2d_pgf_draw_text(pgf, cx + sinf(a) * rr - tw / 2, cy - cosf(a) * rr + 9,
-                             k == 0 ? RGBA8(255, 90, 80, 255) : RGBA8(235, 240, 255, 255), 1.3f, CARD[k]);
+        int tw = vita2d_pgf_text_width(pgf, 0.95f, CARD[k]);
+        vita2d_pgf_draw_text(pgf, cx + sinf(a) * rr - tw / 2, cy - cosf(a) * rr + 7,
+                             k == 0 ? RGBA8(255, 90, 80, 255) : RGBA8(235, 240, 255, 255), 0.95f, CARD[k]);
     }
     float ang = t * 0.35f;
-    draw_menu_plane(cx + 7, cy + 9, 118.0f, ang, t * 30.0f, 1);               // shadow
-    draw_menu_plane(cx, cy, 118.0f, ang, t * 30.0f, 0);
+    draw_menu_plane(cx + 5, cy + 6, 78.0f, ang, t * 30.0f, 1);               // shadow
+    draw_menu_plane(cx, cy, 78.0f, ang, t * 30.0f, 0);
 
     // Title.
     draw_title_block(63, 73, RGBA8(8, 16, 44, 255));
     draw_title_block(60, 70, white);
     vita2d_pgf_draw_text(pgf, 64, 160, gold, 1.05f, "A KYLE KNOWLES FLIGHT SIMULATOR");
 
-    // Menu items.
+    // The big OPEN WORLD button and the tiles. A tile is easy to hit with a thumb.
     for (int i = 0; i < menu_count(); i++) {
-        int step = 37;
-        int y = 204 + i * step;
-        int sel = (i == menu_sel);
-        vita2d_draw_rectangle(52, y - 33, 420, step - 3, sel ? RGBA8(22, 46, 104, 255) : RGBA8(12, 26, 62, 255));
-        if (sel) vita2d_draw_rectangle(52, y - 33, 8, step - 3, gold);
-        vita2d_pgf_draw_text(pgf, 80, y, sel ? white : RGBA8(150, 172, 215, 255), 1.5f, MENU_ITEMS[i]);
+        float x, y, w, h; mt_rect(i, &x, &y, &w, &h);
+        bool sel = (i == menu_sel);
+        unsigned int base = (i == 0) ? RGBA8(18, 52, 110, 255) : (i == 8 ? RGBA8(52, 22, 40, 255) : RGBA8(12, 26, 62, 255));
+        unsigned int hi = (i == 0) ? RGBA8(30, 76, 150, 255) : (i == 8 ? RGBA8(86, 34, 58, 255) : RGBA8(24, 50, 112, 255));
+        vita2d_draw_rectangle(x - 2, y - 2, w + 4, h + 4, sel ? gold : RGBA8(70, 94, 150, 255));
+        vita2d_draw_rectangle(x, y, w, h, sel ? hi : base);
+        unsigned int lc = sel ? white : RGBA8(176, 192, 228, 255), vc = sel ? gold : RGBA8(130, 152, 200, 255);
+        char vb[40] = "", sb[48] = "";
+        const char *label = MENU_ITEMS[i];
         if (i == 0) {
+            snprintf(sb, sizeof(sb), "Fly from %s", AIRPORTS[menu_ap].name);
+            vita2d_pgf_draw_text(pgf, x + 24, y + 52, lc, 1.9f, label);
+            vita2d_pgf_draw_text(pgf, x + 26, y + 78, vc, 0.85f, sb);
             if (flight_world == 0 && game_mode == MODE_FREE && ac_flying == menu_ac && start_ap == menu_ap)
-                vita2d_pgf_draw_text(pgf, 340, y - 4, gold, 0.8f, "RESUME");
-        } else if (i == 1) {
-            char ab[40];
-            snprintf(ab, sizeof(ab), "< %s >", AIRPORTS[menu_ap].name);
-            int tw = vita2d_pgf_text_width(pgf, 0.8f, ab);
-            vita2d_pgf_draw_text(pgf, 462 - tw, y - 2, sel ? gold : RGBA8(130, 152, 200, 255), 0.8f, ab);
-        } else if (i == 2) {
-            char cb[24];
-            bool running = (ch_state == CH_FLYING || ch_state == CH_TOUCHED);
-            if (running) snprintf(cb, sizeof(cb), "RESUME");
-            else         snprintf(cb, sizeof(cb), "%d TO FLY", CK_COUNT);
-            vita2d_pgf_draw_text(pgf, 330, y - 4, running || sel ? gold : RGBA8(110, 130, 180, 255), 0.75f, cb);
-        } else if (i == 4) {
-            char wb[32];
-            snprintf(wb, sizeof(wb), "< %s >", menu_wx == WX_COUNT ? "RANDOM" : WX_NAMES[menu_wx]);
-            int tw = vita2d_pgf_text_width(pgf, 0.85f, wb);
-            vita2d_pgf_draw_text(pgf, 462 - tw, y - 2, sel ? gold : RGBA8(130, 152, 200, 255), 0.85f, wb);
-        } else if (i == 5) {
-            char tb[32];
-            snprintf(tb, sizeof(tb), "< %s >", TOD_NAMES[menu_tod]);
-            int tw = vita2d_pgf_text_width(pgf, 0.85f, tb);
-            vita2d_pgf_draw_text(pgf, 462 - tw, y - 2, sel ? gold : RGBA8(130, 152, 200, 255), 0.85f, tb);
-        } else if (i == 3) {
-            char nm[24];
-            snprintf(nm, sizeof(nm), "%s", SPECS[menu_ac].tag);
-            for (char *p = nm; *p; p++) if (*p >= 'a' && *p <= 'z') *p -= 32;
-            int tw = vita2d_pgf_text_width(pgf, 0.8f, nm);
-            vita2d_pgf_draw_text(pgf, 462 - tw, y - 2, sel ? gold : RGBA8(130, 152, 200, 255), 0.8f, nm);
+                vita2d_pgf_draw_text(pgf, x + w - 24 - vita2d_pgf_text_width(pgf, 1.0f, "RESUME"), y + 52, gold, 1.0f, "RESUME");
+            continue;
         }
+        if (i == 1) { snprintf(vb, sizeof(vb), "%s", AIRPORTS[menu_ap].id); snprintf(sb, sizeof(sb), "%s", AIRPORTS[menu_ap].place); }
+        else if (i == 2) { bool run = (ch_state == CH_FLYING || ch_state == CH_TOUCHED); snprintf(vb, sizeof(vb), run ? "RESUME" : "%d TO FLY", CK_COUNT); }
+        else if (i == 3) { snprintf(vb, sizeof(vb), "%s", SPECS[menu_ac].tag); for (char *q = vb; *q; q++) if (*q >= 'a' && *q <= 'z') *q -= 32; }
+        else if (i == 4) snprintf(vb, sizeof(vb), "%s", menu_wx == WX_COUNT ? "RANDOM" : WX_NAMES[menu_wx]);
+        else if (i == 5) snprintf(vb, sizeof(vb), "%s", TOD_NAMES[menu_tod]);
+        else if (i == 6) { snprintf(vb, sizeof(vb), "SOUND %s", SND_NAMES[snd_level & 3]); snprintf(sb, sizeof(sb), "%s", "Flight controls"); }
+        else if (i == 7) snprintf(vb, sizeof(vb), "SHOW KEYS");
+        else if (i == 8) snprintf(vb, sizeof(vb), "%s", menu_quit_t > 0 ? "TAP AGAIN" : "");
+        vita2d_pgf_draw_text(pgf, x + 16, y + 34, lc, 1.25f, label);
+        vita2d_pgf_draw_text(pgf, x + 16, y + 64, vc, 0.95f, vb);
+        if (sb[0]) vita2d_pgf_draw_text(pgf, x + 16, y + 84, RGBA8(130, 152, 200, 255), 0.66f, sb);
     }
 
     // Footer.
-    vita2d_pgf_draw_text(pgf, 60, 528, RGBA8(190, 205, 235, 255), 0.8f,
-                         menu_sel == 1 ? "X or tap: choose the starting airport     Left / Right: quick change"
-                       : (menu_sel == 4 ? "X or tap: choose the weather     Left / Right: quick change"
-                       : (menu_sel == 5 ? "X or tap: choose the time of day     Left / Right: quick change"
-                       : (menu_sel == 6 ? "X or tap: sound and flight controls     Up / Down: move"
-                       : (menu_sel == 7 ? "X: show the controls     Up / Down: move" : "D-pad / left stick: move     X: select     Touch: tap")))));
-    if (menu_quit_t > 0) vita2d_pgf_draw_text(pgf, 640, 528, gold, 0.8f, "Press START again to quit");
-    else                 vita2d_pgf_draw_text(pgf, 770, 528, RGBA8(190, 205, 235, 255), 0.8f, "START: quit");
+    vita2d_pgf_draw_text(pgf, 40, 528, RGBA8(190, 205, 235, 255), 0.8f, "Touch: tap a tile     D-pad / left stick: move     X: select");
+    if (menu_quit_t > 0) vita2d_pgf_draw_text(pgf, 700, 528, gold, 0.8f, "Press QUIT again to quit");
 
     // The hangar: the list of aircraft on the left, a turning picture of the chosen one on the right.
     if (menu_hopen) {

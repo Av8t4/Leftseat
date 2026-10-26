@@ -61,8 +61,7 @@ Left Seat saves your best challenge scores and sound volume in `ux0:data/skyhawk
 4. A typical takeoff in the K-4: flaps 10, full throttle, a little right rudder to hold the centre line, rotate at
    about 55 kt and climb at about 74 kt. Approach at about 65 kt with full flaps and flare just above the runway.
 
-In the menu, use the D-pad or left stick to move and ✕ to select. Airport, Weather, Time and Options open a list like the Hangar's. Options holds Sound (the volume) and Controls (sticks; gyro will be added here), with a picture and details on the right (✕ or SELECT chooses, ○ or BACK cancels); left / right in a list moves the highlight. On the touch screen, tap a row to open it, tap a row in the list to look at it, then tap it again or tap SELECT to choose. Press START
-twice to quit.
+The start menu is a big **OPEN WORLD** button over a grid of tiles: Airport, Hangar, Weather, Time, Challenges, Options, Controls and Quit. On the touch screen, tap a tile. With the buttons, move with the D-pad or left stick and press ✕. Airport, Hangar, Weather, Time and Options open a list with a picture and details on the right: tap a row to look at it, then tap it again or tap SELECT to choose (✕ or SELECT chooses, ○ or BACK cancels). Options holds Sound (the volume) and Controls (sticks; gyro will be added here). Tap Quit twice (or press START twice) to leave the game.
 
 ## Controls
 
