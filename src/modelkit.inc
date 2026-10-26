@@ -101,6 +101,9 @@ static void loft_car(const KS *K, int nk, const float *Z, int nz, const Paint *p
                 static const float W30[7][2] = { { 6.05f, 5.15f }, { 3.80f, 3.30f }, { 2.90f, 2.40f }, { 2.00f, 1.50f }, { 1.10f, 0.60f }, { 0.20f, -0.30f }, { -0.70f, -1.20f } };
                 if (sd <= 1 && zm > 5.35f && zm < 6.55f) glass = true;                  // windscreen
                 if (sd == 2 && in_any(W30, 7, zm)) glass = true;                        // cockpit and cabin windows
+            } else if (kind == 8) {
+                if (sd <= 1 && zm > 3.35f && zm < 4.25f) glass = true;                  // windscreen (the small single)
+                if (sd == 2 && zm > 3.35f && zm < 4.25f) glass = true;
             } else if (kind == 7) {
                 if (sd <= 1 && zm > 2.05f && zm < 3.15f) glass = true;                  // windscreen
                 if (sd == 2 && zm > 2.05f && zm < 3.15f) glass = true;                  // cockpit side windows, level with the windscreen
@@ -112,21 +115,22 @@ static void loft_car(const KS *K, int nk, const float *Z, int nz, const Paint *p
             else if (kind == 3 && sd == 0) { r = 40.0f; g = 42.0f; b = 48.0f; }         // black anti-glare panel
             if (glass) { r = p->glass[0]; g = p->glass[1]; b = p->glass[2]; }
             pf_poly(4, q, &cc, r, g, b, kind == 3 ? PF_TWO : 0, 255);             // (the cockpit nose is drawn solid from every side)
-            if (kind == 7 && sd == 2) {                                                  // passenger windows: one small window on every other panel
-                static const float PW[4] = { 1.225f, -1.475f, -1.925f, -2.375f };
+            if ((kind == 7 || kind == 8) && sd == 2) {                                   // passenger windows: one small window on every other panel
+                static const float PW[4] = { 1.225f, -1.475f, -1.925f, -2.375f }, PW8[4] = { 2.35f, 1.35f, 9.0f, 9.0f };
+                const float *PWP = kind == 8 ? PW8 : PW;
                 for (int w = 0; w < 4; w++)
-                    if (fabsf(zm - PW[w]) < 0.1f) {                                                                       // a round window: an octagon drawn on the panel
+                    if (fabsf(zm - PWP[w]) < 0.1f) {                                                                       // a round window: an octagon drawn on the panel
                         V3 o[8];
                         for (int q = 0; q < 8; q++) { float a = q * PI_F / 4.0f + PI_F / 8.0f; o[q] = bilerp(A, B, C, D, 0.5f + 0.40f * cosf(a), 0.5f + 0.42f * sinf(a)); }
                         pf_poly(8, o, NULL, 34, 62, 104, PF_DECAL, 255);
                     }
             }
-            if (kind == 1 || kind == 4 || kind == 5 || kind == 6 || kind == 7) {
+            if (kind == 1 || kind == 4 || kind == 5 || kind == 6 || kind == 7 || kind == 8) {
                 if (sd == 3) {                                                           // belt stripes
                     decal_quad(A, B, C, D, 0.10f, 0.32f, 0.0f, 1.0f, p->a1[0], p->a1[1], p->a1[2]);
                     decal_quad(A, B, C, D, 0.32f, 0.50f, 0.0f, 1.0f, p->a2[0], p->a2[1], p->a2[2]);
                 }
-                if (kind != 5 && kind != 6 && kind != 7 && zm > 3.55f && sd < 3) decal_quad(A, B, C, D, 0.0f, 1.0f, 0.0f, 1.0f, p->a1[0], p->a1[1], p->a1[2]);   // cowl band
+                if (kind != 5 && kind != 6 && kind != 7 && kind != 8 && zm > 3.55f && sd < 3) decal_quad(A, B, C, D, 0.0f, 1.0f, 0.0f, 1.0f, p->a1[0], p->a1[1], p->a1[2]);   // cowl band
             }
         }
     }
