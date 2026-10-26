@@ -390,7 +390,8 @@ static void draw_menu(vita2d_pgf *pgf) {
             vita2d_pgf_draw_text(pgf, 194, ry + 47, RGBA8(190, 205, 235, 255), 0.75f, SPECS[i].line1);
             vita2d_pgf_draw_text(pgf, 194, ry + 67, RGBA8(150, 172, 215, 255), 0.7f, SPECS[i].line2);
             if (i == menu_ac) vita2d_pgf_draw_text(pgf, 700, ry + 26, gold, 0.8f, "SELECTED");
-            vita2d_pgf_draw_text(pgf, 778 - vita2d_pgf_text_width(pgf, 0.6f, "KNOWLES AIRCRAFT CO."), ry + 67, RGBA8(176, 150, 96, 255), 0.6f, "KNOWLES AIRCRAFT CO.");
+            const char *maker = (i == AC_A22) ? "ASHLEY AEROSPACE" : "KNOWLES AIRCRAFT CO.";
+            vita2d_pgf_draw_text(pgf, 778 - vita2d_pgf_text_width(pgf, 0.6f, maker), ry + 67, RGBA8(176, 150, 96, 255), 0.6f, maker);
         }
         vita2d_pgf_draw_text(pgf, 194, top + h - 12, RGBA8(190, 205, 235, 255), 0.8f, "Up / Down: choose     X: select     O: back");
     }
@@ -407,7 +408,7 @@ static void draw_menu(vita2d_pgf *pgf) {
             { "D-pad down (in the air)",   "Trim for level flight at your current airspeed" },
             { "D-pad down (on the ground)", "Wheel brakes" },
             { "D-pad up",                  "Fast forward x2 / x5 / normal (free flight only)" },
-            { "Square",                    "Landing gear up / down (K-30 only)" },
+            { "Square",                    "Landing gear up / down (K-30 and A22)" },
             { "Triangle",                  "Reset the aircraft (restart the attempt in a challenge)" },
             { "Select (tap)",              "Switch camera: cockpit / chase" },
             { "Select (hold)",             "Chart (L / R scroll the list)" },

@@ -107,7 +107,7 @@ static void snd_game_update(const SceCtrlData *pad) {
     prev_dead = dead;
     if (fail_t < 99.0f) fail_t += dtf;
     switch (spec->model) {
-        case 1:                                                     // turboprop: the propeller speed gives the gas generator speed
+        case 1: case 4:                                             // turboprop (K-10, A22): the propeller speed gives the gas generator speed
             in.engine_kind = SND_TURBOPROP; in.blades = 3; in.prop_rpm = pl.rpm;
             in.n1 = clampf(0.36f + 0.64f * (pl.rpm - spec->rpm_idle) / spec->rpm_thr, 0.30f, 1.05f);
             in.load = clampf((in.n1 - 0.30f) / 0.70f, 0.0f, 1.0f);
