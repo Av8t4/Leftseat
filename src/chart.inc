@@ -24,15 +24,14 @@ static float ch_sx(float x) { return CH_MX + CH_MW * 0.5f + (x - chart_cx) * ch_
 static float ch_sy(float z) { return CH_MY + CH_MH * 0.5f - (z - chart_cz) * ch_s(); }
 
 static void ch_clamp_view(void) {
-    float zmin = ap_found ? 0.6f : 1.0f;
-    chart_zm = clampf(chart_zm, zmin, 16.0f);
-    chart_cx = clampf(chart_cx, -22000.0f, ap_found ? 40000.0f : 22000.0f);
-    chart_cz = clampf(chart_cz, ap_found ? -34000.0f : -16000.0f, 34000.0f);
+    chart_zm = clampf(chart_zm, 0.6f, 16.0f);
+    chart_cx = clampf(chart_cx, -22000.0f, 40000.0f);
+    chart_cz = clampf(chart_cz, -34000.0f, 34000.0f);
 }
 static void ch_zoom_at(float px, float py, float k) {                            // zoom, keeping the point under (px, py) where it is
     float s = ch_s(), wx = chart_cx + (px - CH_MX - CH_MW * 0.5f) / s, wz = chart_cz - (py - CH_MY - CH_MH * 0.5f) / s;
     chart_zm *= k;
-    chart_zm = clampf(chart_zm, ap_found ? 0.6f : 1.0f, 16.0f);
+    chart_zm = clampf(chart_zm, 0.6f, 16.0f);
     s = ch_s();
     chart_cx = wx - (px - CH_MX - CH_MW * 0.5f) / s;
     chart_cz = wz + (py - CH_MY - CH_MH * 0.5f) / s;
@@ -43,8 +42,8 @@ static void ch_center_on(float x, float z) { chart_cx = x; chart_cz = z; ch_clam
 static struct { int mode; int id; float sx, sy, mx, my; int age; bool moved; int btn; int cnt; float d; } ct;   // the finger that is down
 
 static void chart_begin(void) {                                                  // called as the chart opens
-    chart_scroll = 0.0f; chart_sel = -1; chart_zm = 1.0f;
-    chart_cx = -1700.0f; chart_cz = 7000.0f;
+    chart_scroll = 0.0f; chart_sel = -1; chart_zm = 0.8f;                       // wide enough to take in the airports and the coast
+    chart_cx = 7750.0f; chart_cz = 7000.0f;
     float hx = 0.5f * CH_MW / ch_s() - 1500.0f, hz = 0.5f * CH_MH / ch_s() - 1500.0f;     // flying outside the usual window (the far spaceport): look at you
     if (fabsf(pl.pos.x - chart_cx) > hx || fabsf(pl.pos.z - chart_cz) > hz) { chart_cx = pl.pos.x; chart_cz = pl.pos.z; }
     ch_clamp_view();
@@ -112,7 +111,7 @@ static void draw_chart(vita2d_pgf *pgf) {
         for (int i = 0; i < 8; i++) { float a = i * PI_F / 4.0f + 0.39f; o[i] = (P2){ bx + cosf(a) * r, by + sinf(a) * r }; }
         ch_poly(o, 8, RGBA8(112, 80, 58, 255));
     }
-    if (ap_found) {                                                                // the sea down the east side, once you have been out there
+    {                                                                              // the sea down the east side: always on the chart, it is the way to the spaceport
         for (float z = -60000.0f; z < 60000.0f; z += 1500.0f) {
             float c0 = sea_coast_x(z), c1 = sea_coast_x(z + 1500.0f);
             float y0 = ch_sy(z), y1 = ch_sy(z + 1500.0f);

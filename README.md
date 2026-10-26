@@ -111,7 +111,7 @@ strike) is a crash.
 
 ## The world
 
-The airports and the country between them. Hold **Select** for a chart of the whole area (the flight pauses; use the touch screen to move and zoom it) showing the airports,
+The airports and the country between them. Hold **Select** for a chart of the whole area (the flight pauses; use the touch screen to move and zoom it) showing the airports and the whole coastline (the ocean is always drawn, so follow the coast to find what is out there),
 your position and heading, your track so far, and the bearing and distance to each airport.
 
 There is one more place that is not on the chart or in any list until you find it: a long way out, where the farmland ends at an ocean coast. Fly there and it is added to the chart and the start menu.

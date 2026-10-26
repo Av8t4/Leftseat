@@ -112,9 +112,58 @@ static bool wx_dirty;              // the weather choice changed since the fligh
 
 static int menu_count(void) { return 8; }
 
+// Touch on the menus: a tap is turned into the button press it stands for, so the touch screen and the buttons share one set of rules.
+// Main menu: tap a row (on a row with < > values, the left half of the value steps back and the right half steps forward).
+// Challenge list: tap a row to start it, tap outside the list to go back. Controls window and message box: tap to close.
+static unsigned int menu_touch_taps(void) {
+    static struct { int on; int id; float sx, sy, lx, ly; bool moved; } mt;
+    const ChTouch *t = &g_touch;
+    unsigned int vp = 0;
+    int pi = -1;
+    for (int i = 0; i < t->n; i++) if (mt.on && t->id[i] == mt.id) pi = i;
+    if (mt.on && pi < 0) {                                             // the finger came up
+        mt.on = 0;
+        if (!mt.moved) {
+            float tx = mt.lx, ty = mt.ly;
+            if (menu_kopen || menu_popup >= 0) vp = SCE_CTRL_CIRCLE;
+            else if (menu_chopen) {
+                bool run = ch_running();
+                int n = CK_COUNT + (run ? 1 : 0);
+                bool tight = (n >= 6);
+                int rs = tight ? 48 : 58, rh = tight ? 44 : 52, top = tight ? 56 : 84, h = 70 + n * rs + 36;
+                if (tx < 150.0f || tx > 810.0f || ty < top || ty > top + h) vp = SCE_CTRL_CIRCLE;
+                else for (int i = 0; i < n; i++) {
+                    int ry = top + 60 + i * rs;
+                    if (tx >= 172.0f && tx <= 788.0f && ty >= ry && ty < ry + rh) { menu_chsel = i; vp = SCE_CTRL_CROSS; }
+                }
+            } else {
+                if (tx >= 760.0f && ty >= 505.0f) vp = SCE_CTRL_START;                          // "START: quit"
+                for (int i = 0; i < menu_count(); i++) {
+                    float top = 171.0f + 37.0f * i;
+                    if (tx < 52.0f || tx > 472.0f || ty < top || ty >= top + 34.0f) continue;
+                    menu_sel = i;
+                    bool value = (i == 1 || i == 4 || i == 5 || i == 6);
+                    if (value && tx >= 270.0f) vp = (tx < 372.0f) ? SCE_CTRL_LEFT : SCE_CTRL_RIGHT;
+                    else vp = SCE_CTRL_CROSS;
+                }
+            }
+        }
+    }
+    if (!mt.on && t->n > 0) { mt.on = 1; mt.id = t->id[0]; mt.sx = mt.lx = t->x[0]; mt.sy = mt.ly = t->y[0]; mt.moved = false; pi = 0; }
+    if (mt.on && pi >= 0) {
+        mt.lx = t->x[pi]; mt.ly = t->y[pi];
+        if (fabsf(mt.lx - mt.sx) + fabsf(mt.ly - mt.sy) > 14.0f) mt.moved = true;
+    }
+    return vp;
+}
+
 // Returns 0 = nothing, 1 = start / resume the flight, 2 = quit the game.
 static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
     if (menu_quit_t > 0) menu_quit_t--;
+    {
+        unsigned int vp = menu_touch_taps();
+        if (!menu_hopen) pressed |= vp;
+    }
     if (menu_hopen) {                                         // hangar: choose an aircraft (D-pad / stick, or touch)
         int mv = 0;
         if (pressed & SCE_CTRL_UP)   mv = -1;
@@ -482,7 +531,7 @@ static void draw_menu(vita2d_pgf *pgf) {
                        : (menu_sel == 4 ? "Left / Right: change weather     Up / Down: move"
                        : (menu_sel == 5 ? "Left / Right: change time of day     Up / Down: move"
                        : (menu_sel == 6 ? "Left / Right: change the volume     Up / Down: move"
-                       : (menu_sel == 7 ? "X: show the controls     Up / Down: move" : "D-pad / left stick: move     X: select")))));
+                       : (menu_sel == 7 ? "X: show the controls     Up / Down: move" : "D-pad / left stick: move     X: select     Touch: tap")))));
     if (menu_quit_t > 0) vita2d_pgf_draw_text(pgf, 640, 528, gold, 0.8f, "Press START again to quit");
     else                 vita2d_pgf_draw_text(pgf, 770, 528, RGBA8(190, 205, 235, 255), 0.8f, "START: quit");
 
