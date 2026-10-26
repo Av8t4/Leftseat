@@ -61,7 +61,7 @@ Left Seat saves your best challenge scores and sound volume in `ux0:data/skyhawk
 4. A typical takeoff in the K-4: flaps 10, full throttle, a little right rudder to hold the centre line, rotate at
    about 55 kt and climb at about 74 kt. Approach at about 65 kt with full flaps and flare just above the runway.
 
-In the menu, use the D-pad or left stick to move, ✕ to select and left / right on a row to change it. Press START
+In the menu, use the D-pad or left stick to move and ✕ to select. Airport, Weather, Time and Options open a list like the Hangar's. Options holds Sound (the volume) and Controls (sticks; gyro will be added here), with a picture and details on the right (✕ or SELECT chooses, ○ or BACK cancels); left / right in a list moves the highlight. On the touch screen, tap a row to open it, tap a row in the list to look at it, then tap it again or tap SELECT to choose. Press START
 twice to quit.
 
 ## Controls
@@ -111,7 +111,7 @@ strike) is a crash.
 
 ## The world
 
-The airports and the country between them. Hold **Select** for a chart of the whole area (the flight pauses; use the touch screen to move and zoom it) showing the airports,
+The airports and the country between them. Hold **Select** for a chart of the whole area (the flight pauses; use the touch screen to move and zoom it) showing the airports and the whole coastline (the ocean is always drawn, so follow the coast to find what is out there),
 your position and heading, your track so far, and the bearing and distance to each airport.
 
 There is one more place that is not on the chart or in any list until you find it: a long way out, where the farmland ends at an ocean coast. Fly there and it is added to the chart and the start menu.

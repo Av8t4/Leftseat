@@ -264,6 +264,52 @@ static void build_spaceport(void) {
         for (int i = 0; i < 10; i++) { sp_box(a, cl - 60.0f + i * 25.0f, 2.8f, 1.0f, 1.0f, 0.0f, 1.8f, 100, 84, 62); sp_box(a, cl - 60.0f + i * 25.0f, -2.8f, 1.0f, 1.0f, 0.0f, 1.8f, 100, 84, 62); }
         sp_box(a, cl + 150.0f, 0.0f, 14.0f, 9.0f, 2.4f, 5.5f, 220, 220, 224);                                  // a little shed at the end
     }
+
+    // ---- and more -------------------------------------------------------------------------------------------------------------------------
+    {
+        float cl = sea_coast_x(a->cz) - a->cx;
+        // A lighthouse on the dunes: red and white bands, a gallery and a lamp room. A landmark on a coast with nothing else on it.
+        V3 c = ap_pt(a, cl - 110.0f, 0.0f, 330.0f);
+        sp_cyl(c.x, c.z, 5.0f, 0.0f, 24.0f, 240, 240, 244, 0);
+        sp_cyl(c.x, c.z, 5.1f, 8.0f, 16.0f, 200, 50, 44, 0);
+        sp_cyl(c.x, c.z, 6.0f, 24.0f, 25.6f, 60, 62, 70, 0);
+        sp_cyl(c.x, c.z, 3.0f, 25.6f, 31.0f, 190, 214, 236, 0);
+        sp_cone(c.x, c.z, 3.8f, 31.0f, 35.0f, 200, 50, 44);
+        sp_col(a, cl - 110.0f, 330.0f, 10.0f, 10.0f, 35.0f);
+        // A drone-ship barge and a tug off the beach, and two small boats.
+        sp_box(a, cl + 330.0f, 250.0f, 90.0f, 28.0f, 0.0f, 2.4f, 52, 56, 66);
+        sp_box(a, cl + 330.0f, 250.0f, 84.0f, 24.0f, 2.4f, 2.7f, 96, 100, 110);
+        sp_box(a, cl + 372.0f, 250.0f, 12.0f, 9.0f, 2.7f, 10.0f, 214, 216, 222);
+        sp_col(a, cl + 330.0f, 250.0f, 90.0f, 28.0f, 10.0f);
+        sp_box(a, cl + 404.0f, 258.0f, 18.0f, 6.0f, 0.0f, 2.2f, 190, 56, 48);
+        sp_box(a, cl + 408.0f, 258.0f, 7.0f, 4.4f, 2.2f, 5.6f, 236, 236, 240);
+        sp_box(a, cl + 130.0f, -150.0f, 10.0f, 3.4f, 0.0f, 1.3f, 236, 236, 240);
+        sp_box(a, cl + 128.0f, -150.0f, 3.6f, 2.6f, 1.3f, 3.0f, 70, 120, 176);
+        sp_box(a, cl + 230.0f, -190.0f, 9.0f, 3.2f, 0.0f, 1.2f, 240, 200, 70);
+        sp_box(a, cl + 228.0f, -190.0f, 3.4f, 2.4f, 1.2f, 2.8f, 236, 236, 240);
+        // A radar dome and mast on the airfield, a gantry crane over the road to the build site, and a flare stack.
+        V3 rd = ap_pt(a, 70.0f, 0.0f, 180.0f);
+        sp_cyl(rd.x, rd.z, 6.0f, 0.0f, 9.0f, 232, 234, 240, 0);
+        sp_cone(rd.x, rd.z, 6.0f, 9.0f, 15.0f, 244, 244, 248);
+        sp_col(a, 70.0f, 180.0f, 12.0f, 12.0f, 15.0f);
+        sp_box(a, 90.0f, 200.0f, 0.8f, 0.8f, 0.0f, 30.0f, 160, 164, 172);
+        sp_box(a, 980.0f, 396.0f, 4.0f, 4.0f, 0.0f, 22.0f, 214, 170, 40);
+        sp_box(a, 980.0f, 418.0f, 4.0f, 4.0f, 0.0f, 22.0f, 214, 170, 40);
+        sp_box(a, 980.0f, 407.0f, 4.0f, 30.0f, 22.0f, 25.5f, 214, 170, 40);
+        sp_col(a, 980.0f, 407.0f, 6.0f, 30.0f, 25.5f);
+        sp_box(a, 1292.0f, -380.0f, 4.0f, 4.0f, 0.0f, 2.0f, 130, 134, 142);
+        sp_box(a, 1292.0f, -380.0f, 1.0f, 1.0f, 2.0f, 46.0f, 150, 154, 162);
+        sp_col(a, 1292.0f, -380.0f, 4.0f, 4.0f, 46.0f);
+        // Three booster sections laid out on the build-site apron, an entrance sign at the airfield.
+        for (int i = 0; i < 3; i++) {
+            sp_box(a, 860.0f + 12.0f * i, 1850.0f, 4.6f, 54.0f, 1.4f, 6.0f, 226, 228, 234);
+            sp_box(a, 860.0f + 12.0f * i, 1821.0f, 4.0f, 3.0f, 1.8f, 5.6f, 44, 46, 54);
+        }
+        sp_box(a, 36.0f, 70.0f, 0.8f, 0.8f, 0.0f, 6.0f, 130, 134, 142);
+        sp_box(a, 36.0f, 94.0f, 0.8f, 0.8f, 0.0f, 6.0f, 130, 134, 142);
+        sp_box(a, 36.0f, 82.0f, 1.0f, 28.0f, 3.0f, 8.0f, 244, 246, 248);
+        sp_box(a, 35.4f, 82.0f, 0.3f, 24.0f, 4.6f, 6.4f, 40, 120, 130);
+    }
 }
 
 static void draw_spaceport_all(void) {
@@ -318,6 +364,21 @@ static void draw_spaceport_all(void) {
         ap_quad(a, 190.0f, 116.0f, 206.0f, 124.0f, tw);
         ap_quad(a, 590.0f, 740.0f, 690.0f, 850.0f, RGBA8(138, 130, 112, 255));   // gravel under the solar array
         ap_quad(a, 1640.0f - 20.0f, -9.0f, 1700.0f, 9.0f, RGBA8(214, 196, 150, 255));   // the end of the beach road
+        {   // helipad, retention ponds, hazard stripes round the flame pits, hold lines on the taxiway connectors
+            unsigned int yel = RGBA8(235, 205, 70, 255);
+            ap_quad(a, 125.0f, -355.0f, 155.0f, -325.0f, conc);
+            ap_quad(a, 132.0f, -349.0f, 134.5f, -331.0f, yel); ap_quad(a, 145.5f, -349.0f, 148.0f, -331.0f, yel); ap_quad(a, 134.5f, -341.0f, 145.5f, -338.5f, yel);
+            ap_quad(a, 100.0f, -355.0f, 125.0f, -349.0f, tw);
+            ap_quad(a, 380.0f, 880.0f, 450.0f, 925.0f, RGBA8(58, 98, 142, 255));
+            ap_quad(a, 460.0f, 940.0f, 505.0f, 975.0f, RGBA8(58, 98, 142, 255));
+            for (int p = 0; p < 2; p++) {
+                float pz = p ? 130.0f : -120.0f;
+                ap_quad(a, 1146.0f, pz - 14.0f, 1174.0f, pz - 12.0f, yel); ap_quad(a, 1146.0f, pz + 12.0f, 1174.0f, pz + 14.0f, yel);
+                ap_quad(a, 1146.0f, pz - 12.0f, 1148.0f, pz + 12.0f, yel); ap_quad(a, 1172.0f, pz - 12.0f, 1174.0f, pz + 12.0f, yel);
+            }
+            ap_quad(a, 15.0f, -hl + 27.0f, 36.0f, -hl + 28.0f, yel); ap_quad(a, 15.0f, -hl + 29.5f, 36.0f, -hl + 30.5f, yel);
+            ap_quad(a, 15.0f, hl - 28.0f, 36.0f, hl - 27.0f, yel); ap_quad(a, 15.0f, hl - 30.5f, 36.0f, hl - 29.5f, yel);
+        }
         static const int NUM[2][2] = { { 3, 6 }, { 1, 8 } };                   // runway 36 at the north end of the frame, 18 at the other
         for (int north = 0; north < 2; north++) {
             ap_digit(a, NUM[north][0], north, -9.0f, wht);
@@ -358,6 +419,24 @@ static void draw_spaceport_all(void) {
         }
         { V3 w = ap_pt(a, 1252.0f, 52.5f, -200.0f); draw_light(w.x, w.y, w.z, 2.2f, red); }
         for (int i = 0; i < 6; i++) { V3 w = ap_pt(a, 62.0f + i * 8.0f, 4.0f, 52.0f); draw_light(w.x, w.y, w.z, 1.4f, lw); }
+        {                                                                                                   // lighthouse, barge, boats, crane, radar, flare stack, helipad
+            float cl = sea_coast_x(a->cz) - a->cx;
+            bool on = ((frame_count / 24) & 1) != 0;
+            V3 lh = ap_pt(a, cl - 110.0f, 33.0f, 330.0f); light_far = 20000.0f;
+            draw_light(lh.x, lh.y, lh.z, 3.2f, on ? RGBA8(255, 246, 214, 255) : RGBA8(255, 200, 120, 255)); light_far = 9000.0f;
+            static const float BL[4][2] = { { 288.0f, 238.0f }, { 288.0f, 262.0f }, { 372.0f, 238.0f }, { 372.0f, 262.0f } };
+            for (int i = 0; i < 4; i++) { V3 w = ap_pt(a, cl + BL[i][0], 3.4f, BL[i][1]); draw_light(w.x, w.y, w.z, 1.8f, i < 2 ? red : grn); }
+            { V3 w = ap_pt(a, cl + 372.0f, 11.0f, 250.0f); draw_light(w.x, w.y, w.z, 1.8f, lw); }
+            { V3 w = ap_pt(a, cl + 408.0f, 6.4f, 258.0f); draw_light(w.x, w.y, w.z, 1.6f, lw); }
+            { V3 w = ap_pt(a, cl + 130.0f, 3.4f, -150.0f); draw_light(w.x, w.y, w.z, 1.5f, lw); }
+            { V3 w = ap_pt(a, cl + 230.0f, 3.2f, -190.0f); draw_light(w.x, w.y, w.z, 1.5f, red); }
+            { V3 w = ap_pt(a, 980.0f, 26.0f, 396.0f); draw_light(w.x, w.y, w.z, 2.0f, red); }
+            { V3 w = ap_pt(a, 980.0f, 26.0f, 418.0f); draw_light(w.x, w.y, w.z, 2.0f, red); }
+            { V3 w = ap_pt(a, 70.0f, 16.5f, 180.0f); draw_light(w.x, w.y, w.z, 1.8f, red); }
+            { V3 w = ap_pt(a, 90.0f, 31.0f, 200.0f); draw_light(w.x, w.y, w.z, 1.8f, red); }
+            { V3 w = ap_pt(a, 1292.0f, 47.0f, -380.0f); light_far = 14000.0f; draw_light(w.x, w.y, w.z, 3.4f, RGBA8(255, 150, 60, 255)); light_far = 9000.0f; }
+            for (int i = 0; i < 8; i++) { float an = i * PI_F / 4.0f; V3 w = ap_pt(a, 140.0f + cosf(an) * 13.0f, 0.4f, -340.0f + sinf(an) * 13.0f); draw_light(w.x, w.y, w.z, 1.4f, grn); }
+        }
         for (int i = 0; i < 6; i++) { V3 w = ap_pt(a, 1040.0f + i * 14.0f, 14.0f, 1450.0f); draw_light(w.x, w.y, w.z, 1.6f, lw); }
     }
     if (tod != TOD_DAY && dc < 12000.0f) {                                                                  // the build site, lit
