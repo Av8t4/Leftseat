@@ -49,7 +49,7 @@ typedef struct {
     float kd_gear, gear_vmax, gear_time;                // extra drag with the gear out, fastest speed (m/s) at which it may move, seconds to move
 } Spec;
 
-enum { AC_K4 = 0, AC_K10, AC_JET1, AC_K30, AC_COUNT };
+enum { AC_K4 = 0, AC_K10, AC_JET1, AC_K30, AC_A22, AC_COUNT };
 
 static const Spec SPECS[AC_COUNT] = {
     {   // ---- K-4 Trainer ------------------------------------------------------------
@@ -162,6 +162,35 @@ static const Spec SPECS[AC_COUNT] = {
         3.2f, 2.0f, 1.3f, 0.04f, 0.0f, 0.0f,
         400.0f, 100.0f, 5.0f,
         5.0f, 20.0f, 0.8f, 1.0f, "%",
+        0,
+        1, 0.00004f, 103.0f, 4.5f
+    },
+    {   // ---- Ashley A22 --------------------------------------------------------
+        "ASHLEY TWIN A22", "a22", "A22",
+        "Twin pusher turboprop, retractable gear, cruise 200 kt", "Stalls at 62 kt. Fast, smooth and different. Gear on Square.",
+        0.0041f, 4.9f, -0.060f, 0.270f, 1.45f,
+        0.000124f, 0.000238f, 0.00006f, 0.0022f,
+        3.1f, 275.0f,
+        62.0f, 0.050f, 112.0f,
+        { 0.0f, 0.35f, 0.70f, 0.90f }, { 0.0f, 0.00005f, 0.00014f, 0.00032f },
+        0.02f, 2.2f, 8.0f, 4.6f,
+        1.0f, 2.8f, 0.8f, 2.6f, 4.5f,
+        320.0f, 7600.0f, 6.7f, 34.0f, 58.0f,
+        1000.0f, 900.0f, 0.0f, 2000.0f, 14.0f, 1100.0f, 1350.0f,
+        29.0f, 0.22f, 3.5f,
+        1.55f,
+        2.60f, 3.00f, 4.80f,
+        { { -2.45f, -0.160f, -0.30f, 30.0f, 9.0f }, { 2.45f, -0.160f, -0.30f, 30.0f, 9.0f }, { 0.0f, -0.180f, 3.20f, 11.0f, 5.0f } },
+        6.60f, 1.30f, -6.40f, 2.20f, 0.0f, 0.0f,
+        -0.40f, 2.20f, 1.60f, 20.0f, 5.5f,
+        64.0f, 130.0f, 74.0f, 175.0f, 205.0f,
+        2400.0f, 1600.0f, 1900.0f, 1900.0f,
+        82.0f, 2, 43.0f, -0.088f, 430.0f, 510.0f,
+        1.90f, 2.50f, 1.05f, 0.20f, 3.00f, 2.35f, 3,
+        4,
+        0.0f, 0.0f, 1.0f, 0.0f, 0.12f, 0.03f,
+        240.0f, 40.0f, 2.0f,
+        100.0f, 500.0f, 10.0f, 10.0f, "RPM",
         0,
         1, 0.00004f, 103.0f, 4.5f
     },

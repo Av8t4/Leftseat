@@ -32,6 +32,7 @@
 #include "k10.inc"
 #include "jet1.inc"
 #include "k30.inc"
+#include "a22.inc"
 #include "fleet.inc"
 #include "sky.inc"
 #include "scenery.inc"

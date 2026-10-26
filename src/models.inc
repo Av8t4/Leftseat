@@ -343,14 +343,15 @@ static void wheel(float cx, float cy, float cz, float rad, float hw, int hub_sid
     }
 }
 
-static void build_prop(int cockpit) {
-    const float cy = spec->prop_cy, pz = spec->prop_pz, R = spec->prop_r, k = spec->prop_r / 0.95f, sr = spec->spin_r;
+static bool prop_pusher = false; static float prop_pusher_z = 0.0f;               // pusher: the prop sits behind its nacelle, spinner pointing back
+static void build_prop_x(float xo, int cockpit, bool adv) {
+    const float cy = spec->prop_cy, pz = prop_pusher ? prop_pusher_z : spec->prop_pz, R = spec->prop_r, k = spec->prop_r / 0.95f, sr = spec->spin_r;
     const int nb = spec->nblades;
     // spinner
-    V3 base[8], tip = MW(0, cy, spec->spin_tip), cs = MW(0, cy, spec->spin_back);
+    V3 base[8], tip = MW(xo + 0, cy, prop_pusher ? pz - 0.50f : spec->spin_tip), cs = MW(xo + 0, cy, prop_pusher ? pz + 0.35f : spec->spin_back);
     for (int i = 0; i < 8; i++) {
         float a = i * PI_F / 4.0f;
-        base[i] = MW(sr * cosf(a), cy + sr * sinf(a), pz);
+        base[i] = MW(xo + sr * cosf(a), cy + sr * sinf(a), pz);
     }
     for (int i = 0; i < 8; i++) {
         V3 q[3] = { base[i], base[(i + 1) & 7], tip };
@@ -359,19 +360,18 @@ static void build_prop(int cockpit) {
     pf_poly(8, base, &tip, 180, 30, 34, 0, 255);                      // back plate: what you see from the cockpit
     // blades
     float rate = pl.rpm * 0.10472f;                              // rad/s from rpm
-    prop_phase += rate * DT;
-    if (prop_phase > 2 * PI_F) prop_phase -= 2 * PI_F;
+    if (adv) { prop_phase += rate * DT; if (prop_phase > 2 * PI_F) prop_phase -= 2 * PI_F; }
     for (int bl = 0; bl < nb && (!cockpit || pl.rpm < spec->blade_vis_rpm); bl++) {     // in the cockpit the blades blur away at speed
         float th = prop_phase + bl * (2.0f * PI_F / nb), ux = cosf(th), uy = sinf(th), px = -uy, py = ux;
         const float r0 = 0.16f * k, r1 = R, w0 = 0.075f * k, w1 = 0.05f * k, rt = 0.78f * k;
         float wt = w0 + (w1 - w0) * (rt - r0) / (r1 - r0);
-        V3 q[4] = { MW(r0 * ux + px * w0, cy + r0 * uy + py * w0, pz + 0.02f),
-                    MW(rt * ux + px * wt, cy + rt * uy + py * wt, pz + 0.02f),
-                    MW(rt * ux - px * wt, cy + rt * uy - py * wt, pz + 0.02f),
-                    MW(r0 * ux - px * w0, cy + r0 * uy - py * w0, pz + 0.02f) };
+        V3 q[4] = { MW(xo + r0 * ux + px * w0, cy + r0 * uy + py * w0, pz + 0.02f),
+                    MW(xo + rt * ux + px * wt, cy + rt * uy + py * wt, pz + 0.02f),
+                    MW(xo + rt * ux - px * wt, cy + rt * uy - py * wt, pz + 0.02f),
+                    MW(xo + r0 * ux - px * w0, cy + r0 * uy - py * w0, pz + 0.02f) };
         pf_poly(4, q, NULL, C_BLACK, PF_TWO, 255);
-        V3 t[4] = { q[1], MW(r1 * ux + px * w1, cy + r1 * uy + py * w1, pz + 0.02f),
-                    MW(r1 * ux - px * w1, cy + r1 * uy - py * w1, pz + 0.02f), q[2] };
+        V3 t[4] = { q[1], MW(xo + r1 * ux + px * w1, cy + r1 * uy + py * w1, pz + 0.02f),
+                    MW(xo + r1 * ux - px * w1, cy + r1 * uy - py * w1, pz + 0.02f), q[2] };
         pf_poly(4, t, NULL, C_YELLOW, PF_TWO, 255);
     }
     // blurred disc at speed
@@ -381,18 +381,19 @@ static void build_prop(int cockpit) {
         if (cockpit)                                                       // faint yellow ring where the blade tips sweep
             for (int i = 0; i < 8; i++) {
                 float a0 = i * PI_F / 4.0f, a1 = (i + 1) * PI_F / 4.0f;
-                V3 rq[4] = { MW(0.76f * k * cosf(a0), cy + 0.76f * k * sinf(a0), pz + 0.03f), MW(R * cosf(a0), cy + R * sinf(a0), pz + 0.03f),
-                             MW(R * cosf(a1), cy + R * sinf(a1), pz + 0.03f), MW(0.76f * k * cosf(a1), cy + 0.76f * k * sinf(a1), pz + 0.03f) };
+                V3 rq[4] = { MW(xo + 0.76f * k * cosf(a0), cy + 0.76f * k * sinf(a0), pz + 0.03f), MW(xo + R * cosf(a0), cy + R * sinf(a0), pz + 0.03f),
+                             MW(xo + R * cosf(a1), cy + R * sinf(a1), pz + 0.03f), MW(xo + 0.76f * k * cosf(a1), cy + 0.76f * k * sinf(a1), pz + 0.03f) };
                 pf_poly(4, rq, NULL, (float)(ycol & 255u), (float)((ycol >> 8) & 255u), (float)((ycol >> 16) & 255u), PF_TWO | PF_EMIT, alpha / 2);
             }
         V3 d[8];
         for (int i = 0; i < 8; i++) {
             float a = i * PI_F / 4.0f;
-            d[i] = MW(R * cosf(a), cy + R * sinf(a), pz + 0.03f);
+            d[i] = MW(xo + R * cosf(a), cy + R * sinf(a), pz + 0.03f);
         }
         pf_poly(8, d, NULL, (float)(dcol & 255u), (float)((dcol >> 8) & 255u), (float)((dcol >> 16) & 255u), PF_TWO | PF_EMIT, alpha);
     }
 }
+static void build_prop(int cockpit) { build_prop_x(0.0f, cockpit, true); }
 
 static void build_k4(void) {
     npf = 0; pf_last = -1;

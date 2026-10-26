@@ -101,16 +101,32 @@ static void loft_car(const KS *K, int nk, const float *Z, int nz, const Paint *p
                 static const float W30[7][2] = { { 6.05f, 5.15f }, { 3.80f, 3.30f }, { 2.90f, 2.40f }, { 2.00f, 1.50f }, { 1.10f, 0.60f }, { 0.20f, -0.30f }, { -0.70f, -1.20f } };
                 if (sd <= 1 && zm > 5.35f && zm < 6.55f) glass = true;                  // windscreen
                 if (sd == 2 && in_any(W30, 7, zm)) glass = true;                        // cockpit and cabin windows
+            } else if (kind == 7) {
+                if (sd <= 1 && zm > 2.05f && zm < 3.15f) glass = true;                  // windscreen
+                if (sd == 2 && zm > 2.05f && zm < 3.15f) glass = true;                  // cockpit side windows, level with the windscreen
+                        } else if (kind == 6) {
+                static const float W22[6][2] = { { 2.10f, 1.45f }, { 0.95f, 0.35f }, { -0.05f, -0.65f }, { -1.05f, -1.65f }, { -2.05f, -2.65f }, { -3.05f, -3.55f } };
+                if (sd <= 1 && zm > 1.95f && zm < 2.95f) glass = true;                  // windscreen
+                if (sd == 2 && in_any(W22, 6, zm)) glass = true;                        // cockpit and cabin windows
             } else if (kind == 2) { r = p->body[0] * 0.92f; g = p->body[1] * 0.92f; b = p->body[2] * 0.92f; }
             else if (kind == 3 && sd == 0) { r = 40.0f; g = 42.0f; b = 48.0f; }         // black anti-glare panel
             if (glass) { r = p->glass[0]; g = p->glass[1]; b = p->glass[2]; }
             pf_poly(4, q, &cc, r, g, b, kind == 3 ? PF_TWO : 0, 255);             // (the cockpit nose is drawn solid from every side)
-            if (kind == 1 || kind == 4 || kind == 5) {
+            if (kind == 7 && sd == 2) {                                                  // passenger windows: one small window on every other panel
+                static const float PW[4] = { 1.225f, -1.475f, -1.925f, -2.375f };
+                for (int w = 0; w < 4; w++)
+                    if (fabsf(zm - PW[w]) < 0.1f) {                                                                       // a round window: an octagon drawn on the panel
+                        V3 o[8];
+                        for (int q = 0; q < 8; q++) { float a = q * PI_F / 4.0f + PI_F / 8.0f; o[q] = bilerp(A, B, C, D, 0.5f + 0.40f * cosf(a), 0.5f + 0.42f * sinf(a)); }
+                        pf_poly(8, o, NULL, 34, 62, 104, PF_DECAL, 255);
+                    }
+            }
+            if (kind == 1 || kind == 4 || kind == 5 || kind == 6 || kind == 7) {
                 if (sd == 3) {                                                           // belt stripes
                     decal_quad(A, B, C, D, 0.10f, 0.32f, 0.0f, 1.0f, p->a1[0], p->a1[1], p->a1[2]);
                     decal_quad(A, B, C, D, 0.32f, 0.50f, 0.0f, 1.0f, p->a2[0], p->a2[1], p->a2[2]);
                 }
-                if (kind != 5 && zm > 3.55f && sd < 3) decal_quad(A, B, C, D, 0.0f, 1.0f, 0.0f, 1.0f, p->a1[0], p->a1[1], p->a1[2]);   // cowl band
+                if (kind != 5 && kind != 6 && kind != 7 && zm > 3.55f && sd < 3) decal_quad(A, B, C, D, 0.0f, 1.0f, 0.0f, 1.0f, p->a1[0], p->a1[1], p->a1[2]);   // cowl band
             }
         }
     }
@@ -183,17 +199,18 @@ static void a_wing(const AWing *W, int sx, const float *dy, const Paint *p, bool
 }
 
 typedef struct { int n; float y[5], zl[5], ch[5], th[5]; float yc; } ATail;           // the fin
+static float fin_xoff = 0.0f;                     // sideways offset for a fin (twin-boom tails)
 static void a_fin(const ATail *F, float rud, const Paint *p) {
     V3 sec[6][6];
     for (int k = 0; k < F->n; k++) {
         float c = F->ch[k], t = F->th[k], dx = rud * 0.13f * clampf((F->y[k] - F->yc) / 1.3f, 0.0f, 1.0f);
         float zl = F->zl[k], y = F->y[k];
-        sec[k][0] = MW(0, y, zl);
-        sec[k][1] = MW(t * 0.9f, y, zl - 0.18f * c);
-        sec[k][2] = MW(t * 0.9f + dx * 0.4f, y, zl - 0.60f * c);
-        sec[k][3] = MW(dx, y, zl - c);
-        sec[k][4] = MW(-t * 0.9f + dx * 0.4f, y, zl - 0.60f * c);
-        sec[k][5] = MW(-t * 0.9f, y, zl - 0.18f * c);
+        sec[k][0] = MW(fin_xoff + 0, y, zl);
+        sec[k][1] = MW(fin_xoff + t * 0.9f, y, zl - 0.18f * c);
+        sec[k][2] = MW(fin_xoff + t * 0.9f + dx * 0.4f, y, zl - 0.60f * c);
+        sec[k][3] = MW(fin_xoff + dx, y, zl - c);
+        sec[k][4] = MW(fin_xoff + -t * 0.9f + dx * 0.4f, y, zl - 0.60f * c);
+        sec[k][5] = MW(fin_xoff + -t * 0.9f, y, zl - 0.18f * c);
     }
     for (int k = 0; k < F->n - 1; k++) {
         V3 cc = vscale(vadd(avgv(sec[k], 6), avgv(sec[k + 1], 6)), 0.5f);
