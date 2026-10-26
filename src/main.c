@@ -33,6 +33,7 @@
 #include "jet1.inc"
 #include "k30.inc"
 #include "a22.inc"
+#include "a11.inc"
 #include "fleet.inc"
 #include "sky.inc"
 #include "scenery.inc"

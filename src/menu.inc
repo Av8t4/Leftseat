@@ -376,13 +376,13 @@ static void draw_menu(vita2d_pgf *pgf) {
 
     // The hangar.
     if (menu_hopen) {
-        const int pitch = 82, bh = 76;
-        int h = 50 + AC_COUNT * pitch + 34, top = (SCREEN_H - h) / 2;
+        const int pitch = 74, bh = 70;
+        int h = 44 + AC_COUNT * pitch + 30, top = (SCREEN_H - h) / 2;
         vita2d_draw_rectangle(150, top, 660, h, gold);
         vita2d_draw_rectangle(154, top + 4, 652, h - 8, RGBA8(10, 22, 56, 255));
         vita2d_pgf_draw_text(pgf, 180, top + 36, white, 1.3f, "HANGAR");
         for (int i = 0; i < AC_COUNT; i++) {
-            int ry = top + 50 + i * pitch;
+            int ry = top + 44 + i * pitch;
             bool s = (i == menu_hsel);
             vita2d_draw_rectangle(172, ry, 616, bh, s ? RGBA8(22, 46, 104, 255) : RGBA8(14, 30, 70, 255));
             if (s) vita2d_draw_rectangle(172, ry, 6, bh, gold);
@@ -390,7 +390,7 @@ static void draw_menu(vita2d_pgf *pgf) {
             vita2d_pgf_draw_text(pgf, 194, ry + 47, RGBA8(190, 205, 235, 255), 0.75f, SPECS[i].line1);
             vita2d_pgf_draw_text(pgf, 194, ry + 67, RGBA8(150, 172, 215, 255), 0.7f, SPECS[i].line2);
             if (i == menu_ac) vita2d_pgf_draw_text(pgf, 700, ry + 26, gold, 0.8f, "SELECTED");
-            const char *maker = (i == AC_A22) ? "ASHLEY AEROSPACE" : "KNOWLES AIRCRAFT CO.";
+            const char *maker = (i == AC_A22 || i == AC_A11) ? "ASHLEY AEROSPACE" : "KNOWLES AIRCRAFT CO.";
             vita2d_pgf_draw_text(pgf, 778 - vita2d_pgf_text_width(pgf, 0.6f, maker), ry + 67, RGBA8(176, 150, 96, 255), 0.6f, maker);
         }
         vita2d_pgf_draw_text(pgf, 194, top + h - 12, RGBA8(190, 205, 235, 255), 0.8f, "Up / Down: choose     X: select     O: back");
