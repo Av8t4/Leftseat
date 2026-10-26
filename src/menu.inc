@@ -111,6 +111,39 @@ static int  menu_psel;              // its highlighted row
 static int  menu_pparent;           // the picker to go back to when this one closes (8 = options), or 0
 static int  menu_psnd;              // the volume when the sound picker opened (Back restores it)
 #define PK_ROW 56.0f
+
+// ---- Options: one screen with every setting on it, each shown as a row of buttons ----
+static int  menu_oopen;             // the options screen is showing
+static int  menu_osel;              // its highlighted row
+#define OP_N   5
+#define OP_X   44.0f
+#define OP_Y   76.0f
+#define OP_ROW 66.0f
+#define OP_CX  236.0f                // where the buttons of a row start, and their total width
+#define OP_CW  320.0f
+#define OP_CH  44.0f
+#define OP_DY  424.0f                // the DONE button
+#define OP_PX  584.0f                // the tilt test panel
+#define OP_PY  76.0f
+#define OP_PW  332.0f
+#define OP_PH  330.0f
+static const int OP_COUNT[OP_N] = { 4, 2, 2, 2, 3 };
+static const char *const OP_NAME[OP_N] = { "SOUND", "CONTROLS", "GYRO ROLL", "GYRO PITCH", "SENSITIVITY" };
+static const char *const OP_CHIP[OP_N][4] = { { "OFF", "LOW", "MEDIUM", "HIGH" }, { "STICKS", "GYRO", "", "" }, { "NORMAL", "REVERSED", "", "" },
+                                              { "NORMAL", "REVERSED", "", "" }, { "LOW", "MEDIUM", "HIGH", "" } };
+static int op_get(int r) { return r == 0 ? (snd_level & 3) : (r == 1 ? gy_mode : (r == 2 ? gy_rinv : (r == 3 ? gy_pinv : gy_sens))); }
+static void op_set(int r, int v) {
+    if (v < 0 || v >= OP_COUNT[r] || v == op_get(r)) return;
+    if (r == 0) snd_level = v; else if (r == 1) { gy_mode = v; if (v) gyro_recenter(); } else if (r == 2) gy_rinv = v; else if (r == 3) gy_pinv = v; else gy_sens = v;
+    scores_save(); snd_event(EV_CLICK, 1.0f);
+}
+static const char *op_desc(int r) {
+    if (r == 0) return "Engine and effects volume";
+    if (r == 1) return gy_mode ? "Tilt to fly (sticks still work)" : "The sticks fly the aircraft";
+    if (r == 2) return gy_rinv ? "Tilting right rolls LEFT" : "Tilting right rolls right";
+    if (r == 3) return gy_pinv ? "Top edge towards you is nose DOWN" : "Top edge towards you is nose up";
+    return "How far you tilt for full control";
+}
 static int  menu_tod;              // time of day for the next flight: day, dusk or night
 static int  menu_wx;               // starting weather: 0..WX_COUNT-1, or WX_COUNT for random
 static bool wx_dirty;              // the weather choice changed since the flight started
@@ -236,6 +269,20 @@ static unsigned int menu_touch_taps(void) {
         if (!mt.moved) {
             float tx = mt.lx, ty = mt.ly;
             if (menu_kopen || menu_popup >= 0) vp = SCE_CTRL_CIRCLE;
+            else if (menu_oopen) {
+                if (ty >= OP_DY && ty <= OP_DY + HG_BH && tx >= HG_LX && tx <= HG_LX + 210.0f) vp = SCE_CTRL_CIRCLE;                     // DONE
+                else for (int r = 0; r < OP_N; r++) {
+                    float ry = OP_Y + r * OP_ROW;
+                    if (ty < ry || ty >= ry + OP_ROW || tx < OP_X || tx > OP_CX + OP_CW + 10.0f) continue;
+                    menu_osel = r;
+                    int n = OP_COUNT[r];
+                    float cw = (OP_CW - 8.0f * (n - 1)) / n;
+                    for (int c = 0; c < n; c++) {
+                        float cx0 = OP_CX + c * (cw + 8.0f);
+                        if (tx >= cx0 - 4.0f && tx <= cx0 + cw + 4.0f) op_set(r, c);
+                    }
+                }
+            }
             else if (menu_popen) {
                 if (tx >= HG_LX && tx <= HG_LX + HG_LW && ty >= HG_LY && ty < HG_LY + pk_count(menu_popen) * PK_ROW) {
                     int row = (int)floorf((ty - HG_LY) / PK_ROW);
@@ -331,6 +378,22 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
         if (!turning && !(pad->buttons & (SCE_CTRL_LEFT | SCE_CTRL_RIGHT))) menu_hang += 0.008f;     // a slow turntable
         return 0;
     }
+    if (menu_oopen) {                                         // options: Up / Down choose a row, Left / Right change it
+        int dy = 0, dx = 0;
+        if (pressed & SCE_CTRL_UP)    dy = -1;
+        if (pressed & SCE_CTRL_DOWN)  dy = 1;
+        if (pressed & SCE_CTRL_LEFT)  dx = -1;
+        if (pressed & SCE_CTRL_RIGHT) dx = 1;
+        int sy = pad->ly < 64 ? -1 : (pad->ly > 192 ? 1 : 0), sx = pad->lx < 64 ? -1 : (pad->lx > 192 ? 1 : 0);
+        if (sy != 0 && menu_stick == 0) dy = sy;
+        if (sx != 0 && menu_stickx == 0) dx = sx;
+        menu_stick = sy; menu_stickx = sx;
+        if (dy) { menu_osel = (menu_osel + dy + OP_N) % OP_N; snd_event(EV_CLICK, 1.0f); }
+        if (dx) op_set(menu_osel, op_get(menu_osel) + dx);
+        if (pressed & SCE_CTRL_CROSS) { int v = op_get(menu_osel) + 1; op_set(menu_osel, v >= OP_COUNT[menu_osel] ? 0 : v); }     // X steps on, round to the start
+        if (pressed & (SCE_CTRL_CIRCLE | SCE_CTRL_START)) { menu_oopen = 0; snd_event(EV_CLICK, 1.0f); }
+        return 0;
+    }
     if (menu_popen) {                                         // a picker: choose with D-pad / stick or touch
         int n = pk_count(menu_popen), mv = 0;
         if (pressed & (SCE_CTRL_UP | SCE_CTRL_LEFT))    mv = -1;
@@ -409,7 +472,8 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
         }
         snd_event(EV_CONFIRM, 1.0f);
         if (menu_sel == 1 || menu_sel == 4 || menu_sel == 5 || menu_sel == 6) {   // airport, weather, time, options: open the list
-            menu_popen = (menu_sel == 6) ? 8 : menu_sel; menu_psel = pk_cur(menu_popen); if (menu_psel < 0) menu_psel = 0; menu_psnd = snd_level & 3; menu_pparent = 0;
+            if (menu_sel == 6) { menu_oopen = 1; menu_osel = 0; return 0; }
+            menu_popen = menu_sel; menu_psel = pk_cur(menu_popen); menu_psnd = snd_level & 3; menu_pparent = 0;
             return 0;
         }
         if (menu_sel == 0) return 1;
@@ -844,6 +908,69 @@ static void draw_menu(vita2d_pgf *pgf) {
         }
         vita2d_pgf_draw_text(pgf, HG_LX, 508, pale, 0.66f, "Touch: tap a row to look, tap it again or SELECT to choose");
         vita2d_pgf_draw_text(pgf, HG_LX, 525, pale, 0.66f, "Up / Down: choose   X: select   O: back");
+    }
+
+    // Options: every setting on one screen.
+    if (menu_oopen) {
+        const unsigned int card = RGBA8(10, 22, 56, 255), dimc = RGBA8(150, 172, 215, 255), pale = RGBA8(190, 205, 235, 255);
+        vita2d_draw_rectangle(20, 12, 920, 520, gold);
+        vita2d_draw_rectangle(24, 16, 912, 512, card);
+        vita2d_pgf_draw_text(pgf, OP_X, 54, white, 1.3f, "OPTIONS");
+        for (int r = 0; r < OP_N; r++) {
+            float ry = OP_Y + r * OP_ROW;
+            bool f = (r == menu_osel), gyrow = (r >= 2);
+            vita2d_draw_rectangle(OP_X, ry, OP_CX + OP_CW + 14.0f - OP_X, OP_ROW - 6.0f, f ? RGBA8(22, 46, 104, 255) : RGBA8(14, 30, 70, 255));
+            if (f) vita2d_draw_rectangle(OP_X, ry, 6, OP_ROW - 6.0f, gold);
+            unsigned int nc = f ? white : dimc;
+            if (gyrow && !gy_mode) nc = RGBA8(110, 126, 166, 255);
+            vita2d_pgf_draw_text(pgf, OP_X + 18, ry + 26, nc, 1.0f, OP_NAME[r]);
+            vita2d_pgf_draw_text(pgf, OP_X + 18, ry + 47, RGBA8(150, 172, 215, 255), 0.55f, op_desc(r));
+            int n = OP_COUNT[r], cur = op_get(r);
+            float cw = (OP_CW - 8.0f * (n - 1)) / n;
+            for (int c = 0; c < n; c++) {
+                float cx0 = OP_CX + c * (cw + 8.0f), cy0 = ry + (OP_ROW - 6.0f - OP_CH) * 0.5f;
+                bool on = (c == cur);
+                vita2d_draw_rectangle(cx0, cy0, cw, OP_CH, on ? RGBA8(214, 160, 70, 255) : RGBA8(30, 52, 96, 255));
+                if (!on) { vita2d_draw_rectangle(cx0, cy0, cw, 1, RGBA8(70, 94, 150, 255)); vita2d_draw_rectangle(cx0, cy0 + OP_CH - 1, cw, 1, RGBA8(70, 94, 150, 255)); }
+                int tw = vita2d_pgf_text_width(pgf, 0.8f, OP_CHIP[r][c]);
+                vita2d_pgf_draw_text(pgf, (int)(cx0 + (cw - tw) * 0.5f), cy0 + 29, on ? RGBA8(20, 24, 40, 255) : pale, 0.8f, OP_CHIP[r][c]);
+            }
+        }
+        // The tilt test: the Vita turns with your tilt, and the bars show what the tilt asks of the aircraft.
+        vita2d_draw_rectangle(OP_PX - 2, OP_PY - 2, OP_PW + 4, OP_PH + 4, gold);
+        vita2d_draw_rectangle(OP_PX, OP_PY, OP_PW, OP_PH, RGBA8(14, 30, 70, 255));
+        vita2d_pgf_draw_text(pgf, OP_PX + 14, OP_PY + 26, pale, 0.8f, "TILT TEST");
+        {
+            float tcx = OP_PX + OP_PW * 0.5f - 22.0f, tcy = OP_PY + 112.0f;
+            float an = clampf(gy_roll_deg, -42.0f, 42.0f) * (PI_F / 180.0f), ca = cosf(an), sa = sinf(an);
+            P2 body[4]; float ox[4] = { -96, 96, 96, -96 }, oy[4] = { -40, -40, 40, 40 };
+            for (int q = 0; q < 4; q++) { body[q].x = tcx + ox[q] * ca - oy[q] * sa; body[q].y = tcy + ox[q] * sa + oy[q] * ca; }
+            fill_poly_panel(body, 4, RGBA8(36, 44, 70, 255));
+            P2 scr[4]; float sx[4] = { -56, 56, 56, -56 }, sy2[4] = { -33, -33, 33, 33 };
+            for (int q = 0; q < 4; q++) { scr[q].x = tcx + sx[q] * ca - sy2[q] * sa; scr[q].y = tcy + sx[q] * sa + sy2[q] * ca; }
+            fill_poly_panel(scr, 4, RGBA8(70, 110, 170, 255));
+            for (int q = 0; q < 2; q++) { float lx2 = q ? 79.0f : -79.0f; vita2d_draw_fill_circle(tcx + lx2 * ca + 10 * sa, tcy + lx2 * sa - 10 * ca, 11, RGBA8(90, 100, 130, 255)); }
+            const float rc = tcx, rby = OP_PY + 244.0f;
+            vita2d_draw_rectangle(rc - 120, rby, 240, 14, RGBA8(40, 56, 90, 255));
+            vita2d_draw_rectangle(gy_ail >= 0 ? rc : rc + gy_ail * 120.0f, rby, fabsf(gy_ail) * 120.0f, 14, gold);
+            vita2d_draw_rectangle(rc - 1, rby - 4, 2, 22, white);
+            vita2d_pgf_draw_text(pgf, rc - 120, rby - 8, pale, 0.6f, "ROLL LEFT");
+            vita2d_pgf_draw_text(pgf, rc + 120 - vita2d_pgf_text_width(pgf, 0.6f, "ROLL RIGHT"), rby - 8, pale, 0.6f, "ROLL RIGHT");
+            const float pc = OP_PY + 112.0f, px = OP_PX + OP_PW - 40.0f;
+            vita2d_draw_rectangle(px, pc - 78, 14, 156, RGBA8(40, 56, 90, 255));
+            vita2d_draw_rectangle(px, gy_ele >= 0 ? pc - gy_ele * 78.0f : pc, 14, fabsf(gy_ele) * 78.0f, gold);
+            vita2d_draw_rectangle(px - 4, pc - 1, 22, 2, white);
+            vita2d_pgf_draw_text(pgf, px - 24, OP_PY + 22, pale, 0.6f, "NOSE UP");
+            vita2d_pgf_draw_text(pgf, px - 32, OP_PY + 206, pale, 0.6f, "NOSE DOWN");
+            vita2d_pgf_draw_text(pgf, OP_PX + 14, OP_PY + OP_PH - 38, dimc, 0.6f, gy_have ? "Tilt the Vita: the bars show what it asks of the aircraft." : "No motion data");
+            vita2d_pgf_draw_text(pgf, OP_PX + 14, OP_PY + OP_PH - 18, dimc, 0.6f, "In flight, SELECT + Triangle centres the tilt.");
+        }
+        vita2d_draw_rectangle(HG_LX, OP_DY, 210, HG_BH, RGBA8(30, 52, 96, 255));
+        vita2d_draw_rectangle(HG_LX, OP_DY, 210, 1, gold); vita2d_draw_rectangle(HG_LX, OP_DY + HG_BH - 1, 210, 1, gold);
+        vita2d_draw_rectangle(HG_LX, OP_DY, 1, HG_BH, gold); vita2d_draw_rectangle(HG_LX + 209, OP_DY, 1, HG_BH, gold);
+        vita2d_pgf_draw_text(pgf, (int)(HG_LX + (210 - vita2d_pgf_text_width(pgf, 1.1f, "DONE")) * 0.5f), OP_DY + 31, white, 1.1f, "DONE");
+        vita2d_pgf_draw_text(pgf, HG_LX, 508, pale, 0.66f, "Touch: tap a button     Up / Down: choose a row     Left / Right or X: change it");
+        vita2d_pgf_draw_text(pgf, HG_LX, 525, pale, 0.66f, "O: done");
     }
 
     // The controls window.

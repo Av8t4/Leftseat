@@ -61,7 +61,7 @@ Left Seat saves your best challenge scores and sound volume in `ux0:data/skyhawk
 4. A typical takeoff in the K-4: flaps 10, full throttle, a little right rudder to hold the centre line, rotate at
    about 55 kt and climb at about 74 kt. Approach at about 65 kt with full flaps and flare just above the runway.
 
-The start menu is a big **OPEN WORLD** button over a grid of tiles: Airport, Hangar, Weather, Time, Challenges, Options, Controls and Quit. On the touch screen, tap a tile. With the buttons, move with the D-pad or left stick and press ✕. Airport, Hangar, Weather, Time and Options open a list with a picture and details on the right: tap a row to look at it, then tap it again or tap SELECT to choose (✕ or SELECT chooses, ○ or BACK cancels). Options holds Sound (the volume) and Controls (sticks; gyro will be added here). Tap Quit twice (or press START twice) to leave the game.
+The start menu is a big **OPEN WORLD** button over a grid of tiles: Airport, Hangar, Weather, Time, Challenges, Options, Controls and Quit. On the touch screen, tap a tile. With the buttons, move with the D-pad or left stick and press ✕. Airport, Hangar, Weather and Time open a list with a picture and details on the right: tap a row to look at it, then tap it again or tap SELECT to choose (✕ or SELECT chooses, ○ or BACK cancels). Options is one screen with every setting as a row of buttons: tap a button to set it, or use Up / Down to pick a row and Left / Right (or ✕) to change it. Tap Quit twice (or press START twice) to leave the game.
 
 ## Controls
 
@@ -88,9 +88,9 @@ The same list is in the game: choose **CONTROLS** on the start menu.
 
 ### Flying by tilt (gyro)
 
-In **Options > Controls** choose **GYRO**. Tilt the Vita like a control column: left or right rolls, the top edge towards you is nose up. The tilt is measured from the way you were holding the Vita when the flight started, so any comfortable grip works. SELECT + Triangle centres it again at any time. The tilt adds to the sticks, so you can still use them. The throttle and rudder stay on the right stick.
+In **Options**, set **Controls** to **GYRO**. Tilt the Vita like a control column: left or right rolls, the top edge towards you is nose up. The tilt is measured from the way you were holding the Vita when the flight started, so any comfortable grip works. SELECT + Triangle centres it again at any time. The tilt adds to the sticks, so you can still use them. The throttle and rudder stay on the right stick.
 
-Options also has **Gyro Roll** and **Gyro Pitch** (reverse a direction) and **Gyro Sensitivity** (how far you tilt for full control: about 40, 28 or 18 degrees). Those lists show the Vita turning with your tilt and two bars for what it asks of the aircraft, so you can check the directions before you fly. The settings are saved.
+Options also has **Gyro Roll** and **Gyro Pitch** (reverse a direction) and **Sensitivity** (how far you tilt for full control: about 40, 28 or 18 degrees). The Tilt Test panel on that screen shows the Vita turning with your tilt and two bars for what it asks of the aircraft, so you can check the directions before you fly. The settings are saved.
 
 ## Aircraft
 
