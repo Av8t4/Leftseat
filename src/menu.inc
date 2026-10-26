@@ -90,6 +90,21 @@ static bool ch_running(void) { return ch_state == CH_FLYING || ch_state == CH_TO
 static int  menu_ap;                // airport picked for the open world (start and Triangle reset)
 static int  menu_ac;                // aircraft picked in the hangar for the next flight
 static int  menu_hopen, menu_hsel;  // the hangar list is showing, and its highlighted row
+static float menu_hang;             // the turn of the aircraft in the hangar preview (radians)
+static float menu_hscroll;          // how far the hangar list is scrolled (pixels)
+static struct { int mode; int id; float sx, sy, lx, ly; bool moved; } hg_t;     // the finger that is down in the hangar
+// Hangar layout: the list on the left, the picture and the buttons on the right.
+#define HG_LX 44.0f
+#define HG_LY 72.0f
+#define HG_LW 400.0f
+#define HG_ROW 62.0f
+#define HG_LH 412.0f                     // height of the list window
+#define HG_PX 464.0f                     // the picture
+#define HG_PY 66.0f
+#define HG_PW 452.0f
+#define HG_PH 282.0f
+#define HG_BY 462.0f                     // the buttons
+#define HG_BH 46.0f
 static int  menu_kopen;             // the controls window is showing
 static int  menu_tod;              // time of day for the next flight: day, dusk or night
 static int  menu_wx;               // starting weather: 0..WX_COUNT-1, or WX_COUNT for random
@@ -100,16 +115,58 @@ static int menu_count(void) { return 8; }
 // Returns 0 = nothing, 1 = start / resume the flight, 2 = quit the game.
 static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
     if (menu_quit_t > 0) menu_quit_t--;
-    if (menu_hopen) {                                         // hangar: choose an aircraft
+    if (menu_hopen) {                                         // hangar: choose an aircraft (D-pad / stick, or touch)
         int mv = 0;
         if (pressed & SCE_CTRL_UP)   mv = -1;
         if (pressed & SCE_CTRL_DOWN) mv = 1;
         int sy = pad->ly < 64 ? -1 : (pad->ly > 192 ? 1 : 0);
         if (sy != 0 && menu_stick == 0) mv = sy;
         menu_stick = sy;
-        if (mv) { menu_hsel = (menu_hsel + mv + AC_COUNT) % AC_COUNT; snd_event(EV_CLICK, 1.0f); }
+        float hmax = fmaxf(0.0f, AC_COUNT * HG_ROW - HG_LH);
+        if (mv) {
+            menu_hsel = (menu_hsel + mv + AC_COUNT) % AC_COUNT; snd_event(EV_CLICK, 1.0f);
+            float top = menu_hsel * HG_ROW;                   // keep the highlighted row on show
+            if (top < menu_hscroll) menu_hscroll = top;
+            if (top + HG_ROW > menu_hscroll + HG_LH) menu_hscroll = top + HG_ROW - HG_LH;
+        }
+        if (pad->buttons & SCE_CTRL_LEFT)  menu_hang -= 0.035f;       // turn the picture
+        if (pad->buttons & SCE_CTRL_RIGHT) menu_hang += 0.035f;
         if (pressed & SCE_CTRL_CIRCLE) { menu_hopen = 0; snd_event(EV_CLICK, 1.0f); }
         if (pressed & SCE_CTRL_CROSS)  { menu_ac = menu_hsel; menu_hopen = 0; snd_event(EV_CONFIRM, 1.0f); }
+        // Touch: tap a row to look at that aircraft, drag the list to scroll it, drag the picture to turn it, tap the buttons.
+        const ChTouch *t = &g_touch;
+        int pi = -1;
+        for (int i = 0; i < t->n; i++) if (hg_t.mode && t->id[i] == hg_t.id) pi = i;
+        bool turning = false;
+        if (hg_t.mode && pi < 0) {                                     // the finger came up
+            if (!hg_t.moved) {
+                if (hg_t.mode == 1) {
+                    int row = (int)floorf((hg_t.ly - HG_LY + menu_hscroll) / HG_ROW);
+                    if (row >= 0 && row < AC_COUNT) { menu_hsel = row; snd_event(EV_CLICK, 1.0f); }
+                } else if (hg_t.mode == 3 && hg_t.lx >= HG_PX && hg_t.lx <= HG_PX + 210.0f && hg_t.ly >= HG_BY && hg_t.ly <= HG_BY + HG_BH) {
+                    menu_ac = menu_hsel; menu_hopen = 0; snd_event(EV_CONFIRM, 1.0f);
+                } else if (hg_t.mode == 3 && hg_t.lx >= HG_PX + 230.0f && hg_t.ly >= HG_BY && hg_t.ly <= HG_BY + HG_BH) {
+                    menu_hopen = 0; snd_event(EV_CLICK, 1.0f);
+                }
+            }
+            hg_t.mode = 0;
+        }
+        if (!hg_t.mode && t->n > 0 && menu_hopen) {                    // a finger went down
+            float fx = t->x[0], fy = t->y[0];
+            hg_t.id = t->id[0]; hg_t.sx = hg_t.lx = fx; hg_t.sy = hg_t.ly = fy; hg_t.moved = false;
+            if (fx >= HG_LX && fx <= HG_LX + HG_LW && fy >= HG_LY && fy <= HG_LY + HG_LH) hg_t.mode = 1;
+            else if (fx >= HG_PX && fx <= HG_PX + HG_PW && fy >= HG_PY && fy <= HG_PY + HG_PH) hg_t.mode = 2;
+            else if (fy >= HG_BY && fy <= HG_BY + HG_BH) hg_t.mode = 3;
+            pi = 0;
+        }
+        if (hg_t.mode && pi >= 0) {
+            float fx = t->x[pi], fy = t->y[pi];
+            if (fabsf(fx - hg_t.sx) + fabsf(fy - hg_t.sy) > 10.0f) hg_t.moved = true;
+            if (hg_t.mode == 1 && hg_t.moved) menu_hscroll = clampf(menu_hscroll - (fy - hg_t.ly), 0.0f, hmax);
+            if (hg_t.mode == 2) { menu_hang += (fx - hg_t.lx) * 0.012f; turning = hg_t.moved; }
+            hg_t.lx = fx; hg_t.ly = fy;
+        }
+        if (!turning && !(pad->buttons & (SCE_CTRL_LEFT | SCE_CTRL_RIGHT))) menu_hang += 0.008f;     // a slow turntable
         return 0;
     }
     if (menu_kopen) {                                         // controls window: X or O closes it
@@ -147,8 +204,8 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
     menu_stick = sy;
     if (move) { menu_sel = (menu_sel + move + menu_count()) % menu_count(); snd_event(EV_CLICK, 1.0f); }
     if (menu_sel == 1) {                                      // airport row: left / right picks where the open world starts
-        if (pressed & SCE_CTRL_RIGHT) { menu_ap = (menu_ap + 1) % AP_COUNT; snd_event(EV_CLICK, 1.0f); }
-        if (pressed & SCE_CTRL_LEFT)  { menu_ap = (menu_ap + AP_COUNT - 1) % AP_COUNT; snd_event(EV_CLICK, 1.0f); }
+        if (pressed & SCE_CTRL_RIGHT) { menu_ap = ap_next(menu_ap, 1); snd_event(EV_CLICK, 1.0f); }
+        if (pressed & SCE_CTRL_LEFT)  { menu_ap = ap_next(menu_ap, -1); snd_event(EV_CLICK, 1.0f); }
     }
     if (menu_sel == 4) {                                      // weather row: left / right picks the starting weather
         if (pressed & SCE_CTRL_RIGHT) { menu_wx = (menu_wx + 1) % (WX_COUNT + 1); wx_dirty = true; }
@@ -170,7 +227,7 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
         snd_event(EV_CONFIRM, 1.0f);
         if (menu_sel == 0) return 1;
         if (menu_sel == 1) {                                  // X also steps through the airports
-            menu_ap = (menu_ap + 1) % AP_COUNT;
+            menu_ap = ap_next(menu_ap, 1);
             return 0;
         }
         if (menu_sel == 2) {                                  // challenges: open the list
@@ -181,6 +238,7 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
         if (menu_sel == 3) {                                  // hangar: open the list of aircraft
             menu_hopen = 1;
             menu_hsel = menu_ac;
+            menu_hang = 0.6f; menu_hscroll = 0.0f; hg_t.mode = 0;
             return 0;
         }
         if (menu_sel == 7) {                                  // controls: open the window
@@ -268,6 +326,60 @@ static void draw_title_block(float x, float y, unsigned int col) {
         }
         x += w + gap;
     }
+}
+
+// The real 3D model of an aircraft, standing on a round pad, turned by `ang`, drawn in the picture box of the hangar. It borrows the
+// flight's camera and aircraft state for the moment and gives them back, so it is safe to call from the menu in the middle of a flight.
+static void draw_hangar_preview(int ac, float ang) {
+    Plane sv_pl = pl; Camera sv_cam = cam; const Spec *sv_spec = spec;
+    int sv_ac = ac_flying, sv_tod = tod; float sv_f = g_focal, sv_n = g_near, sv_vis = fog_vis, sv_ph = prop_phase;
+    spec = &SPECS[ac]; ac_flying = ac; tod = TOD_DAY; fog_vis = 35000.0f;
+    memset(&pl, 0, sizeof pl);
+    pl.pos = v3(0.0f, 0.0f, 0.0f); pl.gear = 1.0f; pl.gear_cmd = true; pl.on_ground = true; pl.rpm = 700.0f;
+    set_axes(ang, 0.0f, 0.0f);
+    g_focal = 520.0f; g_near = 0.5f;
+    float rm = fmaxf(spec->tip_x, fmaxf(-spec->tail_z, 4.5f)), D = 3.3f * rm;
+    V3 pivot = v3(0.0f, spec->piv_y * 0.8f, 0.0f);
+    look_at(vadd(pivot, v3(0.0f, D * 0.30f, -D * 0.95f)), pivot);
+    float cxp = HG_PX + HG_PW * 0.5f, cyp = HG_PY + HG_PH * 0.52f;       // where the aircraft should appear on the screen
+    cam.pos = vsub(cam.pos, vscale(cam.r, (cxp - CX) * D / g_focal));
+    cam.pos = vadd(cam.pos, vscale(cam.u, (cyp - CY) * D / g_focal));
+    {                                                                      // the pad
+        V3 o[8], q[8];
+        for (int i = 0; i < 8; i++) {
+            float a = (i + 0.5f) * PI_F / 4.0f;
+            o[i] = v3(cosf(a) * rm * 0.85f, 0.0f, sinf(a) * rm * 0.85f);
+            q[i] = v3(cosf(a) * rm * 0.79f, 0.02f, sinf(a) * rm * 0.79f);
+        }
+        draw_world_poly(o, 8, RGBA8(52, 56, 66, 255));
+        draw_world_poly(q, 8, RGBA8(112, 116, 126, 255));
+    }
+    draw_plane_shadow();
+    npf = 0; pf_last = -1;
+    build_plane();
+    int ni = 0;
+    for (int k = 0; k < npf; k++) {
+        const PFace *pf = &pfaces[k];
+        if (pf->isdecal) continue;
+        if (!pf->twosided && vdot(pf->nrm, vsub(cam.pos, pf->c)) <= 0.0f) continue;
+        V3 d = vsub(pf->c, cam.pos);
+        float d2 = vdot(d, d);
+        if (pf->twosided && d2 > 1e-6f) { float dl = sqrtf(d2); dl -= 0.3f * (-vdot(pf->nrm, d) / dl); d2 = dl * dl; }
+        items[ni].dist = d2; items[ni].idx = MAX_FACES + k; ni++;
+    }
+    sort_items(ni);
+    for (int i = 0; i < ni; i++) {
+        const PFace *pf = &pfaces[items[i].idx - MAX_FACES];
+        if (pf->emit) draw_world_poly_emit(pf->p, pf->n, pf->color); else draw_world_poly(pf->p, pf->n, pf->color);
+        for (int d = 1; d <= pf->ndecals; d++) {
+            const PFace *dc = &pfaces[items[i].idx - MAX_FACES + d];
+            if (pf->twosided && !dc->emit && vdot(dc->nrm, vsub(cam.pos, dc->c)) <= 0.0f) continue;
+            if (dc->emit) draw_world_poly_emit(dc->p, dc->n, dc->color); else draw_world_poly(dc->p, dc->n, dc->color);
+        }
+    }
+    flush_batch();
+    npf = 0; pf_last = -1;
+    pl = sv_pl; cam = sv_cam; spec = sv_spec; ac_flying = sv_ac; tod = sv_tod; g_focal = sv_f; g_near = sv_n; fog_vis = sv_vis; prop_phase = sv_ph;
 }
 
 static void draw_menu(vita2d_pgf *pgf) {
@@ -374,26 +486,62 @@ static void draw_menu(vita2d_pgf *pgf) {
     if (menu_quit_t > 0) vita2d_pgf_draw_text(pgf, 640, 528, gold, 0.8f, "Press START again to quit");
     else                 vita2d_pgf_draw_text(pgf, 770, 528, RGBA8(190, 205, 235, 255), 0.8f, "START: quit");
 
-    // The hangar.
+    // The hangar: the list of aircraft on the left, a turning picture of the chosen one on the right.
     if (menu_hopen) {
-        const int pitch = 74, bh = 70;
-        int h = 44 + AC_COUNT * pitch + 30, top = (SCREEN_H - h) / 2;
-        vita2d_draw_rectangle(150, top, 660, h, gold);
-        vita2d_draw_rectangle(154, top + 4, 652, h - 8, RGBA8(10, 22, 56, 255));
-        vita2d_pgf_draw_text(pgf, 180, top + 36, white, 1.3f, "HANGAR");
-        for (int i = 0; i < AC_COUNT; i++) {
-            int ry = top + 44 + i * pitch;
-            bool s = (i == menu_hsel);
-            vita2d_draw_rectangle(172, ry, 616, bh, s ? RGBA8(22, 46, 104, 255) : RGBA8(14, 30, 70, 255));
-            if (s) vita2d_draw_rectangle(172, ry, 6, bh, gold);
-            vita2d_pgf_draw_text(pgf, 194, ry + 26, s ? white : RGBA8(150, 172, 215, 255), 1.1f, SPECS[i].name);
-            vita2d_pgf_draw_text(pgf, 194, ry + 47, RGBA8(190, 205, 235, 255), 0.75f, SPECS[i].line1);
-            vita2d_pgf_draw_text(pgf, 194, ry + 67, RGBA8(150, 172, 215, 255), 0.7f, SPECS[i].line2);
-            if (i == menu_ac) vita2d_pgf_draw_text(pgf, 700, ry + 26, gold, 0.8f, "SELECTED");
-            const char *maker = (i == AC_A22 || i == AC_A11) ? "ASHLEY AEROSPACE" : "KNOWLES AIRCRAFT CO.";
-            vita2d_pgf_draw_text(pgf, 778 - vita2d_pgf_text_width(pgf, 0.6f, maker), ry + 67, RGBA8(176, 150, 96, 255), 0.6f, maker);
+        const unsigned int card = RGBA8(10, 22, 56, 255), dimc = RGBA8(150, 172, 215, 255), pale = RGBA8(190, 205, 235, 255);
+        vita2d_draw_rectangle(20, 12, 920, 520, gold);
+        vita2d_draw_rectangle(24, 16, 912, 512, card);
+        for (int i = 0; i < 12; i++) {                                    // the picture's sky, and the ground under it
+            float u = i / 11.0f;
+            vita2d_draw_rectangle(HG_PX, HG_PY + i * (HG_PH * 0.56f / 12.0f), HG_PW, HG_PH * 0.56f / 12.0f + 1.0f, RGBA8((int)(58 + 120 * u), (int)(104 + 100 * u), (int)(176 + 56 * u), 255));
         }
-        vita2d_pgf_draw_text(pgf, 194, top + h - 12, RGBA8(190, 205, 235, 255), 0.8f, "Up / Down: choose     X: select     O: back");
+        vita2d_draw_rectangle(HG_PX, HG_PY + HG_PH * 0.56f, HG_PW, HG_PH * 0.44f, RGBA8(64, 92, 66, 255));
+        draw_hangar_preview(menu_hsel, menu_hang);
+        // Hide anything that spilled outside the picture, then frame it.
+        vita2d_draw_rectangle(24, 16, 912, HG_PY - 16, card);
+        vita2d_draw_rectangle(24, HG_PY + HG_PH, 912, 528 - HG_PY - HG_PH, card);
+        vita2d_draw_rectangle(24, 16, HG_PX - 24, 512, card);
+        vita2d_draw_rectangle(HG_PX + HG_PW, 16, 936 - HG_PX - HG_PW, 512, card);
+        vita2d_draw_rectangle(HG_PX - 2, HG_PY - 2, HG_PW + 4, 2, gold); vita2d_draw_rectangle(HG_PX - 2, HG_PY + HG_PH, HG_PW + 4, 2, gold);
+        vita2d_draw_rectangle(HG_PX - 2, HG_PY - 2, 2, HG_PH + 4, gold); vita2d_draw_rectangle(HG_PX + HG_PW, HG_PY - 2, 2, HG_PH + 4, gold);
+        vita2d_pgf_draw_text(pgf, HG_LX, 54, white, 1.3f, "HANGAR");
+        for (int i = 0; i < AC_COUNT; i++) {                                // the list: a row is drawn only if it fits completely in the window
+            float ry = HG_LY + i * HG_ROW - menu_hscroll;
+            if (ry < HG_LY - 1.0f || ry + HG_ROW - 4.0f > HG_LY + HG_LH + 1.0f) continue;
+            bool s = (i == menu_hsel);
+            vita2d_draw_rectangle(HG_LX, ry, HG_LW, HG_ROW - 6.0f, s ? RGBA8(22, 46, 104, 255) : RGBA8(14, 30, 70, 255));
+            if (s) vita2d_draw_rectangle(HG_LX, ry, 6, HG_ROW - 6.0f, gold);
+            vita2d_pgf_draw_text(pgf, HG_LX + 20, ry + 26, s ? white : dimc, 1.1f, SPECS[i].name);
+            vita2d_pgf_draw_text(pgf, HG_LX + 20, ry + 47, pale, 0.62f, SPECS[i].line1);
+            if (i == menu_ac) vita2d_pgf_draw_text(pgf, HG_LX + HG_LW - 16 - vita2d_pgf_text_width(pgf, 0.7f, "SELECTED"), ry + 22, gold, 0.7f, "SELECTED");
+        }
+        if (AC_COUNT * HG_ROW > HG_LH) {                                    // scroll bar (only when the list is longer than the window)
+            float full = AC_COUNT * HG_ROW, th = fmaxf(24.0f, HG_LH * HG_LH / full), hm = full - HG_LH;
+            vita2d_draw_rectangle(HG_LX + HG_LW + 6, HG_LY, 3, HG_LH, RGBA8(40, 56, 90, 255));
+            vita2d_draw_rectangle(HG_LX + HG_LW + 6, HG_LY + (HG_LH - th) * (menu_hscroll / hm), 3, th, gold);
+        }
+        {                                                                    // the facts about the aircraft in the picture
+            const char *maker = (menu_hsel == AC_A22 || menu_hsel == AC_A11) ? "ASHLEY AEROSPACE" : "KNOWLES AIRCRAFT CO.";
+            vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 32, white, 1.25f, SPECS[menu_hsel].name);
+            vita2d_pgf_draw_text(pgf, HG_PX + HG_PW - vita2d_pgf_text_width(pgf, 0.65f, maker), HG_PY + HG_PH + 32, RGBA8(176, 150, 96, 255), 0.65f, maker);
+            vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 58, pale, 0.78f, SPECS[menu_hsel].line1);
+            vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 80, dimc, 0.72f, SPECS[menu_hsel].line2);
+        }
+        {                                                                    // buttons
+            bool chosen = (menu_hsel == menu_ac);
+            vita2d_draw_rectangle(HG_PX, HG_BY, 210, HG_BH, chosen ? RGBA8(40, 70, 60, 255) : RGBA8(30, 52, 96, 255));
+            vita2d_draw_rectangle(HG_PX + 230, HG_BY, HG_PW - 230, HG_BH, RGBA8(30, 52, 96, 255));
+            for (int b = 0; b < 2; b++) {
+                float bx = b ? HG_PX + 230 : HG_PX, bw = b ? HG_PW - 230 : 210;
+                vita2d_draw_rectangle(bx, HG_BY, bw, 1, gold); vita2d_draw_rectangle(bx, HG_BY + HG_BH - 1, bw, 1, gold);
+                vita2d_draw_rectangle(bx, HG_BY, 1, HG_BH, gold); vita2d_draw_rectangle(bx + bw - 1, HG_BY, 1, HG_BH, gold);
+            }
+            const char *l1 = chosen ? "SELECTED" : "SELECT", *l2 = "BACK";
+            vita2d_pgf_draw_text(pgf, (int)(HG_PX + (210 - vita2d_pgf_text_width(pgf, 1.1f, l1)) * 0.5f), HG_BY + 31, white, 1.1f, l1);
+            vita2d_pgf_draw_text(pgf, (int)(HG_PX + 230 + (HG_PW - 230 - vita2d_pgf_text_width(pgf, 1.1f, l2)) * 0.5f), HG_BY + 31, white, 1.1f, l2);
+        }
+        vita2d_pgf_draw_text(pgf, HG_LX, 508, pale, 0.66f, "Touch: tap an aircraft, drag the picture to turn it");
+        vita2d_pgf_draw_text(pgf, HG_LX, 525, pale, 0.66f, "Up / Down: choose   Left / Right: turn   X: select   O: back");
     }
 
     // The controls window.

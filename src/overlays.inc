@@ -59,6 +59,13 @@ static void draw_overlays(vita2d_pgf *pgf) {
         vita2d_pgf_draw_text(pgf, (SCREEN_W - tw) / 2, 68, RGBA8(230, 190, 60, 255), 0.8f, "TRIMMED");
     }
     draw_shot_msg(pgf);
+    if (found_msg_t > 0 && !pl.crashed) {                                 // a new place has been found
+        const char *t1 = "DISCOVERED", *t2 = AIRPORTS[AP_SPACE].name;
+        int w1 = vita2d_pgf_text_width(pgf, 1.3f, t1), w2 = vita2d_pgf_text_width(pgf, 0.95f, t2);
+        vita2d_draw_rectangle((SCREEN_W - 460) / 2, 92, 460, 84, RGBA8(10, 22, 56, 200));
+        vita2d_pgf_draw_text(pgf, (SCREEN_W - w1) / 2, 130, RGBA8(255, 210, 90, 255), 1.3f, t1);
+        vita2d_pgf_draw_text(pgf, (SCREEN_W - w2) / 2, 162, RGBA8(235, 240, 250, 255), 0.95f, t2);
+    }
     if (spec->retract && !pl.crashed && gear_msg_t > 0) {                 // gear refusals ("too fast" etc.): top right
         int mw = vita2d_pgf_text_width(pgf, 0.8f, gear_msg);
         vita2d_pgf_draw_text(pgf, SCREEN_W - mw - 20, 68, RGBA8(255, 150, 60, 255), 0.8f, gear_msg);

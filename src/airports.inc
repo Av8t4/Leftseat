@@ -266,9 +266,9 @@ static void draw_lana_all(void) {
 
 // Windsocks at the outlying airports, when you are near enough to see them.
 static void build_outlying_windsocks(void) {
-    V3 p[3] = { ap_pt(&AIRPORTS[AP_REDROCK], -34.0f, 0.0f, -700.0f), ap_pt(&AIRPORTS[AP_PINECREST], 24.0f, 0.0f, -110.0f),
-                ap_pt(&AIRPORTS[AP_LANA], -34.0f, 0.0f, -560.0f) };
-    for (int i = 0; i < 3; i++) {
+    V3 p[4] = { ap_pt(&AIRPORTS[AP_REDROCK], -34.0f, 0.0f, -700.0f), ap_pt(&AIRPORTS[AP_PINECREST], 24.0f, 0.0f, -110.0f),
+                ap_pt(&AIRPORTS[AP_LANA], -34.0f, 0.0f, -560.0f), ap_pt(&AIRPORTS[AP_SPACE], -34.0f, 0.0f, -700.0f) };
+    for (int i = 0; i < 4; i++) {
         float dx = p[i].x - cam.pos.x, dz = p[i].z - cam.pos.z;
         if (dx * dx + dz * dz < 3000.0f * 3000.0f) build_windsock_at(p[i].x, p[i].z);
     }

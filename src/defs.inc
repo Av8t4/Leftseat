@@ -70,9 +70,10 @@ static float  g_near  = 2.0f;
 static int    view_mode;        // 0 cockpit, 1 chase, 2 control tower
 static float  trk_x[300], trk_z[300];   // breadcrumbs of where you have flown, for the chart
 static int    ntrk, trk_i, trk_t;
-#define CHART_SCROLL_MAX 76.0f
+#define CHART_SCROLL_MAX fmaxf(0.0f, ap_nshown() * 78.0f - 314.0f)
 static float  chart_scroll;       // how far the airport list on the chart is scrolled (pixels)
-static bool   chart_open;        // Select is held: show the chart of the whole area
+static bool   chart_open;        // the chart is open (hold Select): the flight is paused while it is
+static void   chart_begin(void);
 static bool   engine_failed;     // the engine has stopped (engine-out challenge), whatever the fuel gauge says
 static int    view_banner;      // frames left to show the view name
 static float  look_ang;         // head / camera turn from straight ahead (radians, right is positive)
