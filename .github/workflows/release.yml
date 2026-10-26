@@ -2,7 +2,8 @@
 #   patch = a small fix        (v1.1   -> v1.1.1,  v1.1.1 -> v1.1.2)
 #   minor = new features       (v1.1.2 -> v1.2)
 #   major = a big new version  (v1.2   -> v2.0)
-# It works out the next number from the latest tag, builds, tags the commit and writes the release notes.
+# It works out the next number from the latest tag, builds, tags the commit and writes the release notes: whatever you
+# type in the Notes box, followed by GitHub's automatic list of changes.
 name: Release
 
 on:
@@ -13,6 +14,11 @@ on:
         type: choice
         options: [ patch, minor, major ]
         default: patch
+      notes:
+        description: "Your release notes (optional). Type \\n for a new line. They go above the automatic list of changes"
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -25,7 +31,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0              # needs the existing tags to count from
 
@@ -72,11 +78,17 @@ jobs:
           bash ../fixpad.sh
           ls -l leftseat.vpk
 
+      - name: Write your notes
+        env:
+          NOTES: ${{ inputs.notes }}
+        run: printf '%b\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
+
       - name: Publish the release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           target_commitish: ${{ github.sha }}
           name: Left Seat ${{ steps.ver.outputs.tag }}
+          body_path: ${{ runner.temp }}/notes.md
           generate_release_notes: true
           files: build/leftseat.vpk
