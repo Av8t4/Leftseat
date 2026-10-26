@@ -49,7 +49,7 @@ typedef struct {
     float kd_gear, gear_vmax, gear_time;                // extra drag with the gear out, fastest speed (m/s) at which it may move, seconds to move
 } Spec;
 
-enum { AC_K4 = 0, AC_K10, AC_JET1, AC_K30, AC_A22, AC_COUNT };
+enum { AC_K4 = 0, AC_K10, AC_JET1, AC_K30, AC_A22, AC_A11, AC_COUNT };
 
 static const Spec SPECS[AC_COUNT] = {
     {   // ---- K-4 Trainer ------------------------------------------------------------
@@ -182,7 +182,7 @@ static const Spec SPECS[AC_COUNT] = {
         2.60f, 3.00f, 4.80f,
         { { -2.45f, -0.160f, -0.30f, 30.0f, 9.0f }, { 2.45f, -0.160f, -0.30f, 30.0f, 9.0f }, { 0.0f, -0.180f, 3.20f, 11.0f, 5.0f } },
         6.60f, 1.30f, -6.40f, 2.20f, 0.0f, 0.0f,
-        -0.40f, 2.20f, 1.60f, 20.0f, 5.5f,
+        -0.40f, 2.20f, 1.90f, 20.0f, 5.5f,
         64.0f, 130.0f, 74.0f, 175.0f, 205.0f,
         2400.0f, 1600.0f, 1900.0f, 1900.0f,
         82.0f, 2, 43.0f, -0.088f, 430.0f, 510.0f,
@@ -194,6 +194,34 @@ static const Spec SPECS[AC_COUNT] = {
         0,
         1, 0.00004f, 103.0f, 4.5f
     },
+    {   // ---- Ashley A11 ------------------------------------------------------------
+        "ASHLEY SINGLE A11", "a11", "A11",
+        "Single pusher piston, twin booms, fixed gear, cruise 150 kt", "Stalls at 52 kt. Small, quick and easy to fly.",
+        0.0062f, 4.7f, -0.065f, 0.261f, 1.5f,
+        0.00029f, 0.00049f, 0.00006f, 0.0027f,
+        2.6f, 450.0f,
+        55.0f, 0.060f, 100.0f,
+        { 0.0f, 0.25f, 0.50f, 0.75f }, { 0.0f, 0.00008f, 0.00020f, 0.00034f },
+        0.02f, 2.7f, 9.0f, 4.2f,
+        1.3f, 2.8f, 0.9f, 2.5f, 5.0f,
+        70.0f, 3300.0f, 6.0f, 3.0f, 14.0f,
+        700.0f, 1600.0f, 7.0f, 2800.0f, 14.0f, 1200.0f, 1100.0f,
+        17.0f, 0.22f, 3.5f,
+        1.15f,
+        1.00f, 1.30f, 2.00f,
+        { { -1.15f, -0.118f, -0.55f, 34.7f, 9.0f }, { 1.15f, -0.118f, -0.55f, 34.7f, 9.0f }, { 0.0f, -0.162f, 3.95f, 10.0f, 5.0f } },
+        4.9f, 1.15f, -5.20f, 1.75f, -1.75f, 1.66f,
+        -0.36f, 1.96f, 3.10f, 15.0f, 4.0f,
+        44.0f, 95.0f, 52.0f, 135.0f, 165.0f,
+        3000.0f, 2100.0f, 2600.0f, 2700.0f,
+        72.0f, 1, 37.0f, -0.098f, 440.0f, 520.0f,
+        2.28f, -1.65f, 0.62f, 0.16f, -2.10f, -1.30f, 2,
+        5,
+        0.0f, 0.0f, 1.0f, 0.0f, 0.12f, 0.03f,
+        200.0f, 40.0f, 2.0f,
+        100.0f, 500.0f, 10.0f, 10.0f, "RPM",
+        0
+    }
 };
 
 static const Spec *spec = &SPECS[AC_K4];           // the aircraft being flown

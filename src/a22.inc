@@ -27,11 +27,11 @@ static const KS KS_A22_BOOM[] = {                                               
     { -6.40f, 0.16f, 2.02f, 2.40f, 2.21f, 2.3f, 2.3f, 2.3f },
 };
 static const float Z_A22_BOOM[] = { 2.40f, 2.10f, 1.70f, 1.20f, 0.60f, 0.00f, -0.60f, -1.20f, -1.80f, -2.40f, -3.00f, -3.60f, -4.20f, -4.80f, -5.40f, -6.00f, -6.40f };
-static const KS KS_A22_NOSE[] = {                                                   // the nose in front of you: a little lower than the outside
-    {  3.80f, 0.30f, 0.92f, 1.44f, 1.18f, 2.4f, 2.4f, 2.3f },
-    {  3.30f, 0.58f, 0.84f, 1.70f, 1.27f, 2.5f, 2.5f, 2.4f },
-    {  2.70f, 0.78f, 0.80f, 1.98f, 1.40f, 2.6f, 2.6f, 2.6f },
-    {  2.00f, 0.86f, 0.80f, 2.20f, 1.50f, 2.7f, 2.7f, 2.8f },
+static const KS KS_A22_NOSE[] = {                                                   // the nose in front of you: it falls away below the glareshield, so only a hint shows
+    {  3.80f, 0.30f, 0.92f, 1.66f, 1.30f, 2.4f, 2.4f, 2.3f },
+    {  3.30f, 0.58f, 0.84f, 1.78f, 1.32f, 2.5f, 2.5f, 2.4f },
+    {  2.70f, 0.78f, 0.80f, 1.92f, 1.42f, 2.6f, 2.6f, 2.6f },
+    {  2.30f, 0.84f, 0.80f, 2.02f, 1.48f, 2.7f, 2.7f, 2.8f },
 };
 static const float Z_A22_NOSE[] = { 3.80f, 3.45f, 3.10f, 2.70f, 2.30f };
 #define A22_BX 4.05f                                                                // pusher layout: the booms sit outboard of the propeller discs
@@ -52,6 +52,15 @@ static const KS KS_A22_PB[] = {                                                 
     { -6.40f, 0.16f, 2.02f, 2.40f, 2.21f, 2.3f, 2.3f, 2.3f },
 };
 static const float Z_A22_PB[] = { 2.05f, 1.65f, 1.00f, 0.00f, -3.00f, -6.40f };
+static const KS KS_A22_TF[] = {                                                     // fairing where each ruddervator meets its boom: swells round the join, then tapers to a point behind it
+    { -4.10f, 0.11f, 2.10f, 2.30f, 2.20f, 2.3f, 2.3f, 2.3f },
+    { -4.70f, 0.23f, 2.00f, 2.54f, 2.26f, 2.3f, 2.3f, 2.3f },
+    { -5.40f, 0.27f, 1.97f, 2.60f, 2.28f, 2.3f, 2.3f, 2.3f },
+    { -6.10f, 0.24f, 1.99f, 2.54f, 2.26f, 2.3f, 2.3f, 2.3f },
+    { -6.60f, 0.15f, 2.04f, 2.44f, 2.24f, 2.3f, 2.3f, 2.3f },
+    { -7.05f, 0.025f, 2.15f, 2.30f, 2.22f, 2.3f, 2.3f, 2.3f },
+};
+static const float Z_A22_TF[] = { -4.10f, -4.40f, -4.80f, -5.20f, -5.60f, -6.00f, -6.40f, -6.80f, -7.05f };
 static AWingS AW_A22;                                                               // forward-swept wing: the tips are ahead of the roots
 static void a22_init(void) {
     static bool done = false;
@@ -82,7 +91,7 @@ static void a_vtail22(const AVTail *V, int sx, float dn, const Paint *p) {
     for (int k = 0; k < V->n; k++) {
         float u = (float)k / (V->n - 1);
         float cx = sx * (V->rx + dx * u), cy = V->ry + dy * u, zl = V->rzl + (V->tzl - V->rzl) * u, c = V->rch + (V->tch - V->rch) * u, t = V->th;
-        float d = (k == V->n - 1) ? 0.4f * dn : dn;
+        float d = (k == V->n - 1) ? 0.4f * dn : dn * fminf(1.0f, u / 0.5f);          // nothing moves at the centre line, so the two halves can never touch
         sec[k][0] = MW(cx, cy, zl);
         sec[k][1] = MW(cx + nx * t * 0.9f, cy + ny * t * 0.9f, zl - 0.18f * c);
         sec[k][2] = MW(cx + nx * (t * 0.9f + d * 0.4f), cy + ny * (t * 0.9f + d * 0.4f), zl - 0.60f * c);
@@ -135,6 +144,7 @@ static void build_a22(void) {
         loft_car(KS_A22_PN, 5, Z_A22_PN, 5, &nac, 2, CAP_FRONT_DARK | CAP_BACK_BODY);
         loft_xoff = sx * A22_BX;
         loft_car(KS_A22_PB, 6, Z_A22_PB, 6, &nac, 2, CAP_FRONT_BODY | CAP_BACK_BODY);
+        loft_car(KS_A22_TF, 6, Z_A22_TF, 9, &nac, 2, CAP_BACK_BODY);
     }
     loft_xoff = 0.0f;
     a22_wings(p);
@@ -154,7 +164,21 @@ static void build_a22(void) {
 }
 
 // From the seat you can see the wing and the propellers when you look out to the side.
-static void build_cockpit_parts_a22(void) { a22_wings(&P_A22); }
+static void build_cockpit_parts_a22(void) {
+    a22_wings(&P_A22);
+    Paint nac = P_A22; nac.body[0] = 238; nac.body[1] = 240; nac.body[2] = 246;
+    for (int sx = -1; sx <= 1; sx += 2) {                                           // the engine nacelles are just outside the pod: you see them when you look out
+        loft_xoff = sx * A22_X;
+        loft_car(KS_A22_PN, 5, Z_A22_PN, 5, &nac, 2, CAP_FRONT_DARK | CAP_BACK_BODY);
+        loft_xoff = sx * A22_BX;
+        loft_car(KS_A22_PB, 6, Z_A22_PB, 6, &nac, 2, CAP_FRONT_BODY | CAP_BACK_BODY);
+    }
+    loft_xoff = 0.0f;
+    prop_pusher = true; prop_pusher_z = -1.75f;
+    build_prop_x(-A22_X, 1, false);
+    build_prop_x( A22_X, 1, false);
+    prop_pusher = false;
+}
 static void build_cockpit_nose_a22(void) {
     loft_car(KS_A22_NOSE, 4, Z_A22_NOSE, (int)(sizeof(Z_A22_NOSE) / sizeof(Z_A22_NOSE[0])), &P_A22, 3, 0);
 }
