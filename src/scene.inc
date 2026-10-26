@@ -78,6 +78,7 @@ static void draw_scene(void) {
             }
         }
         draw_lakes();
+        draw_sea();
         draw_roads(i0, j0, tr);
         draw_river();
         draw_highway();
@@ -104,6 +105,7 @@ static void draw_scene(void) {
     draw_redrock_all();
     draw_pinecrest_all();
     draw_lana_all();
+    draw_spaceport_all();
     draw_landing_light();
 
     // 3b. The aircraft's shadow (not needed in the cockpit).

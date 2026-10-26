@@ -140,13 +140,20 @@ static void add_lathe(float cx, float cz, const float *rad, const float *hgt, in
 /* ------------------------------------------------------------------ */
 
 typedef struct { float cx, cz, hdg, s, c; const char *name, *id; float hl, hw; const char *place; } Airport;      // s, c: sine and cosine of the runway heading; hl, hw: half length and half width of the runway
-enum { AP_HOME = 0, AP_REDROCK, AP_PINECREST, AP_LANA, AP_COUNT };
+enum { AP_HOME = 0, AP_REDROCK, AP_PINECREST, AP_LANA, AP_SPACE, AP_COUNT };
 static const Airport AIRPORTS[AP_COUNT] = {
     {     0.0f,     0.0f, 0.0f,       0.0f,       1.0f,       "KNOWLES FIELD",       "KAK", 1000.0f, 22.0f, "Knowles Field" },
     { 14500.0f, 25500.0f, 1.2217305f, 0.9396926f, 0.3420201f, "REDROCK MUNICIPAL",  "RDR", 1000.0f, 22.0f, "Redrock" },        // runway 07 / 25
     {-19000.0f,  8900.0f, 2.0943951f, 0.8660254f, -0.5f,      "PINECREST AIRSTRIP", "PNC",  325.0f, 12.0f, "Pinecrest" },      // grass, runway 12 / 30
     {  4200.0f,-14800.0f, 2.7925268f, 0.3420201f,-0.9396926f, "LANA LAKE REGIONAL", "LLK",  800.0f, 18.0f, "Lana Lake" },     // 8 NM south of home, runway 16 / 34, the lake to its left
+    { 34650.0f,-30000.0f, 0.0f,       0.0f,       1.0f,       "GULF POINT SPACEPORT", "GPS", 900.0f, 15.0f, "Gulf Point" },  // 24 NM south-east of home, runway 18 / 36, the sea beyond the launch site; hidden until you have flown there
 };
+static int   ap_found;                                   // 1 once you have flown close to Gulf Point (saved with the scores)
+static int   found_msg_t;                                // frames left to show "DISCOVERED"
+static float sea_depth(float x, float z);                // metres into the sea (negative on land); see spaceport.inc
+static int   ap_nshown(void);
+static void  space_check_found(void);
+static void  build_spaceport(void);
 static V3 ap_pt(const Airport *a, float lx, float y, float lz) {
     return v3(a->cx + lx * a->c + lz * a->s, y, a->cz - lx * a->s + lz * a->c);
 }
@@ -516,6 +523,7 @@ static void build_world(void) {
     build_redrock();
     build_pinecrest();
     build_lana();
+    build_spaceport();
 #if WORLD_DETAIL >= 1
     build_countryside();
     build_pinecrest_country();

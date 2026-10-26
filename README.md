@@ -11,7 +11,7 @@ By Kyle Knowles. Written in C with [VitaSDK](https://vitasdk.org) and vita2d. Al
 (projection, clipping and sorting) and drawn as triangles. There are no art or audio assets: the world, the
 aircraft and every sound are generated in code.
 
-> Left Seat is a hobby project. The aircraft are fictional designs from "Knowles Aircraft Co." and the airports
+> Left Seat is a hobby project. The aircraft are fictional designs from "Knowles Aircraft Co." and "Ashley Aerospace" and the airports
 > and places are made up. It is homebrew and needs a modified Vita.
 
 ## Contents
@@ -78,18 +78,18 @@ The same list is in the game: choose **CONTROLS** on the start menu.
 | D-pad down | Wheel brakes on the ground. In the air (above about 100 ft): trim for level flight at your current airspeed. Let go of the stick afterwards |
 | D-pad left / right | Pitch trim: a tap is a fine step (a tenth of a degree), holding speeds up after a moment |
 | ○ / ✕ | Flaps down / up |
-| □ | Landing gear up / down (K-30 only). Refused on the ground and above about 200 kt; takes about 4.5 seconds; landing with it up is a crash |
+| □ | Landing gear up / down (K-30 and Ashley Twin). Refused on the ground and above about 200 kt; takes about 4.5 seconds; landing with it up is a crash |
 | △ | Reset the aircraft (restarts the attempt in a challenge) |
 | Select (tap) | Switch camera (cockpit / chase) |
-| Select (hold) | Chart of the whole area. While it is open, L / R scroll the airport list |
+| Select (hold) | Chart of the whole area. The flight pauses while it is open. Touch screen: drag to move the map, pinch to zoom, tap an airport to pick it, drag the list to scroll. Buttons: D-pad / left stick move, L / R zoom, X centre on you, Square next airport, O / Select / Start resume |
 | L + R + Select | Invert the pitch axis |
 | START | Pause and return to the menu |
 | Select + START | Save a screenshot as a PNG in `ux0:data/` (`leftseat_001.png`, `leftseat_002.png`, ...). Copy the files off the Vita with VitaShell |
 
 ## Aircraft
 
-Four aircraft, all from Knowles Aircraft Co. Each has its own 3D model, cockpit view, handling, gauges and best
-scores. Pick one in the Hangar; it applies to Open World and to every challenge.
+Six aircraft: four from Knowles Aircraft Co. and two from Ashley Aerospace, the Ashley Twin and the Ashley Single. Each has its own 3D model, cockpit view, handling, gauges and best
+scores. Pick one in the Hangar; it applies to Open World and to every challenge. The Hangar shows a turning 3D picture of the aircraft you are looking at. On the touch screen, tap an aircraft in the list, drag the picture to turn it, and tap SELECT or BACK; the D-pad works too (Up / Down choose, Left / Right turn, X select, O back).
 
 | Aircraft | What it is | Numbers |
 |---|---|---|
@@ -97,8 +97,10 @@ scores. Pick one in the Hangar; it applies to Open World and to every challenge.
 | **K-10 Hauler** | Big turboprop, about three times the weight | Cruise about 175 kt (Redrock in about 5.5 minutes instead of 9), climb about 970 fpm, stall 56 kt with full flaps, 335 gallons |
 | **Jet 1 Sprint** | Tiny single-seat jet: turbojet on top of the rear fuselage, V-tail, bubble canopy | Cruise 210 kt, climb about 1,700 fpm, stall 56 kt (50 kt with flaps). The engine takes a couple of seconds to answer the throttle and the exhaust glows when it works hard |
 | **K-30 Courier** | Twin-engine jet with a T-tail, nose canards and retractable gear | Rotates at about 100 kt, cruises about 320 kt, stalls at 82 kt. One throttle drives both engines |
+| **Ashley Twin A22** | Six-seat twin turboprop with pusher propellers, twin tail booms, a forward-swept wing, an inverted-V tail and retractable gear | Cruises about 200 kt, stalls about 62 kt with full flaps, 320 gallons. Round passenger windows. One throttle drives both engines |
+| **Ashley Single A11** | Four-seat single-engine pusher: low swept wing, twin tail booms, an H-tail and a box-shaped piston engine on top of the rear fuselage | Cruises about 150 kt, stalls about 52 kt with full flaps, 70 gallons. Fixed gear |
 
-The K-30's gear is raised and lowered with □. Raise it once you are climbing and lower it before you land. Three
+The K-30's and the Ashley Twin's gear is raised and lowered with □. Raise it once you are climbing and lower it before you land. Three
 gear lights sit on the panel between the engine gauge and the fuel gauge, like a jet's: three green when the gear
 is down and locked, red while it moves, dark when it is up.
 
@@ -109,8 +111,10 @@ strike) is a crash.
 
 ## The world
 
-The airports and the country between them. Hold **Select** for a chart of the whole area showing the airports,
+The airports and the country between them. Hold **Select** for a chart of the whole area (the flight pauses; use the touch screen to move and zoom it) showing the airports,
 your position and heading, your track so far, and the bearing and distance to each airport.
+
+There is one more place that is not on the chart or in any list until you find it: a long way out, where the farmland ends at an ocean coast. Fly there and it is added to the chart and the start menu.
 
 | Airport | Where | Description |
 |---|---|---|
@@ -153,7 +157,7 @@ dark sky with a moon and stars, lit airports (runway edge and threshold lights, 
 tower beacon and windows), glowing glide-slope lights and your landing light.
 
 **Sound:** every sound is made on the fly from what the aircraft is doing, so there are no audio files. There is
-a piston engine with a lumpy idle (K-4), a turboprop throb (K-10) and a jet whine and roar (Jet 1, K-30), each
+a piston engine with a lumpy idle (K-4), a turboprop throb (K-10, Ashley Twin) and a jet whine and roar (Jet 1, K-30), each
 following its engine speed; air noise that rises with speed and gusts; a stall warning horn a few knots before the
 stall; rain and thunder; tyre chirp and thump, rolling rumble (rougher on grass) and brake squeal; the flap motor;
 a sputter when the engine fails; a crash; jingles for good, fair and poor landings; and menu clicks. The cockpit
@@ -249,7 +253,8 @@ src/airports.inc   Redrock, the highway, river, country roads, town streets and 
 src/scene.inc      drawing one frame of the 3D scene
 src/panel.inc      instrument panel and gear lights
 src/overlays.inc   on-screen messages and warnings
-src/chart.inc      the chart shown while holding Select
+src/chart.inc      the pausable, touch-screen chart shown when you hold Select
+src/spaceport.inc  the east coast sea and the hidden spaceport (discovery, launch site, build site)
 src/menu.inc       start menu and the landing result card
 src/pad.c          padding used by fixpad.sh
 fixpad.sh          build helper

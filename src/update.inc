@@ -16,6 +16,8 @@ static bool sel_used;                                              // SELECT was
 static void update(const SceCtrlData *pad, unsigned int pressed) {
     if (gear_msg_t > 0 && !ff_sub) gear_msg_t--;
     if (trim_msg_t > 0 && !ff_sub) trim_msg_t--;
+    if (found_msg_t > 0 && !ff_sub) found_msg_t--;
+    if (!ff_sub && !pl.crashed) space_check_found();                // flying close to the hidden spaceport puts it on the chart
     if (!ff_sub) {                                                  // Select: a tap changes the camera, holding it shows the chart
         static int  sel_hold;
         bool sel = (pad->buttons & SCE_CTRL_SELECT) != 0;
@@ -28,7 +30,9 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
         }
         if (sel) {
             sel_hold++;
-            chart_open = (sel_hold >= 18 && !sel_used);
+            if (sel_hold >= 18 && !sel_used) {                  // held: open the chart (it stays open until you close it; the flight pauses)
+                chart_begin(); chart_open = true; sel_used = true; ff_level = 0;
+            }
         } else {
             if (sel_hold > 0 && sel_hold < 18 && !sel_used) {
                 view_mode = (view_mode + 1) % (ENABLE_TOWER_VIEW ? 3 : 2);   // cockpit -> chase (-> tower)
@@ -36,8 +40,6 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
                 chase_dir = pl.f;
             }
             sel_hold = 0;
-            chart_open = false;
-            chart_scroll = 0.0f;
         }
     }
     if (pressed & SCE_CTRL_TRIANGLE) { if (game_mode == MODE_LANDING) challenge_begin(); else reset_free(); return; }
@@ -52,9 +54,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
         static float look_side = 1.0f;
         bool lb = (pad->buttons & SCE_CTRL_LTRIGGER) != 0, rb = (pad->buttons & SCE_CTRL_RTRIGGER) != 0;
         float lt = 0.0f;
-        if (chart_open) {                              // chart open: L / R scroll the airport list instead of looking round
-            chart_scroll = clampf(chart_scroll + ((rb ? 1.0f : 0.0f) - (lb ? 1.0f : 0.0f)) * 240.0f * DT, 0.0f, CHART_SCROLL_MAX);
-        } else if (lb && rb)  lt = (view_mode == 1) ? PI_F * look_side : 0.0f;       // chase view: swing round to the front; cockpit: stay ahead
+        if (lb && rb)  lt = (view_mode == 1) ? PI_F * look_side : 0.0f;       // chase view: swing round to the front; cockpit: stay ahead
         else if (lb)   { lt = -0.5f * PI_F; look_side = -1.0f; }
         else if (rb)   { lt =  0.5f * PI_F; look_side =  1.0f; }
         look_ang += (lt - look_ang) * 0.22f;

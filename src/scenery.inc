@@ -121,6 +121,12 @@ static bool tree_ok(float x, float z) {
         ap_local(&AIRPORTS[AP_LANA], x, z, &lx, &lz);
         if (lx > -120.0f && lx < 260.0f && fabsf(lz) < AIRPORTS[AP_LANA].hl + 150.0f) return false;
     }
+    if (sea_depth(x, z) > -250.0f) return false;                             // no trees in the sea or on its beach
+    {                                                                         // or on the spaceport and its build site
+        float lx, lz;
+        ap_local(&AIRPORTS[AP_SPACE], x, z, &lx, &lz);
+        if (lx > -120.0f && lx < 1500.0f && lz > -700.0f && lz < 2500.0f) return false;
+    }
     if (fabsf(x) < 320.0f && fabsf(z) < 1400.0f) return false;              // airport
     if (fabsf(x - 150.0f) < 120.0f && fabsf(z) < 500.0f) return false;      // terminal area
     if (fabsf(x - ROAD_X) < 26.0f || fabsf(z - ROAD_Z) < 26.0f) return false;

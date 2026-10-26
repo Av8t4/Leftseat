@@ -50,6 +50,7 @@ static void scores_load(void) {
     int v;
     while (fscanf(f, " %39[^=]=%d", key, &v) == 2) {
         if (!strcmp(key, "attempts")) { ch_att_a[AC_K4][CK_LANDING] = v; continue; }      // first version of the file
+        if (!strcmp(key, "found_gps")) { ap_found = v != 0; continue; }                        // the hidden spaceport has been flown to
         if (!strcmp(key, "sound")) { if (v >= 0 && v < 4) snd_level = v; continue; }            // the volume setting
         for (int a = 0; a < AC_COUNT; a++)
             for (int k = 0; k < CK_COUNT; k++) {
@@ -64,6 +65,7 @@ static void scores_save(void) {
     FILE *f = fopen(SCORE_PATH, "w");
     if (!f) return;
     fprintf(f, "sound=%d\n", snd_level);
+    fprintf(f, "found_gps=%d\n", ap_found);
     for (int a = 0; a < AC_COUNT; a++)
         for (int k = 0; k < CK_COUNT; k++)
             fprintf(f, "%s%s%s_best=%d\n%s%s%s_attempts=%d\n", a ? SPECS[a].key : "", a ? "_" : "", CK_KEYS[k], ch_best_a[a][k],

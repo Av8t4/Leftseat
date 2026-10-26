@@ -9,6 +9,7 @@
 #include <string.h>
 #include <math.h>
 #include <psp2/ctrl.h>
+#include <psp2/touch.h>
 #include <psp2/kernel/processmgr.h>
 #include <vita2d.h>
 
@@ -39,6 +40,7 @@
 #include "scenery.inc"
 #include "night.inc"
 #include "airports.inc"
+#include "spaceport.inc"
 #include "scene.inc"
 #include "panel.inc"
 #include "screenshot.inc"
@@ -79,6 +81,7 @@ int main(void) {
     if (logfile) { fprintf(logfile, "pgf %s\n", pgf ? "ok" : "NULL"); fflush(logfile); }
 
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
+    sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);     // the chart uses the touch screen
     build_world();
     reset_plane();
     scores_load();
@@ -90,6 +93,14 @@ int main(void) {
 
     for (;;) {
         sceCtrlPeekBufferPositive(0, &pad, 1);
+        {
+            SceTouchData td;                                                   // the touch panel is 1920 x 1088; the screen 960 x 544
+            memset(&g_touch, 0, sizeof g_touch);
+            sceTouchPeek(SCE_TOUCH_PORT_FRONT, &td, 1);
+            for (int i = 0; i < (int)td.reportNum && g_touch.n < 2; i++) {
+                g_touch.x[g_touch.n] = td.report[i].x * 0.5f; g_touch.y[g_touch.n] = td.report[i].y * 0.5f; g_touch.id[g_touch.n] = td.report[i].id; g_touch.n++;
+            }
+        }
         unsigned int pressed = pad.buttons & ~prev.buttons;
         if ((pad.buttons & SCE_CTRL_SELECT) && (pressed & SCE_CTRL_START)) {       // SELECT + START: save a screenshot
             shot_pending = true;
@@ -123,6 +134,15 @@ int main(void) {
             vita2d_start_drawing();
             vita2d_clear_screen();
             draw_menu(pgf);
+            vita2d_end_drawing();
+            vita2d_swap_buffers();
+        } else if (chart_open && game_state == ST_FLY) {              // the chart: the flight is paused while you look at it
+            chart_update(&pad, pressed, &g_touch);
+            vita2d_start_drawing();
+            vita2d_clear_screen();
+            draw_scene();
+            draw_panel(pgf);
+            if (chart_open) draw_chart(pgf);
             vita2d_end_drawing();
             vita2d_swap_buffers();
         } else if (pressed & SCE_CTRL_START) {              // START in flight: back to the menu
@@ -163,7 +183,6 @@ int main(void) {
             draw_scene();
             unsigned long long pt2 = sceKernelGetProcessTimeWide();
             draw_overlays(pgf);
-            if (chart_open) draw_chart(pgf);                          // holding Select
             draw_panel(pgf);
             if (game_state == ST_RESULT) draw_result(pgf);
             unsigned long long pt3 = sceKernelGetProcessTimeWide();
