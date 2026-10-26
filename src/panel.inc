@@ -267,9 +267,9 @@ static void draw_panel(vita2d_pgf *pgf) {
 
     // Weather line along the bottom (weather, wind, ground/air state).
     int wd = ((int)(wx_dir * 57.2958f + 360.5f)) % 360;
-    vita2d_pgf_draw_textf(pgf, 250, VIEW_H + 129, txt, 0.65f, "%s  WIND %03d/%d KT   %s%s",
+    vita2d_pgf_draw_textf(pgf, 250, VIEW_H + 129, txt, 0.65f, "%s  WIND %03d/%d KT   %s%s%s",
                           wx_label(), wd, (int)(wx.wind * 1.944f + 0.5f),
-                          pl.on_ground ? "ON GROUND" : "AIRBORNE", invert_pitch ? "  INV" : "");
+                          pl.on_ground ? "ON GROUND" : "AIRBORNE", invert_pitch ? "  INV" : "", gy_mode ? "  GYRO" : "");
 
     // Jet-style gear lights (retractable aircraft only): 3 green = down and locked, 3 red = moving, dark = up.
     if (spec->retract) {

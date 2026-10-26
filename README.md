@@ -61,8 +61,7 @@ Left Seat saves your best challenge scores and sound volume in `ux0:data/skyhawk
 4. A typical takeoff in the K-4: flaps 10, full throttle, a little right rudder to hold the centre line, rotate at
    about 55 kt and climb at about 74 kt. Approach at about 65 kt with full flaps and flare just above the runway.
 
-In the menu, use the D-pad or left stick to move and ✕ to select. Airport, Weather, Time and Options open a list like the Hangar's. Options holds Sound (the volume) and Controls (sticks; gyro will be added here), with a picture and details on the right (✕ or SELECT chooses, ○ or BACK cancels); left / right in a list moves the highlight. On the touch screen, tap a row to open it, tap a row in the list to look at it, then tap it again or tap SELECT to choose. Press START
-twice to quit.
+The start menu is a big **OPEN WORLD** button over a grid of tiles: Airport, Hangar, Weather, Time, Challenges, Options, Controls and Quit. On the touch screen, tap a tile. With the buttons, move with the D-pad or left stick and press ✕. Airport, Hangar, Weather, Time and Options open a list with a picture and details on the right: tap a row to look at it, then tap it again or tap SELECT to choose (✕ or SELECT chooses, ○ or BACK cancels). Options holds Sound (the volume) and Controls (sticks; gyro will be added here). Tap Quit twice (or press START twice) to leave the game.
 
 ## Controls
 
@@ -83,8 +82,15 @@ The same list is in the game: choose **CONTROLS** on the start menu.
 | Select (tap) | Switch camera (cockpit / chase) |
 | Select (hold) | Chart of the whole area. The flight pauses while it is open. Touch screen: drag to move the map, pinch to zoom, tap an airport to pick it, drag the list to scroll. Buttons: D-pad / left stick move, L / R zoom, X centre on you, Square next airport, O / Select / Start resume |
 | L + R + Select | Invert the pitch axis |
+| Select + Triangle | Gyro controls: centre the tilt where the Vita is now |
 | START | Pause and return to the menu |
 | Select + START | Save a screenshot as a PNG in `ux0:data/` (`leftseat_001.png`, `leftseat_002.png`, ...). Copy the files off the Vita with VitaShell |
+
+### Flying by tilt (gyro)
+
+In **Options > Controls** choose **GYRO**. Tilt the Vita like a control column: left or right rolls, the top edge towards you is nose up. The tilt is measured from the way you were holding the Vita when the flight started, so any comfortable grip works. SELECT + Triangle centres it again at any time. The tilt adds to the sticks, so you can still use them. The throttle and rudder stay on the right stick.
+
+Options also has **Gyro Roll** and **Gyro Pitch** (reverse a direction) and **Gyro Sensitivity** (how far you tilt for full control: about 40, 28 or 18 degrees). Those lists show the Vita turning with your tilt and two bars for what it asks of the aircraft, so you can check the directions before you fly. The settings are saved.
 
 ## Aircraft
 
@@ -253,6 +259,7 @@ src/airports.inc   Redrock, the highway, river, country roads, town streets and 
 src/scene.inc      drawing one frame of the 3D scene
 src/panel.inc      instrument panel and gear lights
 src/overlays.inc   on-screen messages and warnings
+src/gyro.inc       flying by tilt: reads the motion sensor
 src/chart.inc      the pausable, touch-screen chart shown when you hold Select
 src/spaceport.inc  the east coast sea and the hidden spaceport (discovery, launch site, build site)
 src/menu.inc       start menu and the landing result card

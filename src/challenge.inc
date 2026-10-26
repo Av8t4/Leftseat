@@ -51,6 +51,10 @@ static void scores_load(void) {
     while (fscanf(f, " %39[^=]=%d", key, &v) == 2) {
         if (!strcmp(key, "attempts")) { ch_att_a[AC_K4][CK_LANDING] = v; continue; }      // first version of the file
         if (!strcmp(key, "found_gps")) { ap_found = v != 0; continue; }                        // the hidden spaceport has been flown to
+        if (!strcmp(key, "gyro")) { gy_mode = v != 0; continue; }
+        if (!strcmp(key, "gyro_roll_rev")) { gy_rinv = v != 0; continue; }
+        if (!strcmp(key, "gyro_pitch_rev")) { gy_pinv = v != 0; continue; }
+        if (!strcmp(key, "gyro_sens")) { if (v >= 0 && v < 3) gy_sens = v; continue; }
         if (!strcmp(key, "sound")) { if (v >= 0 && v < 4) snd_level = v; continue; }            // the volume setting
         for (int a = 0; a < AC_COUNT; a++)
             for (int k = 0; k < CK_COUNT; k++) {
@@ -65,6 +69,7 @@ static void scores_save(void) {
     FILE *f = fopen(SCORE_PATH, "w");
     if (!f) return;
     fprintf(f, "sound=%d\n", snd_level);
+    fprintf(f, "gyro=%d\ngyro_roll_rev=%d\ngyro_pitch_rev=%d\ngyro_sens=%d\n", gy_mode, gy_rinv, gy_pinv, gy_sens);
     fprintf(f, "found_gps=%d\n", ap_found);
     for (int a = 0; a < AC_COUNT; a++)
         for (int k = 0; k < CK_COUNT; k++)
