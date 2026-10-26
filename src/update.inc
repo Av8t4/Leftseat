@@ -42,6 +42,10 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
             sel_hold = 0;
         }
     }
+    if (gy_mode && (pad->buttons & SCE_CTRL_SELECT) && (pressed & SCE_CTRL_TRIANGLE)) {      // SELECT + Triangle: centre the tilt controls where the Vita is now
+        if (!ff_sub) { gyro_recenter(); gear_say("GYRO CENTRED"); }
+        sel_used = true; pressed &= ~SCE_CTRL_TRIANGLE;
+    }
     if (pressed & SCE_CTRL_TRIANGLE) { if (game_mode == MODE_LANDING) challenge_begin(); else reset_free(); return; }
     wx_update();                                       // the weather keeps changing, even after a crash
     if (!pl.crashed && ++trk_t >= 90) {                // a breadcrumb every second and a half, for the chart
@@ -108,6 +112,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
     float ail_in = shape(stick(pad->lx));
     float ele_in = shape(stick(pad->ly));          // stick back (down) = nose up
     if (invert_pitch) ele_in = -ele_in;
+    if (gy_mode) { ail_in = clampf(ail_in + gy_ail, -1.0f, 1.0f); ele_in = clampf(ele_in + gy_ele, -1.0f, 1.0f); }     // tilt adds to the stick
     float rud_in = clampf(shape(stick(pad->rx)), -1.0f, 1.0f);        // right stick left/right: rudder pedals
     pl.ail += (ail_in - pl.ail) * fminf(1.0f, 8.0f * DT);
     pl.ele += (ele_in - pl.ele) * fminf(1.0f, 8.0f * DT);

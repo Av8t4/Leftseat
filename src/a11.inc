@@ -40,6 +40,14 @@ static const KS KS_A11_B[] = {                                                  
     { -5.30f, 0.15f, 1.80f, 2.20f, 2.00f, 2.3f, 2.3f, 2.3f },
 };
 static const float Z_A11_B[] = { 0.80f, 0.35f, -0.60f, -2.50f, -5.30f };
+static const KS KS_A11_TF[] = {                                                     // narrow fairing where each stabiliser meets its fin: swells round the join, then tapers to a point behind it
+    { -4.45f, 0.10f, 3.14f, 3.34f, 3.24f, 2.3f, 2.3f, 2.3f },                       // (raised so it covers the top of the fin and the rudder's top edge)
+    { -4.80f, 0.17f, 3.04f, 3.44f, 3.24f, 2.3f, 2.3f, 2.3f },
+    { -5.25f, 0.19f, 3.02f, 3.46f, 3.24f, 2.3f, 2.3f, 2.3f },
+    { -5.65f, 0.13f, 3.08f, 3.42f, 3.25f, 2.3f, 2.3f, 2.3f },
+    { -6.00f, 0.025f, 3.19f, 3.31f, 3.25f, 2.3f, 2.3f, 2.3f },
+};
+static const float Z_A11_TF[] = { -4.45f, -4.65f, -4.90f, -5.15f, -5.40f, -5.65f, -5.85f, -6.00f };
 static AWingS AW_A11;                                                               // swept-back wing
 static void a11_init(void) {
     static bool done = false;
@@ -84,6 +92,7 @@ static void build_a11(void) {
     for (int sx = -1; sx <= 1; sx += 2) {
         loft_xoff = sx * A11_BX;
         loft_car(KS_A11_B, 5, Z_A11_B, 5, &bm, 2, CAP_FRONT_BODY | CAP_BACK_BODY);
+        loft_car(KS_A11_TF, 5, Z_A11_TF, 8, &bm, 2, CAP_BACK_BODY);
         fin_xoff = sx * A11_BX;
         a_fin(&AF_A11, pl.rud, p);
     }

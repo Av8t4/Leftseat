@@ -10,6 +10,7 @@
 #include <math.h>
 #include <psp2/ctrl.h>
 #include <psp2/touch.h>
+#include <psp2/motion.h>
 #include <psp2/kernel/processmgr.h>
 #include <vita2d.h>
 
@@ -26,6 +27,7 @@
 #include "flight.inc"
 #include "gear.inc"
 #include "soundcore.inc"
+#include "gyro.inc"
 #include "challenge.inc"
 #include "update.inc"
 #include "models.inc"
@@ -82,6 +84,7 @@ int main(void) {
 
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
     sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);     // the chart uses the touch screen
+    sceMotionReset(); sceMotionStartSampling();                                          // the motion sensor, for flying by tilt
     build_world();
     reset_plane();
     scores_load();
@@ -101,6 +104,7 @@ int main(void) {
                 g_touch.x[g_touch.n] = td.report[i].x * 0.5f; g_touch.y[g_touch.n] = td.report[i].y * 0.5f; g_touch.id[g_touch.n] = td.report[i].id; g_touch.n++;
             }
         }
+        gyro_sample();
         unsigned int pressed = pad.buttons & ~prev.buttons;
         if ((pad.buttons & SCE_CTRL_SELECT) && (pressed & SCE_CTRL_START)) {       // SELECT + START: save a screenshot
             shot_pending = true;
@@ -123,11 +127,13 @@ int main(void) {
                 }
                 else if (wx_dirty)     { wx_set_target(pick, drift); wx_dirty = false; }
                 tod = menu_tod;
+                gyro_recenter();
                 game_state = ST_FLY;
             }
             if (act == 4) {                                           // a challenge picked from the list: start it, or resume
                 if (menu_ch_pick >= 0) { ch_kind = menu_ch_pick; start_challenge(); }
                 tod = menu_tod;
+                gyro_recenter();
                 game_state = ST_FLY;
             }
 
