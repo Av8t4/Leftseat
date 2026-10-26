@@ -31,7 +31,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0              # needs the existing tags to count from
 
@@ -84,7 +84,7 @@ jobs:
         run: printf '%b\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
 
       - name: Publish the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v7
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           target_commitish: ${{ github.sha }}
