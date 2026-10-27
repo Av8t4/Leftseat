@@ -28,15 +28,6 @@ static int          ar_rc_open, ar_rc_start, ar_rc_read, ar_active, ar_rstat;
 static const float AR_FOV_DEG[4] = { 50.0f, 60.0f, 70.0f, 80.0f };           // horizontal field of view of the camera
 static float ar_focal(void) { return (ARD_W * 0.5f) / tanf(AR_FOV_DEG[ar_fovi] * 0.5f * PI_F / 180.0f); }   // pixels of the 480 x 272 picture
 
-// A tiny log for finding out where the camera stops (ux0:data/leftseat_ar.txt), written line by line so it survives a freeze.
-static int ar_logn;
-static void ar_log(const char *fmt, int a, int b) {
-    if (ar_logn++ > 12) return;
-    FILE *f = fopen("ux0:data/leftseat_ar.txt", ar_logn == 1 ? "w" : "a");
-    if (!f) return;
-    fprintf(f, fmt, a, b); fputc('\n', f); fclose(f);
-}
-
 static void ar_close(void) {
     if (ar_cam_ok) { sceCameraStop(1); sceCameraClose(1); ar_cam_ok = false; }
     if (ar_blk >= 0) { sceKernelFreeMemBlock(ar_blk); ar_blk = -1; ar_blk_base = NULL; }
@@ -47,9 +38,7 @@ static void ar_close(void) {
 static void ar_open(int ac) {
     ar_ac = ac; ar_on = true; ar_lost = 999; ar_have_c = false; ar_have_pose = false; ar_code = -1;
     ar_lastframe = -1; ar_frames = 0; ar_bad_reads = 0; ar_msg = "";
-    ar_logn = 0; ar_log("open requested ac %d %d", ac, 0);
     ar_tex = vita2d_create_empty_texture(ARD_W, ARD_H);
-    ar_log("texture %d %d", ar_tex != NULL, 0);
     if (!ar_tex) { ar_msg = "No memory for the camera picture"; return; }
     memset(vita2d_texture_get_datap(ar_tex), 0, vita2d_texture_get_stride(ar_tex) * ARD_H);
     int stride = (int)vita2d_texture_get_stride(ar_tex);
@@ -66,14 +55,9 @@ static void ar_open(int ac) {
     if (ar_blk < 0 || sceKernelGetMemBlockBase(ar_blk, &ar_blk_base) < 0) { ar_msg = "No memory for the camera"; return; }
     (void)stride;
     ci.pIBase = ar_blk_base;
-    ar_log("blk %d base ok %d", (int)ar_blk, ar_blk_base != NULL);
-    ar_log("calling open %d %d", 0, 0);
     int r = ar_rc_open = sceCameraOpen(1, &ci);
-    ar_log("open returned %x %d", r, 0);
     if (r < 0) { ar_msg = "The camera could not be opened"; return; }
-    ar_log("calling start %d %d", 0, 0);
     r = ar_rc_start = sceCameraStart(1);
-    ar_log("start returned %x %d", r, 0);
     if (r < 0) { sceCameraClose(1); ar_msg = "The camera could not be started"; return; }
     ar_cam_ok = true;
 }
@@ -92,7 +76,10 @@ static void ar_set_cam(float side) {
     cam.f = v3(R[2][0], -R[2][2], -R[2][1]);                           // into the picture
 }
 
-// One camera frame: smooth the corners, then the pose.
+// One camera frame: smooth the corners, then the pose. The smoothing is heavy while the card is (nearly) still, so a steady Vita gives a steady
+// aircraft, and it opens up at once when the card moves, so the aircraft still follows.
+static float ar_mot;                                                   // how fast the card is moving in the picture (pixels per camera frame, smoothed)
+
 static void ar_track(const ArHit *h) {
     float n[4][2];
     int sh = h->shift;
@@ -107,24 +94,30 @@ static void ar_track(const ArHit *h) {
     for (int i = 0; i < 4; i++) { n[i][0] = h->raw[(i + sh) & 3][0]; n[i][1] = h->raw[(i + sh) & 3][1]; }
     float px = sqrtf(h->area);
     ar_card_px = px;
-    float a = px > 110.0f ? 0.75f : (px > 70.0f ? 0.55f : 0.40f);     // a small card is noisier: trust each frame less
-    if (!ar_have_c || ar_lost >= 25) { memcpy(ar_c, n, sizeof n); }
+    bool fresh = !ar_have_c || ar_lost >= 25;
+    if (fresh) { memcpy(ar_c, n, sizeof n); ar_mot = 30.0f; }
     else {
-        for (int i = 0; i < 4; i++) {
-            float dx = n[i][0] - ar_c[i][0], dy = n[i][1] - ar_c[i][1];
-            float aa = (dx * dx + dy * dy > 30.0f * 30.0f) ? 1.0f : a;      // a quick move: follow at once
-            ar_c[i][0] += dx * aa; ar_c[i][1] += dy * aa;
-        }
+        float m = 0.0f;
+        for (int i = 0; i < 4; i++) m += sqrtf((n[i][0] - ar_c[i][0]) * (n[i][0] - ar_c[i][0]) + (n[i][1] - ar_c[i][1]) * (n[i][1] - ar_c[i][1]));
+        m *= 0.25f;
+        ar_mot = ar_mot * 0.6f + m * 0.4f;
+        float g = ar_mot / 9.0f; g = g > 1.0f ? 1.0f : g * g;
+        float a = 0.18f + 0.82f * g;
+        if (m > 25.0f) a = 1.0f;                                       // a quick jump: follow at once
+        for (int i = 0; i < 4; i++) { ar_c[i][0] += (n[i][0] - ar_c[i][0]) * a; ar_c[i][1] += (n[i][1] - ar_c[i][1]) * a; }
     }
     ar_have_c = true; ar_lost = 0; ar_code = h->code;
     float R[3][3], t[3];
     if (!ar_pose(ar_c, ar_focal(), R, t)) return;
-    if (!ar_have_pose) { memcpy(ar_R, R, sizeof R); memcpy(ar_t, t, sizeof t); ar_have_pose = true; return; }
-    float k = px > 110.0f ? 0.7f : (px > 70.0f ? 0.45f : 0.30f);
-    for (int i = 0; i < 3; i++) { for (int j = 0; j < 3; j++) ar_R[i][j] += (R[i][j] - ar_R[i][j]) * k; ar_t[i] += (t[i] - ar_t[i]) * 0.6f; }
-    float *c0 = &ar_R[0][0];                                           // tidy the turn (Gram-Schmidt on the columns)
-    float c1v[3] = { ar_R[0][0], ar_R[1][0], ar_R[2][0] }, c2v[3] = { ar_R[0][1], ar_R[1][1], ar_R[2][1] };
-    (void)c0;
+    if (!ar_have_pose || fresh) { memcpy(ar_R, R, sizeof R); memcpy(ar_t, t, sizeof t); ar_have_pose = true; return; }
+    float dn = R[0][2] * ar_R[0][2] + R[1][2] * ar_R[1][2] + R[2][2] * ar_R[2][2];     // did the card's tilt suddenly flip? (a known trap of one-card tracking)
+    if (dn < 0.906f && ar_mot < 8.0f) return;                          // the card has not really moved: ignore this frame
+    float g = ar_mot / 8.0f; g = g > 1.0f ? 1.0f : g * g;
+    float floor_k = px < 70.0f ? 0.04f : (px < 110.0f ? 0.06f : 0.09f);
+    float k = floor_k + (1.0f - floor_k) * g;
+    float kt = 0.12f + 0.88f * g;
+    for (int i = 0; i < 3; i++) { for (int j = 0; j < 3; j++) ar_R[i][j] += (R[i][j] - ar_R[i][j]) * k; ar_t[i] += (t[i] - ar_t[i]) * kt; }
+    float c1v[3] = { ar_R[0][0], ar_R[1][0], ar_R[2][0] }, c2v[3] = { ar_R[0][1], ar_R[1][1], ar_R[2][1] };   // tidy the turn (Gram-Schmidt on the columns)
     float l = sqrtf(c1v[0] * c1v[0] + c1v[1] * c1v[1] + c1v[2] * c1v[2]);
     for (int i = 0; i < 3; i++) c1v[i] /= l;
     float d = c1v[0] * c2v[0] + c1v[1] * c2v[1] + c1v[2] * c2v[2];
@@ -150,12 +143,9 @@ static void ar_step(const SceCtrlData *pad, unsigned int pressed) {
     memset(&rd, 0, sizeof rd);
     rd.size = sizeof rd;
     rd.mode = 1;                                                       // do not wait: mode 0 can wait for ever if the camera sends nothing, and freezes the game
-    ar_log("step: calling IsActive %d %d", ar_frames, 0);
     ar_active = sceCameraIsActive(1);
-    ar_log("IsActive %d, calling read %d", ar_active, 0);
     int r = ar_rc_read = sceCameraRead(1, &rd);
-    if (r < 0) { ar_log("read FAILED %x %d", r, 0); if (++ar_bad_reads > 90) ar_msg = "The camera is not giving pictures"; return; }
-    ar_log("read returned %x status %d", r, rd.status);
+    if (r < 0) { if (++ar_bad_reads > 90) ar_msg = "The camera is not giving pictures"; return; }
     ar_bad_reads = 0; ar_rstat = rd.status;
     ar_lastframe = (int)rd.frame; ar_frames++;                         // (the frame counter is not reliable, so every successful read counts)
     {                                                                  // copy out in whole rows (the camera memory is slow to read), make every pixel opaque, show it
@@ -193,26 +183,23 @@ static void ar_draw(vita2d_pgf *pgf) {
         hangar_draw_model();
         pl = sv_pl; cam = sv_cam; spec = sv_spec; ac_flying = sv_ac; tod = sv_tod; g_focal = sv_f; g_near = sv_n; fog_vis = sv_vis; prop_phase = sv_ph;
     }
-    if (ar_have_c && ar_lost < 3) {                                                          // the card outline, so you can see what it found
-        float sx = 2.0f, oy = CY - ARD_H;
-        for (int i = 0; i < 4; i++) {
-            int j = (i + 1) & 3;
-            vita2d_draw_line(ar_c[i][0] * sx, ar_c[i][1] * sx + oy, ar_c[j][0] * sx, ar_c[j][1] * sx + oy, i == 0 ? RGBA8(255, 90, 80, 255) : RGBA8(90, 255, 120, 255));
-        }
-    }
     // The panel under the picture.
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, SCREEN_H - VIEW_H, RGBA8(10, 22, 56, 255));
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, 2, gold);
-    vita2d_pgf_draw_text(pgf, 24, VIEW_H + 34, white, 1.2f, SPECS[ar_ac].name);
-    const char *st;
-    if (ar_msg[0]) st = ar_msg;
-    else if (!ar_cam_ok) st = "No camera";
-    else if (ar_lost >= 999) st = "Point the back camera at a card (flat on the desk, whole black border in view)";
-    else if (ar_lost >= 30) st = "Card lost: bring it back into view";
-    else st = "Tracking the card";
-    vita2d_pgf_draw_text(pgf, 24, VIEW_H + 62, ar_msg[0] || !ar_cam_ok || ar_lost >= 30 ? RGBA8(255, 150, 120, 255) : RGBA8(140, 255, 170, 255), 0.85f, st);
-    vita2d_pgf_draw_textf(pgf, 24, VIEW_H + 90, pale, 0.7f, "Card size %d px   camera view %d deg   detect %.1f ms   aircraft size %d%%   cam %x/%x/%x act %d st %d frames %d id %d",
-                          (int)ar_card_px, (int)AR_FOV_DEG[ar_fovi], ar_det_us / 1000.0f, (int)(ar_size * 100.0f + 0.5f), ar_rc_open, ar_rc_start, ar_rc_read, ar_active, ar_rstat, ar_frames, ar_lastframe);
-    vita2d_pgf_draw_text(pgf, 24, VIEW_H + 116, pale, 0.7f, "Up / Down: aircraft    Left / Right: turn it    L / R: size    Triangle: camera view");
-    vita2d_pgf_draw_text(pgf, 24, VIEW_H + 138, pale, 0.7f, "X: choose this aircraft for flying    O: back to the hangar");
+    vita2d_pgf_draw_text(pgf, 24, VIEW_H + 32, white, 1.2f, SPECS[ar_ac].name);
+    const unsigned int good = RGBA8(140, 255, 170, 255), warn = RGBA8(255, 170, 130, 255);
+    if (ar_msg[0] || !ar_cam_ok) {
+        vita2d_pgf_draw_text(pgf, 24, VIEW_H + 64, warn, 0.85f, ar_msg[0] ? ar_msg : "The camera is not available");
+    } else if (ar_lost >= 999) {
+        vita2d_pgf_draw_text(pgf, 24, VIEW_H + 62, gold, 0.85f, "How to use it");
+        vita2d_pgf_draw_text(pgf, 24, VIEW_H + 84, pale, 0.72f, "1. Lay a card flat on your desk: one of the Vita AR cards, or print docs/ar_marker_a4.png.");
+        vita2d_pgf_draw_text(pgf, 24, VIEW_H + 104, pale, 0.72f, "2. Point the back camera at it from about 25 cm, so the whole black border is in view.");
+    } else if (ar_lost >= 30) {
+        vita2d_pgf_draw_text(pgf, 24, VIEW_H + 64, warn, 0.85f, "Lost the card: bring it back into view (keep the whole black border visible).");
+    } else {
+        vita2d_pgf_draw_text(pgf, 24, VIEW_H + 64, good, 0.85f, "The aircraft is on the card. Move the Vita around to look at it from any side.");
+        vita2d_pgf_draw_text(pgf, 24, VIEW_H + 86, pale, 0.72f, "Hold the Vita steady and keep the card flat and well lit for the steadiest picture.");
+    }
+    vita2d_pgf_draw_text(pgf, 24, VIEW_H + 122, pale, 0.68f, "Up / Down: aircraft    Left / Right: turn it    L / R: size    Triangle: perspective");
+    vita2d_pgf_draw_text(pgf, 24, VIEW_H + 138, pale, 0.68f, "X: fly this aircraft    O: back to the hangar");
 }

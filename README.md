@@ -34,7 +34,7 @@ The start menu is a big **Open World** button with a grid of tiles under it: Air
 
 In the Hangar, press **Square** (or tap **AR VIEW**) to switch on the Vita's back camera. Lay a card with a thick black square border on your desk and point the camera at it: the aircraft stands on the card. Use the Vita's own AR cards, or print `docs/ar_marker_a4.png` at 100% (a bigger card gives a steadier aircraft). Keep the whole black border in view and the card flat and matt.
 
-Up / Down change the aircraft, Left / Right turn it on the card, L / R change its size, Triangle steps the camera's field of view (60° is the usual best; if the aircraft seems to slide when you move the Vita, try another), X picks the aircraft for flying, O goes back. The green outline is what the game found; the red edge is the card's top (the aircraft's nose points that way).
+Up / Down change the aircraft, Left / Right turn it on the card, L / R change its size, Triangle changes the perspective (if the aircraft seems to slide when you move the Vita, try another setting), X picks the aircraft for flying, O goes back. The aircraft's nose points towards the top edge of the card.
 
 A typical takeoff in the K-4: flaps 10, full throttle, a little right rudder to hold the centre line, rotate at about 55 kt and climb at about 74 kt. Come in at about 65 kt with full flaps and flare just above the runway.
 
