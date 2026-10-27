@@ -20,11 +20,24 @@ static const unsigned int FIELD_LIGHT[5] = {
     RGBA8(64, 146, 54, 255), RGBA8(76, 150, 60, 255), RGBA8(104, 148, 58, 255),
     RGBA8(134, 140, 66, 255), RGBA8(84, 132, 66, 255) };
 
-// The land turns to red desert toward Redrock: 0 = farmland, 1 = full desert.
+// Smooth value noise, 0..1, on a lattice of one unit (scale x and z before calling).
+static float vn(float x, float z, int seed) {
+    int ix = (int)floorf(x), iz = (int)floorf(z);
+    float fx = x - (float)ix, fz = z - (float)iz, sx = fx * fx * (3.0f - 2.0f * fx), sz = fz * fz * (3.0f - 2.0f * fz);
+    float a = hf(hash2(ix + seed, iz * 7 + seed), 0), b = hf(hash2(ix + 1 + seed, iz * 7 + seed), 0);
+    float c = hf(hash2(ix + seed, (iz + 1) * 7 + seed), 0), d = hf(hash2(ix + 1 + seed, (iz + 1) * 7 + seed), 0);
+    return a + (b - a) * sx + (c - a) * sz + (a - b - c + d) * sx * sz;
+}
+// The land turns to red desert toward Redrock: 0 = farmland, 1 = full desert. The edge is wandering rather than round: noise pushes
+// it in and out by several kilometres, so the desert has bays and fingers, and dry patches lie scattered beyond it.
 static float desert_k(float x, float z) {
     float d = sat_dist(x, z, AIRPORTS[AP_REDROCK].cx, AIRPORTS[AP_REDROCK].cz);
-    float t = clampf((17000.0f - d) / 9000.0f, 0.0f, 1.0f);
-    return t * t * (3.0f - 2.0f * t);
+    float w = (vn(x / 5200.0f, z / 5200.0f, 3) - 0.5f) * 2.0f + (vn(x / 2100.0f, z / 2100.0f, 9) - 0.5f);
+    d += w * 4200.0f * clampf(d / 7000.0f, 0.0f, 1.0f);
+    float t = clampf((17500.0f - d) / 9500.0f, 0.0f, 1.0f);
+    float k = t * t * (3.0f - 2.0f * t);
+    float p = clampf((vn(x / 3000.0f, z / 3000.0f, 21) - 0.62f) / 0.2f, 0.0f, 1.0f) * clampf((30000.0f - d) / 9000.0f, 0.0f, 1.0f) * 0.55f;
+    return fmaxf(k, p);
 }
 static unsigned int blend_col(unsigned int a, unsigned int b, float t) {
     if (t <= 0.0f) return a;
@@ -32,10 +45,20 @@ static unsigned int blend_col(unsigned int a, unsigned int b, float t) {
     r += ((float)(b & 255u) - r) * t; g += ((float)((b >> 8) & 255u) - g) * t; bl += ((float)((b >> 16) & 255u) - bl) * t;
     return RGBA8((int)r, (int)g, (int)bl, 255);
 }
-// Dense forest round Pinecrest: 0 = the usual country, 1 = deep forest.
+// Dense forest round Pinecrest: 0 = the usual country, 1 = deep forest. Like the desert, its edge wanders, and groves lie beyond it.
 static float forest_k(float x, float z) {
     float d = sat_dist(x, z, AIRPORTS[AP_PINECREST].cx, AIRPORTS[AP_PINECREST].cz);
-    float t = clampf((9000.0f - d) / 6000.0f, 0.0f, 1.0f);
+    float w = (vn(x / 4300.0f, z / 4300.0f, 41) - 0.5f) * 2.0f + (vn(x / 1700.0f, z / 1700.0f, 47) - 0.5f);
+    d += w * 3200.0f * clampf(d / 5000.0f, 0.0f, 1.0f);
+    float t = clampf((10000.0f - d) / 6500.0f, 0.0f, 1.0f);
+    float k = t * t * (3.0f - 2.0f * t);
+    float p = clampf((vn(x / 2400.0f, z / 2400.0f, 53) - 0.60f) / 0.2f, 0.0f, 1.0f) * clampf((21000.0f - d) / 7000.0f, 0.0f, 1.0f) * 0.6f;
+    return fmaxf(k, p);
+}
+// Dry sandy scrub along the coast of the sea, thickest at the shore and thinning inland in an uneven band.
+static float coast_k(float x, float z) {
+    float in = -sea_depth(x, z) + (vn(x / 3600.0f, z / 3600.0f, 59) - 0.5f) * 4200.0f;       // metres inland, pushed about
+    float t = clampf((6500.0f - in) / 6500.0f, 0.0f, 1.0f);
     return t * t * (3.0f - 2.0f * t);
 }
 static const unsigned int FOREST_DARK[5] = {
@@ -47,15 +70,10 @@ static const unsigned int DESERT_DARK[5] = {
 static const unsigned int DESERT_LIGHT[5] = {
     RGBA8(168, 120, 84, 255), RGBA8(176, 126, 88, 255), RGBA8(158, 114, 80, 255), RGBA8(182, 134, 96, 255), RGBA8(148, 108, 78, 255) };
 
-static unsigned int field_color(int i, int j, bool dark) {
-    int k = (int)(hf(hash2(i * 3 + 1, j * 5 + 2), 0) * 4.99f);
-    unsigned int base = dark ? FIELD_DARK[k] : FIELD_LIGHT[k];
-    float dk = desert_k((i + 0.5f) * TILE, (j + 0.5f) * TILE);
-    unsigned int col = dk <= 0.0f ? base : blend_col(base, dark ? DESERT_DARK[k] : DESERT_LIGHT[k], dk);
-    float fk = forest_k((i + 0.5f) * TILE, (j + 0.5f) * TILE);
-    return fk <= 0.0f ? col : blend_col(col, dark ? FOREST_DARK[k] : FOREST_LIGHT[k], fk);
-}
-
+static const unsigned int SCRUB_DARK[5] = {
+    RGBA8(118, 112, 62, 255), RGBA8(126, 118, 66, 255), RGBA8(112, 108, 60, 255), RGBA8(130, 120, 70, 255), RGBA8(108, 104, 58, 255) };
+static const unsigned int SCRUB_LIGHT[5] = {
+    RGBA8(134, 126, 72, 255), RGBA8(142, 132, 76, 255), RGBA8(128, 122, 70, 255), RGBA8(146, 134, 80, 255), RGBA8(124, 118, 68, 255) };
 // Lakes: irregular octagons with a sandy shore.
 typedef struct { float x, z, rx, rz; } Lake;
 #define NLAKES 5
@@ -89,6 +107,56 @@ static bool in_lake(float x, float z, float grow) {
         if (ux * ux + uz * uz < 1.0f) return true;
     }
     return false;
+}
+
+// Lush wet meadow round every lake, in a wandering band.
+static float wet_k(float x, float z) {
+    float best = 0.0f;
+    float w = (vn(x / 2200.0f, z / 2200.0f, 67) - 0.5f) * 1800.0f;
+    for (int n = 0; n < NLAKES; n++) {
+        float dx = x - LAKES[n].x, dz = z - LAKES[n].z;
+        if (fabsf(dx) > 6000.0f || fabsf(dz) > 6000.0f) continue;
+        float d = sqrtf(dx * dx + dz * dz) - LAKES[n].rx + w;
+        float t = clampf((3200.0f - d) / 3000.0f, 0.0f, 1.0f);
+        best = fmaxf(best, t * t * (3.0f - 2.0f * t));
+    }
+    return best;
+}
+static unsigned int field_color(int i, int j, bool dark) {
+    int k = (int)(hf(hash2(i * 3 + 1, j * 5 + 2), 0) * 4.99f);
+    unsigned int base = dark ? FIELD_DARK[k] : FIELD_LIGHT[k];
+    float x = (i + 0.5f) * TILE, z = (j + 0.5f) * TILE;
+    float dk = desert_k(x, z), fk = forest_k(x, z), ck = coast_k(x, z), wk = wet_k(x, z);
+    unsigned int col = base;
+    {                                                                             // big soft patches of ripe and fresh crops, so farmland is not one flat green
+        float n = vn(x / 2600.0f, z / 2600.0f, 61), m = vn(x / 3900.0f, z / 3900.0f, 71);
+        col = blend_col(col, RGBA8(138, 138, 64, 255), clampf((n - 0.58f) / 0.3f, 0.0f, 1.0f) * 0.45f);
+        col = blend_col(col, RGBA8(50, 140, 62, 255), clampf((0.42f - m) / 0.3f, 0.0f, 1.0f) * 0.35f);
+    }
+    if (wk > 0.0f) col = blend_col(col, dark ? RGBA8(40, 118, 62, 255) : RGBA8(50, 132, 70, 255), wk * 0.75f);
+    if (ck > 0.0f) {                                                              // grass -> scrub -> pale sand at the water
+        col = blend_col(col, dark ? SCRUB_DARK[k] : SCRUB_LIGHT[k], clampf(ck * 2.4f, 0.0f, 1.0f) * 0.9f);
+        col = blend_col(col, dark ? RGBA8(184, 170, 118, 255) : RGBA8(194, 180, 126, 255), clampf((ck - 0.4f) / 0.5f, 0.0f, 1.0f) * 0.9f);
+    }
+    if (dk > 0.0f) {                                                              // farmland -> dry scrub -> red desert, with streaks of sand and rock inside it
+        col = blend_col(col, dark ? SCRUB_DARK[k] : SCRUB_LIGHT[k], clampf(dk * 2.2f, 0.0f, 1.0f));
+        float dd = clampf((dk - 0.35f) / 0.5f, 0.0f, 1.0f);
+        if (dd > 0.0f) {
+            col = blend_col(col, dark ? DESERT_DARK[k] : DESERT_LIGHT[k], dd);
+            float n = vn(x / 1300.0f, z / 800.0f, 33);
+            col = blend_col(col, n > 0.5f ? RGBA8(196, 150, 106, 255) : RGBA8(122, 84, 60, 255), fabsf(n - 0.5f) * 0.9f * dd);
+        }
+    }
+    return fk <= 0.0f ? col : blend_col(col, dark ? FOREST_DARK[k] : FOREST_LIGHT[k], fk);
+}
+// The same land, one colour per place, for the chart and the horizon.
+static unsigned int land_mid(float x, float z) {
+    unsigned int col = RGBA8(64, 146, 54, 255);
+    float wk = wet_k(x, z), ck = coast_k(x, z), dk = desert_k(x, z), fk = forest_k(x, z);
+    col = blend_col(col, RGBA8(50, 132, 70, 255), wk * 0.75f);
+    col = blend_col(col, RGBA8(170, 160, 100, 255), ck * 0.8f);
+    col = blend_col(col, RGBA8(160, 116, 84, 255), dk);
+    return blend_col(col, RGBA8(40, 104, 52, 255), fk);
 }
 
 static void draw_roads(int i0, int j0, int tr) {

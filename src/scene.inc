@@ -40,7 +40,7 @@ static void draw_scene(void) {
         float ux = vdot(up, cam.r), uy = vdot(up, cam.u), uz = vdot(up, cam.f);
         float len = sqrtf(ux * ux + uy * uy);
         const float B = 12000.0f;
-        unsigned int gcol = wx_fog_apply(tod_apply(blend_col(blend_col(RGBA8(64, 146, 54, 255), RGBA8(160, 116, 84, 255), desert_k(cam.pos.x, cam.pos.z)), RGBA8(40, 104, 52, 255), forest_k(cam.pos.x, cam.pos.z))), TILE * (float)wx_tile_radius());
+        unsigned int gcol = wx_fog_apply(tod_apply(land_mid(cam.pos.x, cam.pos.z)), TILE * (float)wx_tile_radius());
         if (len < 1e-4f) {
             if (uz < 0.0f) {                      // looking straight down: all ground
                 P2 q[4] = { {0, 0}, {SCREEN_W, 0}, {SCREEN_W, VIEW_H}, {0, VIEW_H} };

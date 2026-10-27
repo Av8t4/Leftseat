@@ -359,6 +359,12 @@ static void build_countryside(void) {
         float hb = frand(450, 700);
         add_mesa((Mesa){ p.x, p.z, hb, frand(140, 260), hb * 0.55f }, 176, 98, 66);
     }
+    // Smaller buttes strung out round the edge of the desert, beyond the route, so it thins out instead of stopping.
+    static const float OUT[6][2] = { {6500,3500}, {8500,-2200}, {-1500,8200}, {3000,9500}, {-7800,6200}, {7000,-7000} };
+    for (int k = 0; k < 6; k++) {
+        float hb = frand(300, 480);
+        add_mesa((Mesa){ B->cx + OUT[k][0], B->cz + OUT[k][1], hb, frand(80, 170), hb * 0.5f }, 170, 96, 64);
+    }
     // Towns.
     static const float TT[5] = { 0.16f, 0.34f, 0.60f, 0.78f, 0.93f }, TL[5] = { 1800.0f, -2300.0f, 1500.0f, -1900.0f, 2600.0f };
     for (int n = 0; n < 5 && ntowns < MAX_TOWNS; n++) {
