@@ -28,6 +28,15 @@ static int          ar_rc_open, ar_rc_start, ar_rc_read, ar_active, ar_rstat;
 static const float AR_FOV_DEG[4] = { 50.0f, 60.0f, 70.0f, 80.0f };           // horizontal field of view of the camera
 static float ar_focal(void) { return (ARD_W * 0.5f) / tanf(AR_FOV_DEG[ar_fovi] * 0.5f * PI_F / 180.0f); }   // pixels of the 480 x 272 picture
 
+// A tiny log for finding out where the camera stops (ux0:data/leftseat_ar.txt), written line by line so it survives a freeze.
+static int ar_logn;
+static void ar_log(const char *fmt, int a, int b) {
+    if (ar_logn++ > 60) return;
+    FILE *f = fopen("ux0:data/leftseat_ar.txt", ar_logn == 1 ? "w" : "a");
+    if (!f) return;
+    fprintf(f, fmt, a, b); fputc('\n', f); fclose(f);
+}
+
 static void ar_close(void) {
     if (ar_cam_ok) { sceCameraStop(1); sceCameraClose(1); ar_cam_ok = false; }
     if (ar_blk >= 0) { sceKernelFreeMemBlock(ar_blk); ar_blk = -1; ar_blk_base = NULL; }
@@ -38,7 +47,9 @@ static void ar_close(void) {
 static void ar_open(int ac) {
     ar_ac = ac; ar_on = true; ar_lost = 999; ar_have_c = false; ar_have_pose = false; ar_code = -1;
     ar_lastframe = -1; ar_frames = 0; ar_bad_reads = 0; ar_msg = "";
+    ar_logn = 0; ar_log("open requested ac %d %d", ac, 0);
     ar_tex = vita2d_create_empty_texture(ARD_W, ARD_H);
+    ar_log("texture %d %d", ar_tex != NULL, 0);
     if (!ar_tex) { ar_msg = "No memory for the camera picture"; return; }
     memset(vita2d_texture_get_datap(ar_tex), 0, vita2d_texture_get_stride(ar_tex) * ARD_H);
     int stride = (int)vita2d_texture_get_stride(ar_tex);
@@ -55,9 +66,14 @@ static void ar_open(int ac) {
     if (ar_blk < 0 || sceKernelGetMemBlockBase(ar_blk, &ar_blk_base) < 0) { ar_msg = "No memory for the camera"; return; }
     (void)stride;
     ci.pIBase = ar_blk_base;
+    ar_log("blk %d base ok %d", (int)ar_blk, ar_blk_base != NULL);
+    ar_log("calling open %d %d", 0, 0);
     int r = ar_rc_open = sceCameraOpen(1, &ci);
+    ar_log("open returned %x %d", r, 0);
     if (r < 0) { ar_msg = "The camera could not be opened"; return; }
+    ar_log("calling start %d %d", 0, 0);
     r = ar_rc_start = sceCameraStart(1);
+    ar_log("start returned %x %d", r, 0);
     if (r < 0) { sceCameraClose(1); ar_msg = "The camera could not be started"; return; }
     ar_cam_ok = true;
 }
@@ -134,9 +150,12 @@ static void ar_step(const SceCtrlData *pad, unsigned int pressed) {
     memset(&rd, 0, sizeof rd);
     rd.size = sizeof rd;
     rd.mode = 1;                                                       // do not wait: mode 0 can wait for ever if the camera sends nothing, and freezes the game
+    ar_log("step: calling IsActive %d %d", ar_frames, 0);
     ar_active = sceCameraIsActive(1);
+    ar_log("IsActive %d, calling read %d", ar_active, 0);
     int r = ar_rc_read = sceCameraRead(1, &rd);
-    if (r < 0) { if (++ar_bad_reads > 90) ar_msg = "The camera is not giving pictures"; return; }
+    if (r < 0) { ar_log("read FAILED %x %d", r, 0); if (++ar_bad_reads > 90) ar_msg = "The camera is not giving pictures"; return; }
+    ar_log("read returned %x status %d", r, rd.status);
     ar_bad_reads = 0; ar_rstat = rd.status;
     ar_lastframe = (int)rd.frame; ar_frames++;                         // (the frame counter is not reliable, so every successful read counts)
     {                                                                  // copy out in whole rows (the camera memory is slow to read), make every pixel opaque, show it
