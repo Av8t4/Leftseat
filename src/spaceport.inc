@@ -10,26 +10,53 @@
 #define SEA_X 36300.0f                                  // where the coast runs (east of home), before the wiggle
 #define SP_Z  (AIRPORTS[AP_SPACE].cz)
 
-// The coast: nearly straight, with a gentle wiggle that fades out near the spaceport so the sites stand well back from the water.
+// The coast: a long, lazy shoreline of headlands and bays. The wiggle fades out near the spaceport so the sites stand well back from the water.
 static float sea_coast_x(float z) {
-    float f = clampf((fabsf(z - SP_Z) - 2500.0f) / 4000.0f, 0.0f, 1.0f);
-    return SEA_X + f * (380.0f * sinf(z * 0.00041f + 0.7f) + 150.0f * sinf(z * 0.00065f + 2.0f));
+    float f = clampf((fabsf(z - SP_Z) - 2500.0f) / 4500.0f, 0.0f, 1.0f);
+    return SEA_X + f * (640.0f * sinf(z * 0.00031f + 0.7f) + 270.0f * sinf(z * 0.00067f + 2.0f) + 110.0f * sinf(z * 0.0016f + 4.1f));
 }
 static float sea_depth(float x, float z) { return x - sea_coast_x(z); }          // metres into the sea (negative: on land)
+static float beach_w(float z) { return 90.0f + 100.0f * (0.5f + 0.5f * sinf(z * 0.0011f + 1.3f)) * (0.6f + 0.4f * sinf(z * 0.0037f)); }   // the beach is wider on the bays
 
-static unsigned int sea_col(float d) {                                           // shallows are pale, the deep sea dark
+static unsigned int sea_col(float d, float mottle) {                             // shallows are pale, the deep sea dark; a little patchy
     float k = clampf(d / 2600.0f, 0.0f, 1.0f);
     k = k * (2.0f - k);
-    return RGBA8((int)(104 + (34 - 104) * k), (int)(178 + (90 - 178) * k), (int)(188 + (150 - 188) * k), 255);
+    float m = 0.95f + 0.1f * mottle;
+    return RGBA8((int)((104 + (34 - 104) * k) * m), (int)((178 + (90 - 178) * k) * m), (int)((188 + (150 - 188) * k) * m), 255);
 }
 
 static void sea_band(float z0, float z1, float e0, float e1) {
     V3 p[4] = { v3(sea_coast_x(z0) + e0, 0.03f, z0), v3(sea_coast_x(z0) + e1, 0.03f, z0), v3(sea_coast_x(z1) + e1, 0.03f, z1), v3(sea_coast_x(z1) + e0, 0.03f, z1) };
-    draw_world_poly(p, 4, sea_col(sqrtf(fmaxf(e0, 0.0f) * fmaxf(e1, 1.0f))));
+    float mot = hf(hash2((int)floorf(z0 / 1600.0f) + 71, (int)(e0 * 0.01f) + 5), 0);
+    draw_world_poly(p, 4, sea_col(sqrtf(fmaxf(e0, 0.0f) * fmaxf(e1, 1.0f)), mot));
 }
 static void sea_strip(float z0, float z1, float e0, float e1, unsigned int col) {
     V3 p[4] = { v3(sea_coast_x(z0) + e0, 0.04f, z0), v3(sea_coast_x(z0) + e1, 0.04f, z0), v3(sea_coast_x(z1) + e1, 0.04f, z1), v3(sea_coast_x(z1) + e0, 0.04f, z1) };
     draw_world_poly(p, 4, col);
+}
+static void beach_strip(float z0, float z1, float inner, float outer, unsigned int col) {     // inner and outer: fractions of the beach width at each end (0 = the water line)
+    float w0 = beach_w(z0), w1 = beach_w(z1);
+    V3 p[4] = { v3(sea_coast_x(z0) - outer * w0, 0.04f, z0), v3(sea_coast_x(z0) - inner * w0, 0.04f, z0), v3(sea_coast_x(z1) - inner * w1, 0.04f, z1), v3(sea_coast_x(z1) - outer * w1, 0.04f, z1) };
+    draw_world_poly(p, 4, col);
+}
+
+// A fishing pier with a few boats, on the bay half way up the coast.
+#define PIER_Z 14000.0f
+static void draw_pier(void) {
+    float dz = PIER_Z - cam.pos.z, dx = sea_coast_x(PIER_Z) - cam.pos.x;
+    if (dz * dz + dx * dx > 6000.0f * 6000.0f) return;
+    float cx = sea_coast_x(PIER_Z);
+    const unsigned int wood = RGBA8(128, 98, 66, 255), wood_d = RGBA8(98, 74, 50, 255);
+    ground_strip(cx - 70.0f, PIER_Z, cx + 260.0f, PIER_Z, 3.2f, wood);                         // the deck
+    ground_strip(cx + 180.0f, PIER_Z, cx + 180.0f, PIER_Z + 46.0f, 2.6f, wood);                 // a side jetty
+    for (int k = 0; k < 26; k++)                                                                 // planks
+        ground_strip(cx - 60.0f + k * 12.0f, PIER_Z - 3.1f, cx - 60.0f + k * 12.0f, PIER_Z + 3.1f, 0.28f, wood_d);
+    for (int k = 0; k < 4; k++) {                                                                // moored boats
+        float bx = cx + 60.0f + k * 55.0f, bz = PIER_Z + (k & 1 ? 12.0f : -12.0f);
+        unsigned int hull = k == 0 ? RGBA8(210, 60, 52, 255) : k == 1 ? RGBA8(236, 236, 240, 255) : k == 2 ? RGBA8(52, 96, 170, 255) : RGBA8(226, 190, 70, 255);
+        ground_strip(bx - 5.0f, bz, bx + 5.0f, bz, 1.8f, hull);
+        ground_strip(bx - 1.5f, bz, bx + 2.0f, bz, 1.1f, RGBA8(238, 238, 240, 255));
+    }
 }
 
 static void draw_sea(void) {
@@ -44,16 +71,28 @@ static void draw_sea(void) {
     for (float z = zc - 4800.0f; z <= zc + 6400.0f + 1.0f; z += 1600.0f) rows[nr++] = z;
     for (float z = zc + 6400.0f + 3200.0f; z <= zc + 16000.0f + 1.0f; z += 3200.0f) rows[nr++] = z;
     rows[nr++] = zc + 64000.0f;
+    float ph = (float)(frame_count % 6000) * 0.035f;
     for (int r = 0; r + 1 < nr; r++) {
         float z0 = rows[r], z1 = rows[r + 1], dz = fabsf(0.5f * (z0 + z1) - cam.pos.z);
         if (vdot(vsub(v3(SEA_X, 0, 0.5f * (z0 + z1)), cam.pos), cam.f) < -(z1 - z0) - 9000.0f && dz > 30000.0f) continue;
         if (dz < 5600.0f) {
             for (int b = 0; b < 8; b++) sea_band(z0, z1, E8[b], E8[b + 1]);
-            if (dz < 4000.0f) sea_strip(z0, z1, 0.0f, 12.0f, RGBA8(240, 244, 244, 255));   // surf
+            if (dz < 4000.0f) {
+                for (int k = 0; k < 3; k++) {                                              // lines of breaking waves sliding in to the shore
+                    float o = fmodf(ph * 9.0f + k * 70.0f, 210.0f);
+                    sea_strip(z0, z1, 12.0f + o, 15.0f + o + 2.0f * (1.0f - o / 210.0f), RGBA8(214, 238, 242, 255));
+                }
+                sea_strip(z0, z1, 0.0f, 9.0f + 5.0f * sinf(ph + z0 * 0.01f), RGBA8(244, 248, 248, 255));   // surf
+            }
         } else
             for (int b = 0; b < 4; b++) sea_band(z0, z1, E4[b], E4[b + 1]);
-        if (dz < 17000.0f) sea_strip(z0, z1, -150.0f, 0.0f, RGBA8(218, 202, 154, 255));       // the beach
+        if (dz < 17000.0f) {
+            beach_strip(z0, z1, 0.0f, 1.0f, RGBA8(222, 206, 158, 255));                      // the beach: dry sand, with a darker wet band at the water
+            beach_strip(z0, z1, 0.0f, 0.12f, RGBA8(190, 174, 128, 255));
+            if (dz < 8000.0f) beach_strip(z0, z1, 0.92f, 1.35f, RGBA8(170, 168, 104, 255));     // dune grass behind it
+        }
     }
+    draw_pier();
 }
 
 /* ------------------------------------------------------------------ */

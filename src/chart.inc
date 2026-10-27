@@ -104,12 +104,28 @@ static void draw_chart(vita2d_pgf *pgf) {
 
     vita2d_draw_rectangle(0, 0, SCREEN_W, SCREEN_H, card);
     vita2d_draw_rectangle(MX, MY, MW, MH, RGBA8(40, 74, 44, 255));                // farmland
-    {                                                                              // the desert around Redrock
-        const Airport *b = &AIRPORTS[AP_REDROCK];
-        float bx = ch_sx(b->cx), by = ch_sy(b->cz), r = 6500.0f * S;
-        P2 o[8];
-        for (int i = 0; i < 8; i++) { float a = i * PI_F / 4.0f + 0.39f; o[i] = (P2){ bx + cosf(a) * r, by + sinf(a) * r }; }
-        ch_poly(o, 8, RGBA8(112, 80, 58, 255));
+    {                                                                              // the land: forest, desert, coast and lake meadows, in small cells; same-shade cells in a row join into one strip
+        float cell = clampf(16.0f / S, 100.0f, 3000.0f);
+        float x0 = chart_cx - 0.5f * MW / S - cell, x1 = chart_cx + 0.5f * MW / S + cell, z0 = chart_cz - 0.5f * MH / S - cell, z1 = chart_cz + 0.5f * MH / S + cell;
+        x0 = fmaxf(x0, -70000.0f); x1 = fminf(x1, 80000.0f); z0 = fmaxf(z0, -70000.0f); z1 = fminf(z1, 70000.0f);
+        const unsigned int farm = RGBA8(64, 146, 54, 255);
+        for (float z = floorf(z0 / cell) * cell; z < z1; z += cell) {
+            int run = 0; float rx = 0.0f; unsigned int rc = 0, rq = 0;
+            for (float x = floorf(x0 / cell) * cell; x <= x1 + cell; x += cell) {
+                unsigned int c = 0, q = 0;
+                if (x < x1) {
+                    c = land_mid(x + cell * 0.5f, z + cell * 0.5f);
+                    q = c & 0x00F8F8F8u;                                          // 5 bits a channel
+                    if (q == (farm & 0x00F8F8F8u)) q = 0;                          // plain farmland: the base already shows
+                }
+                if (run && q != rq) {
+                    P2 p[4] = { { ch_sx(rx), ch_sy(z) }, { ch_sx(x), ch_sy(z) }, { ch_sx(x), ch_sy(z + cell) }, { ch_sx(rx), ch_sy(z + cell) } };
+                    ch_poly(p, 4, blend_col(RGBA8(40, 74, 44, 255), RGBA8(((rc & 255u) * 5) / 9 + 8, (((rc >> 8) & 255u) * 5) / 9 + 8, (((rc >> 16) & 255u) * 5) / 9 + 8, 255), 1.0f));
+                    run = 0;
+                }
+                if (q && !run) { run = 1; rx = x; rc = c; rq = q; }
+            }
+        }
     }
     {                                                                              // the sea down the east side: always on the chart, it is the way to the spaceport
         for (float z = -60000.0f; z < 60000.0f; z += 1500.0f) {
@@ -152,6 +168,23 @@ static void draw_chart(vita2d_pgf *pgf) {
             float x = ch_sx(mesas[i].x), y = ch_sy(mesas[i].z), w = 4.0f * zs, h = 3.0f * zs;
             if (ch_inmap(x, y, -w)) pb_quad((P2){ x - w, y - h }, (P2){ x + w, y - h }, (P2){ x + w, y + h }, (P2){ x - w, y + h }, RGBA8(190, 100, 66, 255));
         }
+#if CITY_DETAIL > 0
+        for (int r = 0; r < CITY_NR; r++) {                                                // downtown Knowles: the built-up blocks, a row at a time
+            float zc = CITY_Z0 + (r + 0.5f) * CITY_S, y0 = ch_sy(zc + CITY_S * 0.5f), y1 = ch_sy(zc - CITY_S * 0.5f);
+            if (y1 < CH_MY || y0 > CH_MY + CH_MH) continue;
+            int run = 0, c0 = 0;
+            for (int cc = 0; cc <= CITY_NC; cc++) {
+                bool on = cc < CITY_NC && city_d(CITY_X0 + (cc + 0.5f) * CITY_S, zc) > 0.20f;
+                if (run && !on) {
+                    float x0 = ch_sx(CITY_X0 + c0 * CITY_S), x1 = ch_sx(CITY_X0 + cc * CITY_S);
+                    P2 q[4] = { { x0, y0 }, { x1, y0 }, { x1, y1 }, { x0, y1 } };
+                    ch_poly(q, 4, RGBA8(176, 168, 140, 255));
+                    run = 0;
+                }
+                if (on && !run) { run = 1; c0 = cc; }
+            }
+        }
+#endif
         for (int i = 0; i < ntowns; i++) {
             float x = ch_sx(town_x[i]), y = ch_sy(town_z[i]), w = 3.0f * zs;
             if (ch_inmap(x, y, -w)) pb_quad((P2){ x - w, y - w }, (P2){ x + w, y - w }, (P2){ x + w, y + w }, (P2){ x - w, y + w }, RGBA8(240, 214, 120, 255));

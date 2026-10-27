@@ -5,6 +5,7 @@
 /* world building (static, flat-shaded faces)                          */
 /* ------------------------------------------------------------------ */
 
+static float face_maxd = 0.0f;          // faces added while this is above zero are dropped beyond that distance
 static void add_face(int n, const V3 *pts, float r, float g, float b) {
     if (nfaces >= MAX_FACES) return;
     Face *f = &faces[nfaces];
@@ -15,7 +16,7 @@ static void add_face(int n, const V3 *pts, float r, float g, float b) {
         c.x += pts[i].x; c.y += pts[i].y; c.z += pts[i].z;
     }
     f->c = v3(c.x / n, c.y / n, c.z / n);
-    f->rad = 0.0f; f->top = 0.0f;
+    f->rad = 0.0f; f->top = 0.0f; f->maxd = face_maxd;
     for (int i = 0; i < n; i++) {
         if (pts[i].y > f->top) f->top = pts[i].y;
         float dx = pts[i].x - f->c.x, dy = pts[i].y - f->c.y, dz = pts[i].z - f->c.z;
@@ -72,14 +73,56 @@ static void add_mountain2(const Mount *mp, float r, float g, float b, float cr, 
     mt_col[i][0] = r; mt_col[i][1] = g; mt_col[i][2] = b; mt_col[i][3] = cr; mt_col[i][4] = cg; mt_col[i][5] = cb;
     mt_has[i] = true;
 }
+// Every mountain has its own turn, snow line and snow-cap width, worked out from where it stands (so the faces and the collision
+// agree without storing anything). The footprint is a square turned by up to 45 degrees; it is shrunk so it fits about the same
+// patch of ground as an unturned one.
+typedef struct { float c, s, hw, ht, yh; } MtShape;
+static unsigned int land_mid(float x, float z);                   // the land colour of a place, see scenery.inc
+static MtShape mt_shape(const Mount *m) {
+    unsigned int h = hash2((int)floorf(m->x / 3.0f) + 13, (int)floorf(m->z / 3.0f) - 5);
+    float a = (hf(h, 0) - 0.5f) * PI_F * 0.5f, c = cosf(a), s = sinf(a);
+    MtShape r;
+    r.c = c; r.s = s;
+    r.hw = m->hb * 1.12f / (fabsf(c) + fabsf(s));
+    r.ht = r.hw * (0.24f + 0.20f * hf(h, 1));                      // snow base, a quarter to 45% of the half width
+    r.yh = m->h * (0.52f + 0.26f * hf(h, 2));                      // snow line, 52% to 78% of the height
+    if (m->h < 200.0f) { r.ht = 0.0f; r.yh = m->h; }                // hills are plain cones: no cap, so four faces instead of eight
+    return r;
+}
 static void emit_mountain(Mount m, float r, float g, float b, float cr, float cg, float cb) {
-    float hb = m.hb, ht = m.hb * MT_TOP, yh = m.h * MT_STEP;
-    V3 bs[4] = { v3(m.x-hb,0,m.z-hb), v3(m.x+hb,0,m.z-hb), v3(m.x+hb,0,m.z+hb), v3(m.x-hb,0,m.z+hb) };
-    V3 ts[4] = { v3(m.x-ht,yh,m.z-ht), v3(m.x+ht,yh,m.z-ht), v3(m.x+ht,yh,m.z+ht), v3(m.x-ht,yh,m.z+ht) };
+    MtShape sh = mt_shape(&m);
+    float hb = sh.hw, ht = sh.ht, yh = sh.yh;
+    float tone = 0.92f + 0.16f * hf(hash2((int)floorf(m.x / 3.0f) + 13, (int)floorf(m.z / 3.0f) - 5), 3);     // rock a little lighter or darker from one mountain to the next
+    r *= tone; g *= tone; b *= tone;
+    static const float K[4][2] = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } };
+    V3 bs[4], ts[4];
+    for (int i = 0; i < 4; i++) {
+        float ux = K[i][0], uz = K[i][1];
+        bs[i] = v3(m.x + (ux * sh.c - uz * sh.s) * hb, 0, m.z + (ux * sh.s + uz * sh.c) * hb);
+        ts[i] = v3(m.x + (ux * sh.c - uz * sh.s) * ht, yh, m.z + (ux * sh.s + uz * sh.c) * ht);
+    }
     V3 apex = v3(m.x, m.h, m.z);
+    if (m.h < 200.0f) {                                                              // a hill: a cone
+        for (int i = 0; i < 4; i++) {
+            V3 tri[3] = { bs[i], bs[(i + 1) & 3], apex };
+            add_face(3, tri, r, g, b);
+        }
+        return;
+    }
+    // A mountain: the lower slopes take the colour of the land they stand on (woods, scrub or desert), then bare rock, then the cap.
+    float yb = fminf(m.h * 0.17f, yh * 0.5f), kb = (hb - ht) * yb / yh, hbb = hb - kb;
+    unsigned int lc = land_mid(m.x, m.z);
+    float lr = (float)(lc & 255u) * 0.72f, lg = (float)((lc >> 8) & 255u) * 0.72f, lb = (float)((lc >> 16) & 255u) * 0.72f;
+    V3 mb[4];
+    for (int i = 0; i < 4; i++) {
+        float ux = K[i][0], uz = K[i][1];
+        mb[i] = v3(m.x + (ux * sh.c - uz * sh.s) * hbb, yb, m.z + (ux * sh.s + uz * sh.c) * hbb);
+    }
     for (int i = 0; i < 4; i++) {
         int j = (i + 1) & 3;
-        V3 side[4] = { bs[i], bs[j], ts[j], ts[i] };
+        V3 low[4] = { bs[i], bs[j], mb[j], mb[i] };
+        add_face(4, low, lr, lg, lb);
+        V3 side[4] = { mb[i], mb[j], ts[j], ts[i] };
         add_face(4, side, r, g, b);
         V3 cap[3] = { ts[i], ts[j], apex };
         add_face(3, cap, cr, cg, cb);
@@ -107,11 +150,13 @@ static float mesa_surface(const Mesa *m, float x, float z) {
     return m->h * (m->hb - d) / (m->hb - m->top);
 }
 static float mountain_surface(const Mount *m, float x, float z) {
-    float d = fmaxf(fabsf(x - m->x), fabsf(z - m->z));
-    float ht = m->hb * MT_TOP, yh = m->h * MT_STEP;
-    if (d >= m->hb) return 0.0f;
-    if (d >= ht)    return yh * (m->hb - d) / (m->hb - ht);
-    return m->h - (m->h - yh) * d / ht;
+    MtShape sh = mt_shape(m);
+    float dx = x - m->x, dz = z - m->z;
+    float u = dx * sh.c + dz * sh.s, v = -dx * sh.s + dz * sh.c;
+    float d = fmaxf(fabsf(u), fabsf(v));
+    if (d >= sh.hw) return 0.0f;
+    if (d >= sh.ht) return sh.yh * (sh.hw - d) / (sh.hw - sh.ht);
+    return m->h - (m->h - sh.yh) * d / sh.ht;
 }
 
 // Solid of revolution around a vertical axis. Ring i has radius rad[i] at height hgt[i];
@@ -150,6 +195,7 @@ static const Airport AIRPORTS[AP_COUNT] = {
 };
 static int   ap_found;                                   // 1 once you have flown close to Gulf Point (saved with the scores)
 static int   found_msg_t;                                // frames left to show "DISCOVERED"
+static float sea_coast_x(float z);
 static float sea_depth(float x, float z);                // metres into the sea (negative on land); see spaceport.inc
 static int   ap_nshown(void);
 static void  space_check_found(void);
@@ -187,8 +233,13 @@ static void ap_building(const Airport *a, float lx, float lz, float w, float d, 
 #define MAX_TOWNS 8
 static float town_x[MAX_TOWNS], town_z[MAX_TOWNS];
 static int   ntowns;
-static V3    town_lights[160];
+static V3    town_lights[640];
 static int   ntown_lights;
+// Every town building, for the yards and paths drawn round them when you are close (see draw_town_streets).
+#define MAX_TB 256
+static float tb_x[MAX_TB], tb_z[MAX_TB], tb_w[MAX_TB], tb_d[MAX_TB];
+static unsigned char tb_town[MAX_TB];
+static int   ntb;
 #define MAX_RIVER 52
 static float river_x[MAX_RIVER], river_z[MAX_RIVER];
 static int   nriver;
@@ -317,6 +368,59 @@ static void build_pinecrest_country(void) {
         }
 }
 
+// ---- town buildings -------------------------------------------------------------------------
+static void tri_face(V3 a, V3 b, V3 c, float r, float g, float bl) { V3 t[3] = { a, b, c }; add_face(3, t, r, g, bl); }
+static void quad_face(V3 a, V3 b, V3 c, V3 d, float r, float g, float bl) { V3 q[4] = { a, b, c, d }; add_face(4, q, r, g, bl); }
+// A house or hall with a pitched roof: four walls, two roof slopes and two gable ends (8 faces). The ridge runs along the longer side.
+static void add_gable(float x, float z, float w, float d, float h, float rh, float r, float g, float b, float rr, float rg, float rb) {
+    float x0 = x - w / 2, x1 = x + w / 2, z0 = z - d / 2, z1 = z + d / 2, ym = h + rh;
+    quad_face(v3(x0,0,z0), v3(x1,0,z0), v3(x1,h,z0), v3(x0,h,z0), r, g, b);
+    quad_face(v3(x1,0,z0), v3(x1,0,z1), v3(x1,h,z1), v3(x1,h,z0), r, g, b);
+    quad_face(v3(x1,0,z1), v3(x0,0,z1), v3(x0,h,z1), v3(x1,h,z1), r, g, b);
+    quad_face(v3(x0,0,z1), v3(x0,0,z0), v3(x0,h,z0), v3(x0,h,z1), r, g, b);
+    if (w >= d) {
+        float zm = z;
+        quad_face(v3(x0,h,z0), v3(x1,h,z0), v3(x1,ym,zm), v3(x0,ym,zm), rr, rg, rb);
+        quad_face(v3(x1,h,z1), v3(x0,h,z1), v3(x0,ym,zm), v3(x1,ym,zm), rr * 0.82f, rg * 0.82f, rb * 0.82f);
+        tri_face(v3(x0,h,z0), v3(x0,h,z1), v3(x0,ym,zm), r * 0.95f, g * 0.95f, b * 0.95f);
+        tri_face(v3(x1,h,z0), v3(x1,h,z1), v3(x1,ym,zm), r * 0.95f, g * 0.95f, b * 0.95f);
+    } else {
+        float xm = x;
+        quad_face(v3(x0,h,z0), v3(x0,h,z1), v3(xm,ym,z1), v3(xm,ym,z0), rr, rg, rb);
+        quad_face(v3(x1,h,z1), v3(x1,h,z0), v3(xm,ym,z0), v3(xm,ym,z1), rr * 0.82f, rg * 0.82f, rb * 0.82f);
+        tri_face(v3(x0,h,z0), v3(x1,h,z0), v3(xm,ym,z0), r * 0.95f, g * 0.95f, b * 0.95f);
+        tri_face(v3(x0,h,z1), v3(x1,h,z1), v3(xm,ym,z1), r * 0.95f, g * 0.95f, b * 0.95f);
+    }
+}
+static void town_box(float x, float z, float w, float d, float h) { if (nboxes < MAX_BOXES) boxes[nboxes++] = (Box){ x, z, w, d, h }; }
+static void town_water_tower(float x, float z) {
+    static const float SR[2] = { 3.2f, 2.0f }, SH[2] = { 0.0f, 13.0f };
+    add_lathe(x, z, SR, SH, 2, 6, 99, 120, 122, 128, 0, 0, 0);                        // the stand
+    static const float TR[4] = { 2.4f, 5.0f, 5.0f, 0.0f }, TH[4] = { 13.0f, 14.6f, 19.5f, 22.5f };
+    add_lathe(x, z, TR, TH, 4, 6, 2, 208, 212, 220, 150, 154, 164);                   // the tank and its roof
+    town_box(x, z, 9.0f, 9.0f, 22.0f);
+}
+static void town_church(float x, float z) {
+    add_gable(x, z, 11.0f, 22.0f, 7.0f, 4.5f, 232, 228, 214, 92, 88, 96);              // nave, roof along the street
+    add_building(x, z - 14.5f, 6.5f, 6.5f, 13.0f, 232, 228, 214);                       // bell tower
+    V3 ap = v3(x, 22.0f, z - 14.5f);
+    float hx = 3.25f, y0 = 13.0f;
+    tri_face(v3(x-hx,y0,z-14.5f-hx), v3(x+hx,y0,z-14.5f-hx), ap, 84, 80, 90);
+    tri_face(v3(x+hx,y0,z-14.5f-hx), v3(x+hx,y0,z-14.5f+hx), ap, 84, 80, 90);
+    tri_face(v3(x+hx,y0,z-14.5f+hx), v3(x-hx,y0,z-14.5f+hx), ap, 84, 80, 90);
+    tri_face(v3(x-hx,y0,z-14.5f+hx), v3(x-hx,y0,z-14.5f-hx), ap, 84, 80, 90);
+    town_box(x, z + 2.0f, 11.0f, 18.0f, 10.0f);
+    town_box(x, z - 14.5f, 6.5f, 6.5f, 21.0f);
+}
+static void town_silos(float x, float z) {
+    static const float R[3] = { 4.4f, 4.4f, 0.0f }, H[3] = { 0.0f, 17.0f, 19.5f };
+    add_lathe(x - 6.0f, z, R, H, 3, 6, 1, 196, 196, 190, 150, 154, 162);
+    add_lathe(x + 6.0f, z, R, H, 3, 6, 1, 196, 196, 190, 150, 154, 162);
+    add_gable(x, z + 16.0f, 22.0f, 11.0f, 6.0f, 3.0f, 150, 70, 56, 110, 112, 120);      // the feed shed
+    town_box(x, z, 20.0f, 9.0f, 19.0f);
+    town_box(x, z + 16.0f, 22.0f, 11.0f, 9.0f);
+}
+
 // The country between the two airports: a mountain pass, low hills, red buttes near Redrock, towns and a river.
 static bool world_spot_ok(float x, float z, float clear) {
     for (int k = 0; k < AP_COUNT; k++) if (sat_dist(x, z, AIRPORTS[k].cx, AIRPORTS[k].cz) < clear) return false;
@@ -359,12 +463,20 @@ static void build_countryside(void) {
         float hb = frand(450, 700);
         add_mesa((Mesa){ p.x, p.z, hb, frand(140, 260), hb * 0.55f }, 176, 98, 66);
     }
+    // Smaller buttes strung out round the edge of the desert, beyond the route, so it thins out instead of stopping.
+    static const float OUT[6][2] = { {6500,3500}, {8500,-2200}, {-1500,8200}, {3000,9500}, {-7800,6200}, {7000,-7000} };
+    for (int k = 0; k < 6; k++) {
+        float hb = frand(300, 480);
+        add_mesa((Mesa){ B->cx + OUT[k][0], B->cz + OUT[k][1], hb, frand(80, 170), hb * 0.5f }, 170, 96, 64);
+    }
     // Towns.
     static const float TT[5] = { 0.16f, 0.34f, 0.60f, 0.78f, 0.93f }, TL[5] = { 1800.0f, -2300.0f, 1500.0f, -1900.0f, 2600.0f };
+    static const float ROOF[4][3] = { { 150, 62, 48 }, { 98, 72, 62 }, { 72, 78, 92 }, { 146, 114, 72 } };
     for (int n = 0; n < 5 && ntowns < MAX_TOWNS; n++) {
         float tx = ux * L * TT[n] + px * TL[n], tz = uz * L * TT[n] + pz * TL[n];
         if (!world_spot_ok(tx, tz, 2200.0f)) continue;
         town_x[ntowns] = tx; town_z[ntowns] = tz; ntowns++;
+        int tb0 = ntb;
         int count = 14 + (int)frand(0.0f, 7.0f);
         for (int k = 0; k < count && nboxes < MAX_BOXES; k++) {
             float ang = frand(0.0f, 2.0f * PI_F), rr = 40.0f + 340.0f * sqrtf(frand(0.0f, 1.0f));
@@ -374,8 +486,41 @@ static void build_countryside(void) {
             float kw = w * 0.5f + 8.0f, kd = d * 0.5f + 8.0f;                 // keep clear of the two main streets (see draw_town_streets)
             if (fabsf(x - tx) < kw) x = tx + (x >= tx ? kw : -kw);
             if (fabsf(z - tz) < kd) z = tz + (z >= tz ? kd : -kd);
-            add_building(x, z, w, d, h, tone, tone * 0.90f, tone * 0.80f);
-            if (ntown_lights < 160) town_lights[ntown_lights++] = v3(x, 3.5f, z);
+            unsigned int hh = hash2((int)x + 91, (int)z - 17);
+            const float *rc = ROOF[hh & 3];
+            if (h < 14.0f) {                                                   // houses and shops: a pitched roof
+                float rh = fminf(fminf(w, d) * 0.32f, 6.0f);
+                if (nboxes < MAX_BOXES) boxes[nboxes++] = (Box){ x, z, w, d, h + rh };
+                add_gable(x, z, w, d, h, rh, tone, tone * 0.90f, tone * 0.80f, rc[0], rc[1], rc[2]);
+            } else {                                                           // taller blocks: flat roof with a stairwell and a plant room
+                add_building(x, z, w, d, h, tone, tone * 0.90f, tone * 0.80f);
+                if (h > 19.0f) add_box_faces(x + w * 0.18f, z - d * 0.15f, w * 0.28f, d * 0.26f, h, h + 2.6f, tone * 0.72f, tone * 0.70f, tone * 0.68f);
+            }
+            if (ntown_lights < 330) town_lights[ntown_lights++] = v3(x, 3.5f, z - d * 0.5f - 0.4f);
+            if (ntb < MAX_TB) { tb_x[ntb] = x; tb_z[ntb] = z; tb_w[ntb] = w; tb_d[ntb] = d; tb_town[ntb] = (unsigned char)(ntowns - 1); ntb++; }
+        }
+        {                                                                      // one landmark in each town, in the first clear spot off the two main streets
+            float lr = (n % 3 == 2) ? 24.0f : 14.0f;
+            for (int t = 0; t < 40; t++) {
+                unsigned int hh = hash2(n * 131 + t * 7 + 3, 55 + t);
+                float ang = hf(hh, 0) * 2.0f * PI_F, rr = 70.0f + 230.0f * hf(hh, 1);
+                float x = tx + cosf(ang) * rr, z = tz + sinf(ang) * rr;
+                if (fabsf(x - tx) < lr + 14.0f || fabsf(z - tz) < lr + 14.0f) continue;
+                bool ok = true;
+                for (int q = tb0; q < ntb && ok; q++)
+                    if (fabsf(x - tb_x[q]) < tb_w[q] * 0.5f + lr + 6.0f && fabsf(z - tb_z[q]) < tb_d[q] * 0.5f + lr + 6.0f) ok = false;
+                if (!ok) continue;
+                if (n % 3 == 0) town_water_tower(x, z);
+                else if (n % 3 == 1) town_church(x, z);
+                else town_silos(x, z);
+                if (ntb < MAX_TB) { tb_x[ntb] = x; tb_z[ntb] = z; tb_w[ntb] = lr; tb_d[ntb] = lr; tb_town[ntb] = (unsigned char)(ntowns - 1); ntb++; }
+                break;
+            }
+        }
+        for (int k = -4; k <= 4; k++) {                                        // street lamps for the night, along both main streets
+            if (k == 0 || ntown_lights >= 396) continue;
+            town_lights[ntown_lights++] = v3(tx + k * 52.0f, 6.0f, tz + 7.0f);
+            town_lights[ntown_lights++] = v3(tx + 7.0f, 6.0f, tz + k * 52.0f);
         }
     }
     // A river wandering across the route, a third of the way along. It rises in the hills to the north-west and
@@ -484,9 +629,237 @@ static void settle_mountains(void) {
             emit_mountain(mounts[i], mt_col[i][0], mt_col[i][1], mt_col[i][2], mt_col[i][3], mt_col[i][4], mt_col[i][5]);
 }
 
+// ---- Knowles Works: the big factory and its village, east of the field -------------------------------------
+#define KW_FX 1750.0f            // factory hall centre
+#define KW_FZ (-1000.0f)
+#define KW_HW 320.0f             // half length of the hall (x)
+#define KW_HD 125.0f             // half depth (z)
+#define KW_VX 2950.0f            // village centre
+#define KW_VZ (-1000.0f)
+static void build_knowles(void) {
+    const float FX = KW_FX, FZ = KW_FZ;
+    // The hall: a very large plain shed with a dark band round it.
+    add_building(FX, FZ, 2.0f * KW_HW, 2.0f * KW_HD, 24.0f, 214, 217, 224);
+    for (int s = -1; s <= 1; s += 2) {
+        float zz = FZ + s * (KW_HD + 0.25f);
+        quad_face(v3(FX - KW_HW, 13.0f, zz), v3(FX + KW_HW, 13.0f, zz), v3(FX + KW_HW, 18.0f, zz), v3(FX - KW_HW, 18.0f, zz), 58, 64, 76);
+    }
+    for (int s = -1; s <= 1; s += 2) {
+        float xx = FX + s * (KW_HW + 0.25f);
+        quad_face(v3(xx, 13.0f, FZ - KW_HD), v3(xx, 13.0f, FZ + KW_HD), v3(xx, 18.0f, FZ + KW_HD), v3(xx, 18.0f, FZ - KW_HD), 58, 64, 76);
+    }
+    add_box_faces(FX, FZ, 520.0f, 26.0f, 24.0f, 24.8f, 70, 84, 104);                       // a long skylight down the middle of the roof
+    for (int k = 0; k < 5; k++)                                                            // rooftop plant
+        add_box_faces(FX + (k - 2) * 120.0f, FZ + (k & 1 ? 60.0f : -60.0f), 38.0f, 26.0f, 24.0f, 28.5f, 176, 180, 188);
+    // Loading dock along the south side, with its doors.
+    add_building(FX, FZ - KW_HD - 24.0f, 560.0f, 48.0f, 10.0f, 194, 198, 206);
+    for (int k = 0; k < 10; k++) {
+        float xx = FX - 252.0f + k * 56.0f, zz = FZ - KW_HD - 48.3f;
+        quad_face(v3(xx - 8.0f, 0.0f, zz), v3(xx + 8.0f, 0.0f, zz), v3(xx + 8.0f, 7.0f, zz), v3(xx - 8.0f, 7.0f, zz), 52, 58, 70);
+    }
+    // The glass office block at the west end, with a red Knowles stripe.
+    add_building(FX - KW_HW - 38.0f, FZ - 20.0f, 76.0f, 130.0f, 19.0f, 96, 138, 178);
+    add_box_faces(FX - KW_HW - 38.0f, FZ - 20.0f, 78.0f, 132.0f, 19.0f, 19.8f, 226, 228, 232);
+    {
+        float xx = FX - KW_HW - 76.3f;
+        quad_face(v3(xx, 11.0f, FZ - 85.0f), v3(xx, 11.0f, FZ + 45.0f), v3(xx, 13.5f, FZ + 45.0f), v3(xx, 13.5f, FZ - 85.0f), 196, 40, 40);
+    }
+    // Cooling towers and battery containers at the east end.
+    static const float CR[3] = { 8.0f, 8.0f, 0.0f }, CH[3] = { 0.0f, 13.0f, 13.3f };
+    for (int k = 0; k < 3; k++) {
+        float cx = FX + KW_HW + 40.0f, cz = FZ - 70.0f + k * 70.0f;
+        add_lathe(cx, cz, CR, CH, 3, 6, 1, 184, 188, 194, 120, 124, 132);
+        town_box(cx, cz, 15.0f, 15.0f, 13.0f);
+    }
+    for (int k = 0; k < 6; k++)
+        add_building(FX + KW_HW + 90.0f, FZ - 100.0f + k * 40.0f, 14.0f, 30.0f, 5.5f, 232, 234, 238);
+    // The village: houses along both main streets, a church on the corner.
+    if (ntowns < MAX_TOWNS) {
+        int vi = ntowns; town_x[ntowns] = KW_VX; town_z[ntowns] = KW_VZ; ntowns++;
+        static const float ROOF[4][3] = { { 150, 62, 48 }, { 98, 72, 62 }, { 72, 78, 92 }, { 146, 114, 72 } };
+        for (int street = 0; street < 2; street++)
+            for (int side = -1; side <= 1; side += 2)
+                for (int q = 0; q < 4; q++) {
+                    int k = (q < 2) ? q - 2 : q - 1;                                      // -2, -1, 1, 2
+                    unsigned int hh = hash2(street * 53 + side * 17 + k * 7 + 301, q + 19);
+                    float w = 15.0f + 8.0f * hf(hh, 0), d = 13.0f + 7.0f * hf(hh, 1), h = 6.0f + 5.0f * hf(hh, 2);
+                    float off = 30.0f, along = k * 46.0f + (hf(hh, 3) - 0.5f) * 8.0f;
+                    float x = street == 0 ? KW_VX + along : KW_VX + side * off;
+                    float z = street == 0 ? KW_VZ + side * off : KW_VZ + along;
+                    float tone = 170.0f + 55.0f * hf(hh, 3);
+                    const float *rc = ROOF[(hh >> 12) & 3];
+                    float rh = fminf(fminf(w, d) * 0.32f, 5.5f);
+                    if (nboxes < MAX_BOXES) boxes[nboxes++] = (Box){ x, z, w, d, h + rh };
+                    add_gable(x, z, w, d, h, rh, tone, tone * 0.92f, tone * 0.82f, rc[0], rc[1], rc[2]);
+                    if (ntown_lights < 330) town_lights[ntown_lights++] = v3(x, 3.5f, z - d * 0.5f - 0.4f);
+                    if (ntb < MAX_TB) { tb_x[ntb] = x; tb_z[ntb] = z; tb_w[ntb] = w; tb_d[ntb] = d; tb_town[ntb] = (unsigned char)vi; ntb++; }
+                }
+        town_church(KW_VX + 86.0f, KW_VZ + 80.0f);
+        if (ntb < MAX_TB) { tb_x[ntb] = KW_VX + 86.0f; tb_z[ntb] = KW_VZ + 80.0f; tb_w[ntb] = 12.0f; tb_d[ntb] = 12.0f; tb_town[ntb] = (unsigned char)vi; ntb++; }
+        for (int k = -4; k <= 4; k++) {
+            if (k == 0 || ntown_lights >= 396) continue;
+            town_lights[ntown_lights++] = v3(KW_VX + k * 52.0f, 6.0f, KW_VZ + 7.0f);
+            town_lights[ntown_lights++] = v3(KW_VX + 7.0f, 6.0f, KW_VZ + k * 52.0f);
+        }
+    }
+    // Floodlights round the factory at night.
+    for (int k = 0; k <= 8 && ntown_lights < 396; k++) {
+        town_lights[ntown_lights++] = v3(FX - KW_HW + k * (2.0f * KW_HW / 8.0f), 9.0f, FZ - KW_HD - 60.0f);
+        if (ntown_lights < 396) town_lights[ntown_lights++] = v3(FX - KW_HW + k * (2.0f * KW_HW / 8.0f), 9.0f, FZ + KW_HD + 12.0f);
+    }
+}
+
+// ---- Downtown Knowles: a city west of the field that thins out into suburbs -------------------------------
+// city_d() says how built-up a place is (0 = open country, 1 = the heart of downtown); it follows a wandering, noisy outline, so the
+// city has no straight edge. Everything else (blocks, streets, ground, chart) is drawn from it.
+#define CITY_X0 (-2700.0f)
+#define CITY_Z0 (-1000.0f)
+#define CITY_S  150.0f
+#define CITY_NC 14
+#define CITY_NR 15
+#define CITY_X1 (CITY_X0 + CITY_NC * CITY_S)
+#define CITY_Z1 (CITY_Z0 + CITY_NR * CITY_S)
+#define CITY_CX (-1650.0f)
+#define CITY_CZ 125.0f
+#define CITY_PARK_C 7
+#define CITY_PARK_R 7
+#define TB_CITY 250
+static float vn(float x, float z, int seed);                                             // smooth noise, see scenery.inc
+static float city_d(float x, float z) {
+    float dx = (x - CITY_CX) / 1.0f, dz = (z - CITY_CZ) / 1.18f;                           // a little longer along the runway than across
+    float r = sqrtf(dx * dx + dz * dz);
+    r += (vn(x / 950.0f, z / 950.0f, 81) - 0.5f) * 700.0f + (vn(x / 340.0f, z / 340.0f, 83) - 0.5f) * 240.0f;
+    float t = clampf(1.0f - r / 1020.0f, 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+static unsigned int city_av[CITY_NC + 1], city_st[CITY_NR + 1];                           // which street segments exist: bit r of an avenue is the stretch from row r to r+1
+typedef struct { float x, y, z, px; unsigned int col; unsigned char blink; } RoofLight;
+#define MAX_RL 200
+static RoofLight roof_lights[MAX_RL];
+static int nroof_lights;
+static void add_roof_light(float x, float y, float z, bool red) {
+    if (nroof_lights < MAX_RL) roof_lights[nroof_lights++] = (RoofLight){ x, y, z, red ? 3.0f : 2.0f, red ? RGBA8(255, 56, 40, 255) : RGBA8(255, 244, 214, 255), (unsigned char)red };
+}
+static void city_win(float x, float y, float z) { if (ntown_lights < 630) town_lights[ntown_lights++] = v3(x, y, z); }
+static void build_city(void) {
+#if CITY_DETAIL > 0
+    static const float TW[5][3] = { { 112, 136, 164 }, { 192, 192, 198 }, { 198, 172, 142 }, { 72, 88, 112 }, { 150, 156, 164 } };
+    static const float MR[4][3] = { { 188, 160, 130 }, { 166, 112, 92 }, { 206, 196, 172 }, { 150, 150, 156 } };
+    static const float ROOF[4][3] = { { 150, 62, 48 }, { 98, 72, 62 }, { 72, 78, 92 }, { 146, 114, 72 } };
+    memset(city_av, 0, sizeof city_av); memset(city_st, 0, sizeof city_st);
+    for (int c = 0; c <= CITY_NC; c++)
+        for (int r = 0; r < CITY_NR; r++) {
+            float x = CITY_X0 + c * CITY_S, z = CITY_Z0 + (r + 0.5f) * CITY_S;
+            if (city_d(x, z) + 0.05f * (hf(hash2(c * 7 + 1, r * 5 + 3), 0) - 0.5f) > 0.16f || c == 7) city_av[c] |= 1u << r;      // the centre avenue runs the whole way
+        }
+    for (int r = 0; r <= CITY_NR; r++)
+        for (int c = 0; c < CITY_NC; c++) {
+            float x = CITY_X0 + (c + 0.5f) * CITY_S, z = CITY_Z0 + r * CITY_S;
+            if (city_d(x, z) + 0.05f * (hf(hash2(c * 11 + 5, r * 3 + 9), 0) - 0.5f) > 0.16f || r == 5) city_st[r] |= 1u << c;      // so does the street out to the field
+        }
+    for (int c = 0; c < CITY_NC; c++)
+        for (int r = 0; r < CITY_NR; r++) {
+            if (c == CITY_PARK_C && r == CITY_PARK_R) continue;                          // the park
+            float cx = CITY_X0 + (c + 0.5f) * CITY_S, cz = CITY_Z0 + (r + 0.5f) * CITY_S;
+            unsigned int h = hash2(c * 37 + 11, r * 53 + 5);
+            float t = city_d(cx, cz) + (hf(h, 3) - 0.5f) * 0.14f;
+#if CITY_DETAIL < 2
+            if ((c + r) & 1) continue;
+#endif
+            if (t < 0.12f) continue;
+            float ramp = clampf((t - 0.5f) / 0.5f, 0.0f, 1.0f);
+            if (t > 0.72f) {                                                              // the heart: towers, taller toward the middle
+                face_maxd = 5600.0f;
+                float w = 46.0f + 38.0f * hf(h, 0), d = 46.0f + 38.0f * hf(h, 1);
+                float hgt = 24.0f + (30.0f + 52.0f * hf(h, 2)) * ramp;
+                const float *tc = TW[(h >> 24) % 5];
+                add_building(cx, cz, w, d, hgt, tc[0], tc[1], tc[2]);
+                float top = hgt;
+                if (hgt > 64.0f) { top = hgt * 1.15f; add_box_faces(cx, cz, w * 0.58f, d * 0.58f, hgt, top, tc[0] * 0.82f, tc[1] * 0.82f, tc[2] * 0.84f); }
+                add_roof_light(cx, top + 2.5f, cz, true);                                 // a red beacon on top
+                if (hgt > 44.0f) { add_roof_light(cx - w * 0.42f, hgt + 1.4f, cz - d * 0.42f, false); add_roof_light(cx + w * 0.42f, hgt + 1.4f, cz + d * 0.42f, false); }
+                city_win(cx - w * 0.22f, hgt * 0.45f, cz - d * 0.5f - 0.5f); city_win(cx + w * 0.22f, hgt * 0.70f, cz - d * 0.5f - 0.5f);
+                city_win(cx + w * 0.5f + 0.5f, hgt * 0.55f, cz - d * 0.2f); city_win(cx - w * 0.5f - 0.5f, hgt * 0.35f, cz + d * 0.2f);
+            } else if (t > 0.5f) {                                                        // the edge of downtown: tall offices and flats, lower as you go out
+                face_maxd = 4600.0f;
+                const float *tc = MR[(h >> 24) & 3];
+                float hgt = 12.0f + (8.0f + 26.0f * hf(h, 2)) * clampf((t - 0.5f) / 0.22f, 0.0f, 1.0f);
+                float w = 46.0f + 38.0f * hf(h, 0), d = 46.0f + 38.0f * hf(h, 1);
+                add_building(cx + (hf(h, 0) - 0.5f) * 20.0f, cz + (hf(h, 1) - 0.5f) * 20.0f, w, d, hgt, tc[0], tc[1], tc[2]);
+                add_roof_light(cx + w * 0.4f, hgt + 1.3f, cz - d * 0.4f, false);
+                city_win(cx, hgt * 0.5f, cz - d * 0.5f - 0.5f - (hf(h, 1) - 0.5f) * 20.0f);
+            } else if (t > 0.28f) {                                                       // low rows of shops and flats
+                face_maxd = 3600.0f;
+                const float *tc = MR[(h >> 24) & 3];
+                for (int k = -1; k <= 1; k += 2) {
+                    if (hf(h, 2 + (k > 0)) < 0.42f) continue;
+                    float hgt = 6.0f + 6.0f * hf(h, 1), w = 40.0f + 22.0f * hf(h, 0);
+                    add_building(cx + k * 34.0f, cz, w * 0.8f, 56.0f + 30.0f * hf(h, 3), hgt, tc[0] * 0.95f, tc[1] * 0.95f, tc[2] * 0.95f);
+                    city_win(cx + k * 34.0f, 3.0f, cz - 30.0f);
+                }
+            } else {                                                                      // houses with yards, thinning out toward the country
+                face_maxd = 2600.0f;
+                int nh = t > 0.22f ? (hf(h, 2) > 0.3f ? 2 : 1) : (hf(h, 2) > 0.55f ? 1 : 0);
+                for (int k = 0; k < nh; k++) {
+                    unsigned int hh = hash2(c * 91 + k * 13 + 3, r * 17 + 29);
+                    float w = 17.0f + 8.0f * hf(hh, 0), d = 13.0f + 5.0f * hf(hh, 1), hgt = 5.5f + 3.0f * hf(hh, 2);
+                    float x = cx + (k ? 26.0f : -28.0f) + (hf(hh, 3) - 0.5f) * 12.0f, z = cz + (k ? 40.0f : -40.0f) + (hf(hh, 0) - 0.5f) * 10.0f;
+                    float tone = 176.0f + 50.0f * hf(hh, 3), rh = fminf(fminf(w, d) * 0.32f, 5.0f);
+                    const float *rc = ROOF[(hh >> 12) & 3];
+                    if (nboxes < MAX_BOXES) boxes[nboxes++] = (Box){ x, z, w, d, hgt + rh };
+                    add_gable(x, z, w, d, hgt, rh, tone, tone * 0.92f, tone * 0.82f, rc[0], rc[1], rc[2]);
+                    if (ntb < MAX_TB) { tb_x[ntb] = x; tb_z[ntb] = z; tb_w[ntb] = w; tb_d[ntb] = d; tb_town[ntb] = TB_CITY; ntb++; }
+                    city_win(x, 3.2f, z - d * 0.5f - 0.4f);
+                }
+            }
+            face_maxd = 0.0f;
+        }
+    for (int c = 0; c <= CITY_NC; c++)                                                    // a lamp at every other crossing that has a street
+        for (int r = 0; r <= CITY_NR; r++) {
+            if ((c + r) & 1) continue;
+            bool on = ((c < CITY_NC) && (city_st[r] >> c & 1)) || ((c > 0) && (city_st[r] >> (c - 1) & 1));
+            if (on && ntown_lights < 630) town_lights[ntown_lights++] = v3(CITY_X0 + c * CITY_S + 8.0f, 6.5f, CITY_Z0 + r * CITY_S + 8.0f);
+        }
+#endif
+}
+
+// ---- the coast: sea stacks and islands, a lighthouse ---------------------------------------------------------
+#define LH_Z (-12500.0f)
+static void build_coast(void) {
+    static const float ZS[8] = { 22000.0f, 16500.0f, 9200.0f, 3000.0f, -4500.0f, -9800.0f, -16800.0f, -21800.0f };
+    for (int k = 0; k < 8 && nmounts < MAX_MOUNTS - 4; k++) {                          // sea stacks: little rock cones just off the beach
+        unsigned int h = hash2(k * 47 + 9, 211);
+        float z = ZS[k] + (hf(h, 0) - 0.5f) * 1800.0f, x = sea_coast_x(z) + 180.0f + 700.0f * hf(h, 1);
+        float hb = 50.0f + 110.0f * hf(h, 2), ht = 26.0f + 70.0f * hf(h, 3);
+        mounts[nmounts] = (Mount){ x, z, hb, ht };
+        add_mountain2(&mounts[nmounts], 112, 104, 96, 112, 104, 96);
+        nmounts++;
+    }
+    for (int k = 0; k < 2 && nmounts < MAX_MOUNTS - 2; k++) {                          // two low islands further out
+        float z = k ? -2600.0f : 12000.0f, x = sea_coast_x(z) + 3300.0f + 900.0f * k;
+        mounts[nmounts] = (Mount){ x, z, 620.0f + 160.0f * k, 70.0f + 26.0f * k };
+        add_mountain2(&mounts[nmounts], 150, 140, 104, 150, 140, 104);
+        nmounts++;
+    }
+    {                                                                                   // a lighthouse on the headland, with the keeper's house
+        float x = sea_coast_x(LH_Z) - 240.0f, z = LH_Z;
+        static const float R[4] = { 6.4f, 5.0f, 5.0f, 4.2f }, H[4] = { 0.0f, 12.0f, 18.0f, 28.0f };
+        add_lathe(x, z, R, H, 2, 6, 99, 238, 238, 240, 0, 0, 0);
+        static const float R2[2] = { 5.0f, 4.6f }, H2[2] = { 12.0f, 19.0f };
+        add_lathe(x, z, R2, H2, 2, 6, 99, 196, 52, 48, 0, 0, 0);
+        static const float R3[2] = { 4.6f, 4.0f }, H3[2] = { 19.0f, 28.0f };
+        add_lathe(x, z, R3, H3, 2, 6, 99, 238, 238, 240, 0, 0, 0);
+        static const float R4[3] = { 3.0f, 3.0f, 0.0f }, H4[3] = { 28.0f, 31.0f, 35.0f };
+        add_lathe(x, z, R4, H4, 3, 6, 1, 250, 232, 150, 196, 52, 48);
+        town_box(x, z, 11.0f, 11.0f, 35.0f);
+        add_gable(x - 36.0f, z + 6.0f, 18.0f, 11.0f, 5.0f, 3.5f, 226, 222, 210, 150, 62, 48);
+        town_box(x - 36.0f, z + 6.0f, 18.0f, 11.0f, 8.5f);
+    }
+}
+
 static void build_world(void) {
     srand(1990);
-    nfaces = 0; nboxes = 0; nmesas = 0; ntowns = 0; ntown_lights = 0; nriver = 0;
+    nfaces = 0; nboxes = 0; nmesas = 0; ntowns = 0; ntown_lights = 0; ntb = 0; nroof_lights = 0; nriver = 0;
     nmounts = NUM_MOUNTS; nbridges = 0; nroadp = 0; mt_pine_first = MAX_MOUNTS; memset(mt_has, 0, sizeof mt_has);
     vita2d_set_clear_color(RGBA8(118, 176, 236, 255));   // sky
 
@@ -507,6 +880,9 @@ static void build_world(void) {
         if (fabsf(x) < 300 && fabsf(z) < 1300) continue;
         float w = frand(20, 70), d = frand(20, 70), h = frand(12, 80);
         float tone = frand(120, 215);
+#if CITY_DETAIL > 0
+        if (city_d(x, z) > 0.04f) continue;                                // the city stands here
+#endif
         add_building(x, z, w, d, h, tone, tone * 0.92f, tone * 0.85f);
     }
 
@@ -528,6 +904,9 @@ static void build_world(void) {
     build_countryside();
     build_pinecrest_country();
 #endif
+    build_knowles();
+    build_coast();
+    build_city();
     settle_mountains();
 }
 

@@ -156,6 +156,23 @@ static void draw_town_lights(void) {
         if (d.x * d.x + d.z * d.z > 7000.0f * 7000.0f) continue;
         draw_light(town_lights[i].x, town_lights[i].y, town_lights[i].z, 1.5f, win);
     }
+    {                                                                                       // the lighthouse: a long white flash, then dark
+        float lx = sea_coast_x(LH_Z) - 240.0f, dx = lx - cam.pos.x, dz = LH_Z - cam.pos.z;
+        if (dx * dx + dz * dz < 40000.0f * 40000.0f && (frame_count % 150) < 40) {
+            light_far = 40000.0f;
+            draw_light(lx, 31.5f, LH_Z, 3.4f, RGBA8(255, 250, 220, 255));
+            light_far = 9000.0f;
+        }
+    }
+    unsigned int sodium = RGBA8(255, 196, 120, 255);                                       // lamps at both ends of every bridge
+    for (int i = 0; i < nbridges; i++) {
+        float dx = br_x[i] - cam.pos.x, dz = br_z[i] - cam.pos.z;
+        if (dx * dx + dz * dz > 6000.0f * 6000.0f) continue;
+        float L = br_len[i] - 36.0f;
+        for (int e = -1; e <= 1; e += 2)
+            for (int sd = -1; sd <= 1; sd += 2)
+                draw_light(br_x[i] + br_dx[i] * e * L * 0.5f - br_dz[i] * sd * br_hw[i], 6.5f, br_z[i] + br_dz[i] * e * L * 0.5f + br_dx[i] * sd * br_hw[i], 1.6f, sodium);
+    }
 }
 
 static void draw_redrock_all(void) {
@@ -167,7 +184,6 @@ static void draw_redrock_all(void) {
     if (tod != TOD_DAY) {
         if (dc < 9000.0f) draw_ap_night(a);
         draw_beacon(a);
-        draw_town_lights();
     }
 }
 
@@ -310,51 +326,301 @@ static void ground_strip(float x0, float z0, float x1, float z1, float half, uns
     draw_world_poly(q, 4, col);
 }
 
+// A strip beside the line from A to B, off to one side by `off` metres (left of the direction of travel when positive).
+static void strip_off(float ax, float az, float bx, float bz, float off, float half, unsigned int col) {
+    float dx = bx - ax, dz = bz - az, len = sqrtf(dx * dx + dz * dz);
+    if (len < 0.01f) return;
+    float nx = -dz / len * off, nz = dx / len * off;
+    ground_strip(ax + nx, az + nz, bx + nx, bz + nz, half, col);
+}
+// A round patch, so two road segments meeting at a bend join up instead of leaving a notch.
+static void ground_disc(float x, float z, float r, unsigned int col) {
+    V3 p[8];
+    for (int k = 0; k < 8; k++) { float a = (k + 0.5f) * PI_F / 4.0f; p[k] = v3(x + r * 1.04f * cosf(a), 0.03f, z + r * 1.04f * sinf(a)); }
+    draw_world_poly(p, 8, col);
+}
+// Dashes along A to B: `dash` metres of paint every `pitch` metres, only the ones within `reach` of the camera.
+static void ground_dashes(float ax, float az, float bx, float bz, float half, float dash, float pitch, float reach, unsigned int col) {
+    float dx = bx - ax, dz = bz - az, len = sqrtf(dx * dx + dz * dz);
+    if (len < 1.0f) return;
+    float ux = dx / len, uz = dz / len;
+    float t0 = fmaxf(0.0f, (cam.pos.x - ax) * ux + (cam.pos.z - az) * uz - reach), t1 = fminf(len, t0 + 2.0f * reach);
+    for (float t = floorf(t0 / pitch) * pitch; t < t1; t += pitch) {
+        float u0 = fmaxf(t, 0.0f), u1 = fminf(t + dash, len);
+        if (u1 > u0) ground_strip(ax + ux * u0, az + uz * u0, ax + ux * u1, az + uz * u1, half, col);
+    }
+}
+static const unsigned int PAINT_W = RGBA8(228, 228, 230, 255), PAINT_Y = RGBA8(226, 200, 70, 255);
+
+// The two long roads past the airfield: a gravel shoulder under the tarmac, white edge lines and a dashed centre line on top.
+static void draw_main_road_shoulders(void) {
+    const unsigned int sh = RGBA8(120, 114, 98, 255);
+    ground_strip(ROAD_X, cam.pos.z - 3000.0f, ROAD_X, cam.pos.z + 3000.0f, 6.2f, sh);
+    ground_strip(cam.pos.x - 3000.0f, ROAD_Z, cam.pos.x + 3000.0f, ROAD_Z, 6.2f, sh);
+}
+static void draw_main_road_marks(void) {
+    float dx = ROAD_X - cam.pos.x, dz = ROAD_Z - cam.pos.z;
+    if (dx * dx > 2500.0f * 2500.0f && dz * dz > 2500.0f * 2500.0f) return;
+    if (fabsf(dx) < 2500.0f) {
+        float z0 = cam.pos.z - 2000.0f, z1 = cam.pos.z + 2000.0f;
+        ground_strip(ROAD_X - 3.7f, z0, ROAD_X - 3.7f, z1, 0.17f, PAINT_W);
+        ground_strip(ROAD_X + 3.7f, z0, ROAD_X + 3.7f, z1, 0.17f, PAINT_W);
+        ground_dashes(ROAD_X, z0, ROAD_X, z1, 0.17f, 6.0f, 18.0f, 700.0f, PAINT_Y);
+    }
+    if (fabsf(dz) < 2500.0f) {
+        float x0 = cam.pos.x - 2000.0f, x1 = cam.pos.x + 2000.0f;
+        ground_strip(x0, ROAD_Z - 3.7f, x1, ROAD_Z - 3.7f, 0.17f, PAINT_W);
+        ground_strip(x0, ROAD_Z + 3.7f, x1, ROAD_Z + 3.7f, 0.17f, PAINT_W);
+        ground_dashes(x0, ROAD_Z, x1, ROAD_Z, 0.17f, 6.0f, 18.0f, 700.0f, PAINT_Y);
+    }
+    if (fabsf(dx) < 140.0f && fabsf(dz) < 140.0f) {                                 // the crossing: tarmac over the lines
+        ground_strip(ROAD_X - 5.0f, ROAD_Z, ROAD_X + 5.0f, ROAD_Z, 5.0f, RGBA8(86, 86, 92, 255));
+        for (int k = -4; k <= 4; k++) {                                              // stop lines
+            ground_strip(ROAD_X + k * 0.8f, ROAD_Z + 7.0f, ROAD_X + k * 0.8f, ROAD_Z + 8.2f, 0.3f, PAINT_W);
+            ground_strip(ROAD_X + k * 0.8f, ROAD_Z - 7.0f, ROAD_X + k * 0.8f, ROAD_Z - 8.2f, 0.3f, PAINT_W);
+        }
+    }
+}
+
 static void draw_highway(void) {
     const Airport *b = &AIRPORTS[AP_REDROCK];
     V3 end = ap_pt(b, 330.0f, 0.0f, -220.0f);
     float x0 = 704.0f, z0 = -300.0f, dx = end.x - x0, dz = end.z - z0, L = sqrtf(dx * dx + dz * dz);
     int n = (int)(L / 500.0f);
-    const unsigned int road = RGBA8(84, 84, 90, 255), line = RGBA8(226, 200, 70, 255);
-    for (int i = 0; i < n; i++) {
-        float t0 = (float)i / n, t1 = (float)(i + 1) / n;
-        float ax = x0 + dx * t0, az = z0 + dz * t0, bx = x0 + dx * t1, bz = z0 + dz * t1;
-        float mx = (ax + bx) * 0.5f - cam.pos.x, mz = (az + bz) * 0.5f - cam.pos.z;
-        float d2 = mx * mx + mz * mz;
-        if (d2 > 8000.0f * 8000.0f) continue;
-        ground_strip(ax, az, bx, bz, 5.5f, road);
-        if (d2 < 2000.0f * 2000.0f) {                                         // dashed centre line
-            for (int k = 0; k < 4; k++) {
-                float u0 = t0 + (t1 - t0) * (k * 0.25f + 0.02f), u1 = t0 + (t1 - t0) * (k * 0.25f + 0.13f);
-                ground_strip(x0 + dx * u0, z0 + dz * u0, x0 + dx * u1, z0 + dz * u1, 0.25f, line);
+    const unsigned int road = RGBA8(84, 84, 90, 255), shoulder = RGBA8(122, 116, 100, 255);
+    for (int pass = 0; pass < 2; pass++)
+        for (int i = 0; i < n; i++) {
+            float t0 = (float)i / n, t1 = (float)(i + 1) / n;
+            float ax = x0 + dx * t0, az = z0 + dz * t0, bx = x0 + dx * t1, bz = z0 + dz * t1;
+            float mx = (ax + bx) * 0.5f - cam.pos.x, mz = (az + bz) * 0.5f - cam.pos.z;
+            float d2 = mx * mx + mz * mz;
+            if (d2 > 8000.0f * 8000.0f) continue;
+            if (pass == 0) { if (d2 < 4500.0f * 4500.0f) ground_strip(ax, az, bx, bz, 7.4f, shoulder); continue; }       // a wide gravel shoulder under the tarmac
+            ground_strip(ax, az, bx, bz, 5.5f, road);
+            if (d2 < 3000.0f * 3000.0f) {
+                strip_off(ax, az, bx, bz, 4.7f, 0.2f, PAINT_W);                                                           // edge lines
+                strip_off(ax, az, bx, bz, -4.7f, 0.2f, PAINT_W);
+                strip_off(ax, az, bx, bz, 0.3f, 0.12f, PAINT_Y);                                                          // double yellow centre, broken near
+                strip_off(ax, az, bx, bz, -0.3f, 0.12f, PAINT_Y);
             }
         }
-    }
 }
 
 // Country roads (built in build_countryside): paved, or gravel.
 static void draw_country_roads(void) {
-    for (int i = 0; i + 1 < nroadp; i++) {
-        if (road_new[i + 1]) continue;
-        float mx = (road_x[i] + road_x[i + 1]) * 0.5f - cam.pos.x, mz = (road_z[i] + road_z[i + 1]) * 0.5f - cam.pos.z;
-        if (mx * mx + mz * mz > 7000.0f * 7000.0f) continue;
-        bool dirt = road_dirt[i] != 0;
-        ground_strip(road_x[i], road_z[i], road_x[i + 1], road_z[i + 1], dirt ? 3.0f : 4.5f, dirt ? RGBA8(150, 124, 86, 255) : RGBA8(86, 86, 92, 255));
-    }
+    const unsigned int tar = RGBA8(86, 86, 92, 255), gravel = RGBA8(150, 124, 86, 255);
+    for (int pass = 0; pass < 3; pass++)
+        for (int i = 0; i + 1 < nroadp; i++) {
+            if (road_new[i + 1]) continue;
+            float mx = (road_x[i] + road_x[i + 1]) * 0.5f - cam.pos.x, mz = (road_z[i] + road_z[i + 1]) * 0.5f - cam.pos.z, d2 = mx * mx + mz * mz;
+            if (d2 > 7000.0f * 7000.0f) continue;
+            bool dirt = road_dirt[i] != 0;
+            float half = dirt ? 3.0f : 4.5f, ax = road_x[i], az = road_z[i], bx = road_x[i + 1], bz = road_z[i + 1];
+            if (pass == 0) {                                                       // verge: gravel round tarmac, dust round a track
+                if (d2 > 3500.0f * 3500.0f) continue;
+                unsigned int vc = dirt ? RGBA8(168, 146, 106, 255) : RGBA8(118, 112, 98, 255);
+                ground_strip(ax, az, bx, bz, half + 1.5f, vc);
+                ground_disc(ax, az, half + 1.5f, vc);
+                if (i + 2 >= nroadp || road_new[i + 2]) ground_disc(bx, bz, half + 1.5f, vc);
+            } else if (pass == 1) {
+                unsigned int rc = dirt ? gravel : tar;
+                ground_strip(ax, az, bx, bz, half, rc);
+                ground_disc(ax, az, half, rc);
+                if (i + 2 >= nroadp || road_new[i + 2]) ground_disc(bx, bz, half, rc);
+            } else if (d2 < 1500.0f * 1500.0f) {
+                if (dirt) {                                                        // two wheel ruts and grass between them
+                    strip_off(ax, az, bx, bz, 1.0f, 0.4f, RGBA8(116, 92, 62, 255));
+                    strip_off(ax, az, bx, bz, -1.0f, 0.4f, RGBA8(116, 92, 62, 255));
+                    strip_off(ax, az, bx, bz, 0.0f, 0.35f, RGBA8(112, 128, 74, 255));
+                } else {
+                    strip_off(ax, az, bx, bz, 3.6f, 0.15f, PAINT_W);
+                    strip_off(ax, az, bx, bz, -3.6f, 0.15f, PAINT_W);
+                    ground_dashes(ax, az, bx, bz, 0.15f, 5.0f, 15.0f, 600.0f, PAINT_Y);
+                }
+            }
+        }
 }
 
-// Two main streets and a little square in every town.
+// Knowles Works' ground: the apron, the road in from the main road, car parks, a solar field and the road to the village.
+static void draw_knowles_ground(void) {
+    float dx = KW_FX - cam.pos.x, dz = KW_FZ - cam.pos.z, d2 = dx * dx + dz * dz;
+    if (d2 > 3500.0f * 3500.0f) return;
+    const float FX = KW_FX, FZ = KW_FZ;
+    const unsigned int road = RGBA8(86, 86, 92, 255), conc = RGBA8(156, 156, 160, 255), asph = RGBA8(64, 64, 70, 255), line = RGBA8(226, 200, 70, 255);
+    ground_strip(FX - 350.0f, FZ - 25.0f, FX + 350.0f, FZ - 25.0f, 178.0f, conc);                  // the apron round the hall
+    ground_strip(700.0f, FZ, FX - KW_HW - 80.0f, FZ, 6.0f, road);                                  // in from the north-south road
+    ground_strip(700.0f, FZ, FX - KW_HW - 80.0f, FZ, 0.25f, line);
+    ground_strip(FX + KW_HW + 120.0f, KW_VZ, KW_VX - 430.0f, KW_VZ, 4.5f, road);                   // out to the village
+    if (d2 > 2600.0f * 2600.0f) return;
+    for (int r = 0; r < 34; r++)                                                                   // solar field south of the loading dock
+        ground_strip(FX - 300.0f, FZ - 240.0f - r * 10.0f, FX + 300.0f, FZ - 240.0f - r * 10.0f, 3.2f, RGBA8(36, 52, 92, 255));
+    ground_strip(FX - 330.0f, FZ + 175.0f, FX + 330.0f, FZ + 175.0f, 0.0f + 28.0f, asph);          // the car park on the north side
+    for (int k = 0; k <= 11; k++)
+        ground_strip(FX - 330.0f + k * 60.0f, FZ + 150.0f, FX - 330.0f + k * 60.0f, FZ + 200.0f, 0.2f, RGBA8(230, 230, 232, 255));
+    if (d2 > 900.0f * 900.0f) return;
+    for (int r = 0; r < 4; r++)                                                                    // cars, a part-full lot
+        for (int c = 0; c < 110; c++) {
+            unsigned int h = hash2(c * 13 + 5, r * 29 + 7);
+            if ((h & 7) > 4) continue;
+            float cx = FX - 322.0f + c * 5.9f, cz = FZ + 156.0f + r * 13.0f;
+            if ((r & 1) == 1) cz += 3.0f;
+            float ddx = cx - cam.pos.x, ddz = cz - cam.pos.z;
+            if (ddx * ddx + ddz * ddz > 700.0f * 700.0f) continue;
+            static const unsigned int CAR[6] = { RGBA8(200, 200, 204, 255), RGBA8(60, 62, 70, 255), RGBA8(176, 40, 44, 255), RGBA8(46, 82, 150, 255), RGBA8(150, 152, 158, 255), RGBA8(226, 226, 230, 255) };
+            ground_strip(cx, cz - 2.1f, cx, cz + 2.1f, 1.0f, CAR[(h >> 8) % 6]);
+        }
+}
+
+// Downtown Knowles: the ground, streets, crossings and cars of the city. Everything follows city_d(), so the streets and blocks fade out
+// raggedly instead of stopping at a straight edge. Blocks and street stretches that sit side by side are drawn as one long strip.
+static bool city_street_seg(bool avenue, int line, int seg) {
+    if (avenue) return line >= 0 && line <= CITY_NC && seg >= 0 && seg < CITY_NR && (city_av[line] >> seg & 1);
+    return line >= 0 && line <= CITY_NR && seg >= 0 && seg < CITY_NC && (city_st[line] >> seg & 1);
+}
+static void draw_downtown_ground(void) {
+#if CITY_DETAIL > 0
+    float dx = CITY_CX - cam.pos.x, dz = CITY_CZ - cam.pos.z, d2 = dx * dx + dz * dz;
+    if (d2 > 4800.0f * 4800.0f) return;
+    const unsigned int asph = RGBA8(78, 78, 84, 255), pave = RGBA8(176, 176, 178, 255);
+    const float S = CITY_S, X0 = CITY_X0, Z0 = CITY_Z0;
+    for (int r = 0; r < CITY_NR; r++) {                                               // the ground under the blocks: lawn at the edge, paving in the middle
+        float zc = Z0 + (r + 0.5f) * S;
+        if (fabsf(zc - cam.pos.z) > 2600.0f) continue;
+        int run = 0, c0 = 0, lv0 = 0;
+        for (int c = 0; c <= CITY_NC; c++) {
+            int lv = 0;
+            if (c < CITY_NC) { float dd = city_d(X0 + (c + 0.5f) * S, zc); lv = dd < 0.10f ? 0 : dd < 0.30f ? 1 : dd < 0.55f ? 2 : 3; }
+            if (run && lv != lv0) {
+                static const unsigned int GC[4] = { 0, RGBA8(70, 150, 62, 255), RGBA8(98, 148, 88, 255), RGBA8(138, 148, 130, 255) };
+                ground_strip(X0 + c0 * S, zc, X0 + c * S, zc, S * 0.5f, GC[lv0]);
+                run = 0;
+            }
+            if (lv && !run) { run = 1; c0 = c; lv0 = lv; }
+        }
+    }
+    {                                                                                  // the park
+        float px = X0 + (CITY_PARK_C + 0.5f) * S, pz = Z0 + (CITY_PARK_R + 0.5f) * S;
+        ground_strip(px - 62.0f, pz, px + 62.0f, pz, 62.0f, RGBA8(70, 150, 62, 255));
+        ground_strip(px - 62.0f, pz, px + 62.0f, pz, 2.2f, RGBA8(200, 190, 160, 255));
+        ground_strip(px, pz - 62.0f, px, pz + 62.0f, 2.2f, RGBA8(200, 190, 160, 255));
+        ground_disc(px + 26.0f, pz - 24.0f, 14.0f, RGBA8(70, 120, 176, 255));
+        ground_disc(px, pz, 5.0f, RGBA8(200, 190, 160, 255));
+    }
+    for (int pass = 0; pass < 3; pass++) {
+        if (pass == 2 && d2 > 1500.0f * 1500.0f) break;
+        for (int k = 0; k < CITY_NC + CITY_NR + 2; k++) {
+            bool avenue = k <= CITY_NC;
+            int line = avenue ? k : k - CITY_NC - 1, nseg = avenue ? CITY_NR : CITY_NC;
+            float pos = avenue ? X0 + line * S : Z0 + line * S, base = avenue ? Z0 : X0;
+            float mid = avenue ? pos - cam.pos.x : pos - cam.pos.z;
+            if (fabsf(mid) > 1800.0f) continue;
+            int run = 0, s0 = 0;
+            for (int sg = 0; sg <= nseg; sg++) {
+                bool on = sg < nseg && city_street_seg(avenue, line, sg);
+                if (run && !on) {
+                    float a0 = base + s0 * S - 6.0f, a1 = base + sg * S + 6.0f;
+                    float amid = (a0 + a1) * 0.5f - (avenue ? cam.pos.z : cam.pos.x);
+                    if (fabsf(amid) < 1800.0f + (a1 - a0) * 0.5f) {
+                        #define SEG(off, half, col) do { if (avenue) ground_strip(pos + (off), a0, pos + (off), a1, (half), (col)); else ground_strip(a0, pos + (off), a1, pos + (off), (half), (col)); } while (0)
+                        if (pass == 0) { SEG(-8.2f, 2.2f, pave); SEG(8.2f, 2.2f, pave); }
+                        else if (pass == 1) SEG(0.0f, 6.0f, asph);
+                        else if (fabsf(mid) < 600.0f) {
+                            if (avenue) { ground_strip(pos - 5.0f, a0, pos - 5.0f, a1, 0.14f, PAINT_W); ground_strip(pos + 5.0f, a0, pos + 5.0f, a1, 0.14f, PAINT_W); ground_dashes(pos, a0, pos, a1, 0.14f, 4.0f, 12.0f, 260.0f, PAINT_Y); }
+                            else        { ground_strip(a0, pos - 5.0f, a1, pos - 5.0f, 0.14f, PAINT_W); ground_strip(a0, pos + 5.0f, a1, pos + 5.0f, 0.14f, PAINT_W); ground_dashes(a0, pos, a1, pos, 0.14f, 4.0f, 12.0f, 260.0f, PAINT_Y); }
+                        }
+                        #undef SEG
+                    }
+                    run = 0;
+                }
+                if (on && !run) { run = 1; s0 = sg; }
+            }
+        }
+    }
+    if (d2 < 1200.0f * 1200.0f) {                                                      // zebra crossings at the crossings close to you, and parked cars along the avenues
+        for (int c = 0; c <= CITY_NC; c++)
+            for (int r = 0; r <= CITY_NR; r++) {
+                float x = X0 + c * S, z = Z0 + r * S, ddx = x - cam.pos.x, ddz = z - cam.pos.z;
+                if (ddx * ddx + ddz * ddz > 320.0f * 320.0f) continue;
+                if (!(city_street_seg(true, c, r) || city_street_seg(true, c, r - 1)) || !(city_street_seg(false, r, c) || city_street_seg(false, r, c - 1))) continue;
+                for (int s = -1; s <= 1; s += 2)
+                    for (int q = -2; q <= 2; q++) {
+                        ground_strip(x + s * 8.5f, z + q * 2.0f, x + s * 10.5f, z + q * 2.0f, 0.6f, PAINT_W);
+                        ground_strip(x + q * 2.0f, z + s * 8.5f, x + q * 2.0f, z + s * 10.5f, 0.6f, PAINT_W);
+                    }
+            }
+        static const unsigned int CAR[6] = { RGBA8(200, 200, 204, 255), RGBA8(60, 62, 70, 255), RGBA8(176, 40, 44, 255), RGBA8(46, 82, 150, 255), RGBA8(150, 152, 158, 255), RGBA8(226, 226, 230, 255) };
+        for (int c = 0; c <= CITY_NC; c++) {
+            float x = X0 + c * S;
+            if (fabsf(x - cam.pos.x) > 260.0f) continue;
+            for (float z = floorf((cam.pos.z - 260.0f) / 14.0f) * 14.0f; z < cam.pos.z + 260.0f; z += 14.0f) {
+                int sg = (int)floorf((z - Z0) / S);
+                if (!city_street_seg(true, c, sg)) continue;
+                unsigned int h = hash2((int)(x * 0.1f) + 3, (int)(z * 0.5f));
+                if ((h & 3) > 1 || city_d(x, z) < 0.3f) continue;
+                ground_strip(x + ((h & 4) ? 3.1f : -3.1f), z - 2.0f, x + ((h & 4) ? 3.1f : -3.1f), z + 2.0f, 0.95f, CAR[(h >> 8) % 6]);
+            }
+        }
+    }
+    if (d2 < 1400.0f * 1400.0f)                                                        // yards and driveways for the houses on the edge
+        for (int i = 0; i < ntb; i++) {
+            if (tb_town[i] != TB_CITY) continue;
+            float ddx = tb_x[i] - cam.pos.x, ddz = tb_z[i] - cam.pos.z;
+            if (ddx * ddx + ddz * ddz > 700.0f * 700.0f) continue;
+            float bx = tb_x[i], bz = tb_z[i], w = tb_w[i], d = tb_d[i];
+            unsigned int h = hash2((int)bx + 5, (int)bz - 9);
+            ground_strip(bx - w * 0.5f - 4.0f, bz, bx + w * 0.5f + 4.0f, bz, d * 0.5f + 4.0f, (h & 1) ? RGBA8(78, 156, 62, 255) : RGBA8(94, 160, 66, 255));
+            float zs = Z0 + roundf((bz - Z0) / S) * S;
+            ground_strip(bx, bz, bx, zs + (bz > zs ? 7.0f : -7.0f), 1.3f, pave);
+        }
+    // roads out of town: east along the hangar row to the field, and south to the main east-west road
+    ground_strip(CITY_X1, Z0 + 5.0f * S, -140.0f, Z0 + 5.0f * S, 5.5f, asph);
+    ground_strip(CITY_X1, Z0 + 5.0f * S, -140.0f, Z0 + 5.0f * S, 0.15f, PAINT_Y);
+    ground_strip(X0 + 7.0f * S, Z0 - 10.0f, X0 + 7.0f * S, ROAD_Z, 5.5f, asph);
+    ground_strip(X0 + 7.0f * S, Z0 - 10.0f, X0 + 7.0f * S, ROAD_Z, 0.15f, PAINT_Y);
+#endif
+}
+
+// Two main streets and a little square in every town; close up, also pavements, crossings, a paved square and a yard and
+// path for every building.
 static void draw_town_streets(void) {
-    const unsigned int st = RGBA8(88, 88, 94, 255), sq = RGBA8(172, 160, 128, 255);
+    draw_knowles_ground();
+    draw_downtown_ground();
+    const unsigned int st = RGBA8(88, 88, 94, 255), sq = RGBA8(172, 160, 128, 255), pave = RGBA8(168, 168, 170, 255), zebra = RGBA8(230, 230, 232, 255);
     for (int n = 0; n < ntowns; n++) {
-        float dx = town_x[n] - cam.pos.x, dz = town_z[n] - cam.pos.z;
-        if (dx * dx + dz * dz > 6000.0f * 6000.0f) continue;
+        float dx = town_x[n] - cam.pos.x, dz = town_z[n] - cam.pos.z, d2 = dx * dx + dz * dz;
+        if (d2 > 6000.0f * 6000.0f) continue;
         float x = town_x[n], z = town_z[n];
         ground_strip(x - 430.0f, z, x + 430.0f, z, 4.5f, st);
         ground_strip(x, z - 430.0f, x, z + 430.0f, 4.5f, st);
         ground_strip(x - 20.0f, z, x + 20.0f, z, 20.0f, sq);
         ground_strip(x - 430.0f, z, x + 430.0f, z, 0.25f, RGBA8(226, 200, 70, 255));
         ground_strip(x, z - 430.0f, x, z + 430.0f, 0.25f, RGBA8(226, 200, 70, 255));
+        if (d2 > 1900.0f * 1900.0f) continue;
+        ground_strip(x - 150.0f, z - 6.4f, x + 150.0f, z - 6.4f, 1.3f, pave);          // pavements along the main streets
+        ground_strip(x - 150.0f, z + 6.4f, x + 150.0f, z + 6.4f, 1.3f, pave);
+        ground_strip(x - 6.4f, z - 150.0f, x - 6.4f, z + 150.0f, 1.3f, pave);
+        ground_strip(x + 6.4f, z - 150.0f, x + 6.4f, z + 150.0f, 1.3f, pave);
+        for (int s = -1; s <= 1; s += 2)                                              // zebra crossings at the square
+            for (int k = -3; k <= 3; k++) {
+                ground_strip(x + s * 24.0f, z + k * 1.3f, x + s * 28.0f, z + k * 1.3f, 0.5f, zebra);
+                ground_strip(x + k * 1.3f, z + s * 24.0f, x + k * 1.3f, z + s * 28.0f, 0.5f, zebra);
+            }
+        ground_strip(x - 12.0f, z, x + 12.0f, z, 12.0f, RGBA8(150, 140, 112, 255));    // the paved middle of the square
+        ground_strip(x - 3.0f, z, x + 3.0f, z, 3.0f, RGBA8(84, 130, 170, 255));        // a fountain basin
+        for (int i = 0; i < ntb; i++) {
+            if (tb_town[i] != n) continue;
+            float bx = tb_x[i], bz = tb_z[i], w = tb_w[i], d = tb_d[i];
+            float ddx = bx - cam.pos.x, ddz = bz - cam.pos.z;
+            if (ddx * ddx + ddz * ddz > 1300.0f * 1300.0f) continue;
+            unsigned int h = hash2((int)bx + 7, (int)bz + 3);
+            float lw = w * 0.5f + 5.0f, ld = d * 0.5f + 5.0f;
+            unsigned int lawn = (h & 1) ? RGBA8(78, 156, 62, 255) : RGBA8(94, 160, 66, 255);
+            ground_strip(bx - lw, bz, bx + lw, bz, ld, lawn);                         // the yard
+            float ax = fabsf(bx - x), az = fabsf(bz - z);                              // a path from the nearer main street
+            if (ax < az) ground_strip(bx, bz, x + (bx > x ? 7.0f : -7.0f), bz, 1.2f, pave);
+            else         ground_strip(bx, bz, bx, z + (bz > z ? 7.0f : -7.0f), 1.2f, pave);
+            if (w < 30.0f && (h & 6) == 0) ground_strip(bx + w * 0.5f + 2.0f, bz - d * 0.2f, bx + w * 0.5f + 7.0f, bz - d * 0.2f, 1.5f, RGBA8(70, 70, 76, 255));   // a parked car
+        }
     }
 }
 
@@ -369,6 +635,11 @@ static void draw_bridges(void) {
         float L = br_len[i] - 36.0f, hw = br_hw[i];                                    // L = the deck over the river and its banks
         float ux = br_dx[i], uz = br_dz[i], px = -uz, pz = ux, cx = br_x[i], cz = br_z[i];
         #define BP(a, b, y) v3(cx + ux * (a) + px * (b), (y), cz + uz * (a) + pz * (b))
+        for (int r = -1; r <= 1; r += 2)                                                 // foam round the piers
+            for (int c = -1; c <= 1; c += 2) {
+                float a0 = r * L * 0.24f, b0 = c * (hw - 2.2f);
+                ground_disc(cx + ux * a0 + px * b0, cz + uz * a0 + pz * b0, 2.8f, RGBA8(196, 222, 240, 255));
+            }
         // Piers: two rows of two square columns standing in the river.
         for (int r = -1; r <= 1; r += 2)
             for (int c = -1; c <= 1; c += 2) {
@@ -410,19 +681,71 @@ static void draw_bridges(void) {
             draw_world_poly(r2, 4, conc_d);
             draw_world_poly(r1, 4, conc);
         }
+        if (dx * dx + dz * dz < 1500.0f * 1500.0f) {                                    // steel trusses along both sides, the far side first
+            const unsigned int steel = RGBA8(98, 106, 118, 255), steel_l = RGBA8(136, 144, 156, 255);
+            float cs = (cam.pos.x - cx) * px + (cam.pos.z - cz) * pz;
+            const int NP = 8;
+            for (int k = 0; k < 2; k++) {
+                int s = (k == 0) ? (cs > 0.0f ? -1 : 1) : (cs > 0.0f ? 1 : -1);
+                float b0 = s * (hw + 0.2f), TH = H + 5.0f;
+                V3 chord[4] = { BP(-L * 0.5f, b0, TH), BP(L * 0.5f, b0, TH), BP(L * 0.5f, b0, TH + 0.7f), BP(-L * 0.5f, b0, TH + 0.7f) };
+                draw_world_poly(chord, 4, steel_l);
+                for (int q = 0; q < NP; q++) {
+                    float a0 = -L * 0.5f + L * q / NP, a1 = -L * 0.5f + L * (q + 1) / NP;
+                    float rise0 = (q & 1) ? H + 1.0f : TH, rise1 = (q & 1) ? TH : H + 1.0f;
+                    V3 dg[4] = { BP(a0 - 0.3f, b0, rise0 == TH ? TH : H + 1.0f), BP(a0 + 0.3f, b0, rise0 == TH ? TH : H + 1.0f), BP(a1 + 0.3f, b0, rise1 == TH ? TH : H + 1.0f), BP(a1 - 0.3f, b0, rise1 == TH ? TH : H + 1.0f) };
+                    draw_world_poly(dg, 4, steel);
+                }
+                for (int q = 0; q <= NP; q++) {
+                    float a0 = -L * 0.5f + L * q / NP;
+                    V3 post[4] = { BP(a0 - 0.3f, b0, H + 1.0f), BP(a0 + 0.3f, b0, H + 1.0f), BP(a0 + 0.3f, b0, TH), BP(a0 - 0.3f, b0, TH) };
+                    draw_world_poly(post, 4, steel_l);
+                }
+            }
+            for (int q = 0; q <= NP; q += 2) {                                          // cross beams over the deck
+                float a0 = -L * 0.5f + L * q / NP;
+                V3 beam[4] = { BP(a0 - 0.3f, -hw, (H + 5.0f)), BP(a0 + 0.3f, -hw, (H + 5.0f)), BP(a0 + 0.3f, hw, (H + 5.0f)), BP(a0 - 0.3f, hw, (H + 5.0f)) };
+                draw_world_poly(beam, 4, steel);
+            }
+        }
         #undef BP
     }
 }
 
+static float river_hw(int i) { return 11.0f + 24.0f * (float)i / (float)(nriver - 2); }     // narrow at the source, wider towards the mouth
 static void draw_river(void) {
     if (nriver < 2) return;
-    for (int i = 0; i + 1 < nriver; i++) {
-        float mx = (river_x[i] + river_x[i + 1]) * 0.5f - cam.pos.x, mz = (river_z[i] + river_z[i + 1]) * 0.5f - cam.pos.z;
-        if (mx * mx + mz * mz > 9000.0f * 9000.0f) continue;
-        float t = (float)i / (float)(nriver - 2);                                   // narrow at the source, wider towards the mouth
-        float hw = 11.0f + 24.0f * t;
-        ground_strip(river_x[i], river_z[i], river_x[i + 1], river_z[i + 1], hw + 10.0f, RGBA8(196, 184, 130, 255));    // sandy banks
-        ground_strip(river_x[i], river_z[i], river_x[i + 1], river_z[i + 1], hw, RGBA8(52, 108, 172, 255));
-    }
+    const unsigned int verge = RGBA8(84, 138, 72, 255), sand = RGBA8(196, 184, 130, 255), shallow = RGBA8(86, 142, 196, 255), deep = RGBA8(46, 98, 164, 255);
+    for (int pass = 0; pass < 5; pass++)
+        for (int i = 0; i + 1 < nriver; i++) {
+            float ax = river_x[i], az = river_z[i], bx = river_x[i + 1], bz = river_z[i + 1];
+            float mx = (ax + bx) * 0.5f - cam.pos.x, mz = (az + bz) * 0.5f - cam.pos.z, d2 = mx * mx + mz * mz;
+            if (d2 > 9000.0f * 9000.0f) continue;
+            float hw = river_hw(i), hw2 = river_hw(i + 1 < nriver - 1 ? i + 1 : i);
+            unsigned int col = 0; float w = 0.0f;
+            if (pass == 0) { if (d2 > 5500.0f * 5500.0f) continue; col = verge; w = hw + 26.0f; }          // wet grass beside the banks
+            else if (pass == 1) { col = sand; w = hw + 10.0f; }                                              // sandy banks
+            else if (pass == 2) { col = shallow; w = hw; }                                                   // the water, pale at the edges
+            else if (pass == 3) { if (d2 > 4000.0f * 4000.0f) continue; col = deep; w = hw * 0.62f; }       // and dark in the middle
+            else {
+                if (d2 > 2200.0f * 2200.0f) continue;                                                        // sandbars and streaks of foam, close up only
+                unsigned int h = hash2(i * 31 + 7, 11);
+                if ((h & 3) == 0) {
+                    float t = 0.35f + 0.3f * hf(h, 1), px = ax + (bx - ax) * t, pz = az + (bz - az) * t;
+                    float dx = bx - ax, dz = bz - az, len = sqrtf(dx * dx + dz * dz), side = (h & 4) ? 1.0f : -1.0f;
+                    float off = hw * 0.58f * side;
+                    ground_disc(px - dz / len * off, pz + dx / len * off, hw * 0.34f, sand);
+                }
+                for (int k = 0; k < 3; k++) {
+                    float t0 = 0.1f + 0.3f * k + 0.1f * hf(h, 2), t1 = t0 + 0.1f;
+                    float off = hw * (0.25f - 0.25f * k) * ((h >> (3 + k)) & 1 ? 1.0f : -1.0f);
+                    strip_off(ax + (bx - ax) * t0, az + (bz - az) * t0, ax + (bx - ax) * t1, az + (bz - az) * t1, off, 0.5f, RGBA8(170, 208, 236, 255));
+                }
+                continue;
+            }
+            ground_strip(ax, az, bx, bz, w, col);
+            ground_disc(ax, az, w, col);
+            if (i + 2 == nriver) ground_disc(bx, bz, w, col);
+        }
 }
 

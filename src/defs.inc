@@ -14,12 +14,13 @@
 
 #define TILE       400.0f              // checkerboard ground tile size (m)
 #define TILE_R     10                  // tiles drawn in each direction
-#define MAX_FACES  3000
-#define MAX_BOXES  200
+#define MAX_FACES  4800
+#define MAX_BOXES  400
 #define NUM_MOUNTS 7            // the original ring of mountains around the home airport
 #define MAX_MOUNTS 96           // every mountain and hill (they all share one shape and collision test)
 #define MAX_MESAS  24
 #ifndef WORLD_DETAIL
+#define CITY_DETAIL 2           // downtown Knowles: 0 = none, 1 = about half the buildings, 2 = the full city
 #define WORLD_DETAIL 2          // 0 = the original world and two airports only, 1 = add hills and ridges, 2 = also towns, mesas and the river
 #endif
 
@@ -30,7 +31,7 @@
 typedef struct { float x, y, z; } V3;
 typedef struct { float x, y; } P2;
 typedef struct { V3 pos, r, u, f; } Camera;
-typedef struct { V3 p[4]; int n; unsigned int color; V3 c; float rad, top; } Face;      // rad: distance from c to the farthest corner, top: height of the highest corner
+typedef struct { V3 p[4]; int n; unsigned int color; V3 c; float rad, top, maxd; } Face;      // rad: distance from c to the farthest corner, top: height of the highest corner
 typedef struct { float x, z, w, d, h; } Box;
 typedef struct { float x, z, hb, h; } Mount;
 typedef struct { float x, z, hb, h, top; } Mesa;      // flat-topped butte: sloping sides up to a flat top of half-width `top`
