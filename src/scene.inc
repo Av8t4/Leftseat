@@ -52,7 +52,11 @@ static void collect_flights(int *ni) {
     for (int i = 0; i < ntown_lights; i++) add_flight(town_lights[i].x, town_lights[i].y, town_lights[i].z, 1.5f, 3600.0f, win, ni);
     for (int i = 0; i < nroof_lights; i++) {
         const RoofLight *r = &roof_lights[i];
-        if (r->blink) { if ((frame_count % 70) < 40) add_flight(r->x, r->y, r->z, r->px, 16000.0f, r->col, ni); }
+        if (r->blink) {                                                                 // each beacon keeps its own rhythm: its own period and its own start
+            unsigned int hb = hash2((int)r->x * 3 + 17, (int)r->z * 5 - 29);
+            int period = 64 + (int)(hb & 31u) * 2, on = period * (38 + (int)((hb >> 8) & 15u)) / 100;
+            if (((int)frame_count + (int)((hb >> 16) & 255u) * 7) % period < on) add_flight(r->x, r->y, r->z, r->px, 16000.0f, r->col, ni);
+        }
         else add_flight(r->x, r->y, r->z, r->px, 6500.0f, r->col, ni);
     }
     for (int i = 0; i < nbridges; i++) {
