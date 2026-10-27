@@ -117,6 +117,11 @@ int main(void) {
 
         if (game_state == ST_MENU && ar_on) {
             ar_step(&pad, pressed);                                   // the AR view in the hangar: camera, card, aircraft
+            vita2d_start_drawing();
+            vita2d_clear_screen();
+            if (ar_on) ar_draw(pgf); else draw_menu(pgf);      // (O in the AR view closes it)
+            vita2d_end_drawing();
+            vita2d_swap_buffers();
         } else if (game_state == ST_MENU) {
             int act = menu_update(&pad, pressed);
             if (ar_request) { ar_request = 0; ar_open(menu_hsel); act = 0; }

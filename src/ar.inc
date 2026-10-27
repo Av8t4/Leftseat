@@ -31,7 +31,7 @@ static float ar_focal(void) { return (ARD_W * 0.5f) / tanf(AR_FOV_DEG[ar_fovi] *
 // A tiny log for finding out where the camera stops (ux0:data/leftseat_ar.txt), written line by line so it survives a freeze.
 static int ar_logn;
 static void ar_log(const char *fmt, int a, int b) {
-    if (ar_logn++ > 60) return;
+    if (ar_logn++ > 12) return;
     FILE *f = fopen("ux0:data/leftseat_ar.txt", ar_logn == 1 ? "w" : "a");
     if (!f) return;
     fprintf(f, fmt, a, b); fputc('\n', f); fclose(f);
