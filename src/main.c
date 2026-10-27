@@ -12,6 +12,7 @@
 #include <psp2/touch.h>
 #include <psp2/motion.h>
 #include <psp2/camera.h>
+#include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/processmgr.h>
 #include <vita2d.h>
 

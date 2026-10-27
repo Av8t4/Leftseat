@@ -20,12 +20,17 @@ static float        ar_card_px;               // how big the card looks (square 
 static int          ar_code = -1;
 static int          ar_det_us;                // time the last detection took
 static const char  *ar_msg = "";
+static SceUID       ar_blk = -1;              // camera memory (the camera needs its own block of CDRAM, as in the Vita SDK's camera sample)
+static void        *ar_blk_base;
+static uint8_t      ar_frame[ARD_W * ARD_H * 4];   // a normal-memory copy of the latest picture (fast to read; alpha forced on)
+static int          ar_rc_open, ar_rc_start, ar_rc_read;
 
 static const float AR_FOV_DEG[4] = { 50.0f, 60.0f, 70.0f, 80.0f };           // horizontal field of view of the camera
 static float ar_focal(void) { return (ARD_W * 0.5f) / tanf(AR_FOV_DEG[ar_fovi] * 0.5f * PI_F / 180.0f); }   // pixels of the 480 x 272 picture
 
 static void ar_close(void) {
     if (ar_cam_ok) { sceCameraStop(1); sceCameraClose(1); ar_cam_ok = false; }
+    if (ar_blk >= 0) { sceKernelFreeMemBlock(ar_blk); ar_blk = -1; ar_blk_base = NULL; }
     if (ar_tex) { vita2d_wait_rendering_done(); vita2d_free_texture(ar_tex); ar_tex = NULL; }
     ar_on = false;
 }
@@ -45,11 +50,14 @@ static void ar_open(int ac) {
     ci.resolution = SCE_CAMERA_RESOLUTION_480_272;
     ci.framerate = SCE_CAMERA_FRAMERATE_30_FPS;
     ci.sizeIBase = 4 * ARD_W * ARD_H;
-    ci.pitch = stride - 4 * ARD_W;
-    ci.pIBase = vita2d_texture_get_datap(ar_tex);
-    int r = sceCameraOpen(1, &ci);
+    ci.pitch = 0;
+    ar_blk = sceKernelAllocMemBlock("leftseat_cam", SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW, 3 * 256 * 1024, NULL);
+    if (ar_blk < 0 || sceKernelGetMemBlockBase(ar_blk, &ar_blk_base) < 0) { ar_msg = "No memory for the camera"; return; }
+    (void)stride;
+    ci.pIBase = ar_blk_base;
+    int r = ar_rc_open = sceCameraOpen(1, &ci);
     if (r < 0) { ar_msg = "The camera could not be opened"; return; }
-    r = sceCameraStart(1);
+    r = ar_rc_start = sceCameraStart(1);
     if (r < 0) { sceCameraClose(1); ar_msg = "The camera could not be started"; return; }
     ar_cam_ok = true;
 }
@@ -126,14 +134,23 @@ static void ar_step(const SceCtrlData *pad, unsigned int pressed) {
     memset(&rd, 0, sizeof rd);
     rd.size = sizeof rd;
     rd.mode = 0;                                                       // wait for the next picture (the camera makes 30 a second)
-    int r = sceCameraRead(1, &rd);
+    int r = ar_rc_read = sceCameraRead(1, &rd);
     if (r < 0) { if (++ar_bad_reads > 90) ar_msg = "The camera is not giving pictures"; return; }
     ar_bad_reads = 0;
     if (rd.frame == ar_lastframe) return;
     ar_lastframe = rd.frame; ar_frames++;
+    {                                                                  // copy out in whole rows (the camera memory is slow to read), make every pixel opaque, show it
+        uint8_t *dst = (uint8_t *)vita2d_texture_get_datap(ar_tex); int ds = (int)vita2d_texture_get_stride(ar_tex);
+        for (int y = 0; y < ARD_H; y++) {
+            uint32_t *row = (uint32_t *)(ar_frame + y * ARD_W * 4);
+            memcpy(row, (const uint8_t *)ar_blk_base + y * ARD_W * 4, ARD_W * 4);
+            for (int x = 0; x < ARD_W; x++) row[x] |= 0xFF000000u;
+            memcpy(dst + y * ds, row, ARD_W * 4);
+        }
+    }
     unsigned long long t0 = sceKernelGetProcessTimeWide();
     ArHit h;
-    bool got = ar_detect((const uint8_t *)vita2d_texture_get_datap(ar_tex), (int)vita2d_texture_get_stride(ar_tex), &h);
+    bool got = ar_detect(ar_frame, ARD_W * 4, &h);
     ar_det_us = (int)(sceKernelGetProcessTimeWide() - t0);
     if (got) ar_track(&h);
     else if (ar_lost < 999) ar_lost++;
@@ -175,8 +192,8 @@ static void ar_draw(vita2d_pgf *pgf) {
     else if (ar_lost >= 30) st = "Card lost: bring it back into view";
     else st = "Tracking the card";
     vita2d_pgf_draw_text(pgf, 24, VIEW_H + 62, ar_msg[0] || !ar_cam_ok || ar_lost >= 30 ? RGBA8(255, 150, 120, 255) : RGBA8(140, 255, 170, 255), 0.85f, st);
-    vita2d_pgf_draw_textf(pgf, 24, VIEW_H + 90, pale, 0.7f, "Card size %d px   camera view %d deg   detect %.1f ms   aircraft size %d%%",
-                          (int)ar_card_px, (int)AR_FOV_DEG[ar_fovi], ar_det_us / 1000.0f, (int)(ar_size * 100.0f + 0.5f));
+    vita2d_pgf_draw_textf(pgf, 24, VIEW_H + 90, pale, 0.7f, "Card size %d px   camera view %d deg   detect %.1f ms   aircraft size %d%%   cam %x/%x/%x frames %d",
+                          (int)ar_card_px, (int)AR_FOV_DEG[ar_fovi], ar_det_us / 1000.0f, (int)(ar_size * 100.0f + 0.5f), ar_rc_open, ar_rc_start, ar_rc_read, ar_frames);
     vita2d_pgf_draw_text(pgf, 24, VIEW_H + 116, pale, 0.7f, "Up / Down: aircraft    Left / Right: turn it    L / R: size    Triangle: camera view");
     vita2d_pgf_draw_text(pgf, 24, VIEW_H + 138, pale, 0.7f, "X: choose this aircraft for flying    O: back to the hangar");
 }
