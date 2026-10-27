@@ -343,9 +343,40 @@ static void draw_country_roads(void) {
     }
 }
 
+// Knowles Works' ground: the apron, the road in from the main road, car parks, a solar field and the road to the village.
+static void draw_knowles_ground(void) {
+    float dx = KW_FX - cam.pos.x, dz = KW_FZ - cam.pos.z, d2 = dx * dx + dz * dz;
+    if (d2 > 3500.0f * 3500.0f) return;
+    const float FX = KW_FX, FZ = KW_FZ;
+    const unsigned int road = RGBA8(86, 86, 92, 255), conc = RGBA8(156, 156, 160, 255), asph = RGBA8(64, 64, 70, 255), line = RGBA8(226, 200, 70, 255);
+    ground_strip(FX - 350.0f, FZ - 25.0f, FX + 350.0f, FZ - 25.0f, 178.0f, conc);                  // the apron round the hall
+    ground_strip(700.0f, FZ, FX - KW_HW - 80.0f, FZ, 6.0f, road);                                  // in from the north-south road
+    ground_strip(700.0f, FZ, FX - KW_HW - 80.0f, FZ, 0.25f, line);
+    ground_strip(FX + KW_HW + 120.0f, KW_VZ, KW_VX - 430.0f, KW_VZ, 4.5f, road);                   // out to the village
+    if (d2 > 2600.0f * 2600.0f) return;
+    for (int r = 0; r < 34; r++)                                                                   // solar field south of the loading dock
+        ground_strip(FX - 300.0f, FZ - 240.0f - r * 10.0f, FX + 300.0f, FZ - 240.0f - r * 10.0f, 3.2f, RGBA8(36, 52, 92, 255));
+    ground_strip(FX - 330.0f, FZ + 175.0f, FX + 330.0f, FZ + 175.0f, 0.0f + 28.0f, asph);          // the car park on the north side
+    for (int k = 0; k <= 11; k++)
+        ground_strip(FX - 330.0f + k * 60.0f, FZ + 150.0f, FX - 330.0f + k * 60.0f, FZ + 200.0f, 0.2f, RGBA8(230, 230, 232, 255));
+    if (d2 > 900.0f * 900.0f) return;
+    for (int r = 0; r < 4; r++)                                                                    // cars, a part-full lot
+        for (int c = 0; c < 110; c++) {
+            unsigned int h = hash2(c * 13 + 5, r * 29 + 7);
+            if ((h & 7) > 4) continue;
+            float cx = FX - 322.0f + c * 5.9f, cz = FZ + 156.0f + r * 13.0f;
+            if ((r & 1) == 1) cz += 3.0f;
+            float ddx = cx - cam.pos.x, ddz = cz - cam.pos.z;
+            if (ddx * ddx + ddz * ddz > 700.0f * 700.0f) continue;
+            static const unsigned int CAR[6] = { RGBA8(200, 200, 204, 255), RGBA8(60, 62, 70, 255), RGBA8(176, 40, 44, 255), RGBA8(46, 82, 150, 255), RGBA8(150, 152, 158, 255), RGBA8(226, 226, 230, 255) };
+            ground_strip(cx, cz - 2.1f, cx, cz + 2.1f, 1.0f, CAR[(h >> 8) % 6]);
+        }
+}
+
 // Two main streets and a little square in every town; close up, also pavements, crossings, a paved square and a yard and
 // path for every building.
 static void draw_town_streets(void) {
+    draw_knowles_ground();
     const unsigned int st = RGBA8(88, 88, 94, 255), sq = RGBA8(172, 160, 128, 255), pave = RGBA8(168, 168, 170, 255), zebra = RGBA8(230, 230, 232, 255);
     for (int n = 0; n < ntowns; n++) {
         float dx = town_x[n] - cam.pos.x, dz = town_z[n] - cam.pos.z, d2 = dx * dx + dz * dz;

@@ -627,6 +627,86 @@ static void settle_mountains(void) {
             emit_mountain(mounts[i], mt_col[i][0], mt_col[i][1], mt_col[i][2], mt_col[i][3], mt_col[i][4], mt_col[i][5]);
 }
 
+// ---- Knowles Works: the big factory and its village, east of the field -------------------------------------
+#define KW_FX 1750.0f            // factory hall centre
+#define KW_FZ (-1000.0f)
+#define KW_HW 320.0f             // half length of the hall (x)
+#define KW_HD 125.0f             // half depth (z)
+#define KW_VX 2950.0f            // village centre
+#define KW_VZ (-1000.0f)
+static void build_knowles(void) {
+    const float FX = KW_FX, FZ = KW_FZ;
+    // The hall: a very large plain shed with a dark band round it.
+    add_building(FX, FZ, 2.0f * KW_HW, 2.0f * KW_HD, 24.0f, 214, 217, 224);
+    for (int s = -1; s <= 1; s += 2) {
+        float zz = FZ + s * (KW_HD + 0.25f);
+        quad_face(v3(FX - KW_HW, 13.0f, zz), v3(FX + KW_HW, 13.0f, zz), v3(FX + KW_HW, 18.0f, zz), v3(FX - KW_HW, 18.0f, zz), 58, 64, 76);
+    }
+    for (int s = -1; s <= 1; s += 2) {
+        float xx = FX + s * (KW_HW + 0.25f);
+        quad_face(v3(xx, 13.0f, FZ - KW_HD), v3(xx, 13.0f, FZ + KW_HD), v3(xx, 18.0f, FZ + KW_HD), v3(xx, 18.0f, FZ - KW_HD), 58, 64, 76);
+    }
+    add_box_faces(FX, FZ, 520.0f, 26.0f, 24.0f, 24.8f, 70, 84, 104);                       // a long skylight down the middle of the roof
+    for (int k = 0; k < 5; k++)                                                            // rooftop plant
+        add_box_faces(FX + (k - 2) * 120.0f, FZ + (k & 1 ? 60.0f : -60.0f), 38.0f, 26.0f, 24.0f, 28.5f, 176, 180, 188);
+    // Loading dock along the south side, with its doors.
+    add_building(FX, FZ - KW_HD - 24.0f, 560.0f, 48.0f, 10.0f, 194, 198, 206);
+    for (int k = 0; k < 10; k++) {
+        float xx = FX - 252.0f + k * 56.0f, zz = FZ - KW_HD - 48.3f;
+        quad_face(v3(xx - 8.0f, 0.0f, zz), v3(xx + 8.0f, 0.0f, zz), v3(xx + 8.0f, 7.0f, zz), v3(xx - 8.0f, 7.0f, zz), 52, 58, 70);
+    }
+    // The glass office block at the west end, with a red Knowles stripe.
+    add_building(FX - KW_HW - 38.0f, FZ - 20.0f, 76.0f, 130.0f, 19.0f, 96, 138, 178);
+    add_box_faces(FX - KW_HW - 38.0f, FZ - 20.0f, 78.0f, 132.0f, 19.0f, 19.8f, 226, 228, 232);
+    {
+        float xx = FX - KW_HW - 76.3f;
+        quad_face(v3(xx, 11.0f, FZ - 85.0f), v3(xx, 11.0f, FZ + 45.0f), v3(xx, 13.5f, FZ + 45.0f), v3(xx, 13.5f, FZ - 85.0f), 196, 40, 40);
+    }
+    // Cooling towers and battery containers at the east end.
+    static const float CR[3] = { 8.0f, 8.0f, 0.0f }, CH[3] = { 0.0f, 13.0f, 13.3f };
+    for (int k = 0; k < 3; k++) {
+        float cx = FX + KW_HW + 40.0f, cz = FZ - 70.0f + k * 70.0f;
+        add_lathe(cx, cz, CR, CH, 3, 6, 1, 184, 188, 194, 120, 124, 132);
+        town_box(cx, cz, 15.0f, 15.0f, 13.0f);
+    }
+    for (int k = 0; k < 6; k++)
+        add_building(FX + KW_HW + 90.0f, FZ - 100.0f + k * 40.0f, 14.0f, 30.0f, 5.5f, 232, 234, 238);
+    // The village: houses along both main streets, a church on the corner.
+    if (ntowns < MAX_TOWNS) {
+        int vi = ntowns; town_x[ntowns] = KW_VX; town_z[ntowns] = KW_VZ; ntowns++;
+        static const float ROOF[4][3] = { { 150, 62, 48 }, { 98, 72, 62 }, { 72, 78, 92 }, { 146, 114, 72 } };
+        for (int street = 0; street < 2; street++)
+            for (int side = -1; side <= 1; side += 2)
+                for (int q = 0; q < 4; q++) {
+                    int k = (q < 2) ? q - 2 : q - 1;                                      // -2, -1, 1, 2
+                    unsigned int hh = hash2(street * 53 + side * 17 + k * 7 + 301, q + 19);
+                    float w = 15.0f + 8.0f * hf(hh, 0), d = 13.0f + 7.0f * hf(hh, 1), h = 6.0f + 5.0f * hf(hh, 2);
+                    float off = 30.0f, along = k * 46.0f + (hf(hh, 3) - 0.5f) * 8.0f;
+                    float x = street == 0 ? KW_VX + along : KW_VX + side * off;
+                    float z = street == 0 ? KW_VZ + side * off : KW_VZ + along;
+                    float tone = 170.0f + 55.0f * hf(hh, 3);
+                    const float *rc = ROOF[(hh >> 12) & 3];
+                    float rh = fminf(fminf(w, d) * 0.32f, 5.5f);
+                    if (nboxes < MAX_BOXES) boxes[nboxes++] = (Box){ x, z, w, d, h + rh };
+                    add_gable(x, z, w, d, h, rh, tone, tone * 0.92f, tone * 0.82f, rc[0], rc[1], rc[2]);
+                    if (ntown_lights < 330) town_lights[ntown_lights++] = v3(x, 3.5f, z);
+                    if (ntb < MAX_TB) { tb_x[ntb] = x; tb_z[ntb] = z; tb_w[ntb] = w; tb_d[ntb] = d; tb_town[ntb] = (unsigned char)vi; ntb++; }
+                }
+        town_church(KW_VX + 86.0f, KW_VZ + 80.0f);
+        if (ntb < MAX_TB) { tb_x[ntb] = KW_VX + 86.0f; tb_z[ntb] = KW_VZ + 80.0f; tb_w[ntb] = 12.0f; tb_d[ntb] = 12.0f; tb_town[ntb] = (unsigned char)vi; ntb++; }
+        for (int k = -4; k <= 4; k++) {
+            if (k == 0 || ntown_lights >= 396) continue;
+            town_lights[ntown_lights++] = v3(KW_VX + k * 52.0f, 6.0f, KW_VZ + 7.0f);
+            town_lights[ntown_lights++] = v3(KW_VX + 7.0f, 6.0f, KW_VZ + k * 52.0f);
+        }
+    }
+    // Floodlights round the factory at night.
+    for (int k = 0; k <= 8 && ntown_lights < 396; k++) {
+        town_lights[ntown_lights++] = v3(FX - KW_HW + k * (2.0f * KW_HW / 8.0f), 9.0f, FZ - KW_HD - 60.0f);
+        if (ntown_lights < 396) town_lights[ntown_lights++] = v3(FX - KW_HW + k * (2.0f * KW_HW / 8.0f), 9.0f, FZ + KW_HD + 12.0f);
+    }
+}
+
 static void build_world(void) {
     srand(1990);
     nfaces = 0; nboxes = 0; nmesas = 0; ntowns = 0; ntown_lights = 0; ntb = 0; nriver = 0;
@@ -671,6 +751,7 @@ static void build_world(void) {
     build_countryside();
     build_pinecrest_country();
 #endif
+    build_knowles();
     settle_mountains();
 }
 

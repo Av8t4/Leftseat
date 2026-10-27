@@ -14,7 +14,7 @@
 
 #define TILE       400.0f              // checkerboard ground tile size (m)
 #define TILE_R     10                  // tiles drawn in each direction
-#define MAX_FACES  3400
+#define MAX_FACES  3700
 #define MAX_BOXES  240
 #define NUM_MOUNTS 7            // the original ring of mountains around the home airport
 #define MAX_MOUNTS 96           // every mountain and hill (they all share one shape and collision test)

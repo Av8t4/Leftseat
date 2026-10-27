@@ -195,6 +195,8 @@ static bool tree_ok(float x, float z) {
         ap_local(&AIRPORTS[AP_SPACE], x, z, &lx, &lz);
         if (lx > -120.0f && lx < 1500.0f && lz > -700.0f && lz < 2500.0f) return false;
     }
+    if (fabsf(x - KW_FX) < 520.0f && fabsf(z - KW_FZ) < 330.0f) return false;      // the factory
+    if (fabsf(x - KW_VX) < 480.0f && fabsf(z - KW_VZ) < 360.0f) return false;      // and its village
     if (fabsf(x) < 320.0f && fabsf(z) < 1400.0f) return false;              // airport
     if (fabsf(x - 150.0f) < 120.0f && fabsf(z) < 500.0f) return false;      // terminal area
     if (fabsf(x - ROAD_X) < 26.0f || fabsf(z - ROAD_Z) < 26.0f) return false;
