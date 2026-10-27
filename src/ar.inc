@@ -23,7 +23,7 @@ static const char  *ar_msg = "";
 static SceUID       ar_blk = -1;              // camera memory (the camera needs its own block of CDRAM, as in the Vita SDK's camera sample)
 static void        *ar_blk_base;
 static uint8_t      ar_frame[ARD_W * ARD_H * 4];   // a normal-memory copy of the latest picture (fast to read; alpha forced on)
-static int          ar_rc_open, ar_rc_start, ar_rc_read;
+static int          ar_rc_open, ar_rc_start, ar_rc_read, ar_active, ar_rstat;
 
 static const float AR_FOV_DEG[4] = { 50.0f, 60.0f, 70.0f, 80.0f };           // horizontal field of view of the camera
 static float ar_focal(void) { return (ARD_W * 0.5f) / tanf(AR_FOV_DEG[ar_fovi] * 0.5f * PI_F / 180.0f); }   // pixels of the 480 x 272 picture
@@ -133,10 +133,11 @@ static void ar_step(const SceCtrlData *pad, unsigned int pressed) {
     SceCameraRead rd;
     memset(&rd, 0, sizeof rd);
     rd.size = sizeof rd;
-    rd.mode = 0;                                                       // wait for the next picture (the camera makes 30 a second)
+    rd.mode = 1;                                                       // do not wait: mode 0 can wait for ever if the camera sends nothing, and freezes the game
+    ar_active = sceCameraIsActive(1);
     int r = ar_rc_read = sceCameraRead(1, &rd);
     if (r < 0) { if (++ar_bad_reads > 90) ar_msg = "The camera is not giving pictures"; return; }
-    ar_bad_reads = 0;
+    ar_bad_reads = 0; ar_rstat = rd.status;
     ar_lastframe = (int)rd.frame; ar_frames++;                         // (the frame counter is not reliable, so every successful read counts)
     {                                                                  // copy out in whole rows (the camera memory is slow to read), make every pixel opaque, show it
         uint8_t *dst = (uint8_t *)vita2d_texture_get_datap(ar_tex); int ds = (int)vita2d_texture_get_stride(ar_tex);
@@ -191,8 +192,8 @@ static void ar_draw(vita2d_pgf *pgf) {
     else if (ar_lost >= 30) st = "Card lost: bring it back into view";
     else st = "Tracking the card";
     vita2d_pgf_draw_text(pgf, 24, VIEW_H + 62, ar_msg[0] || !ar_cam_ok || ar_lost >= 30 ? RGBA8(255, 150, 120, 255) : RGBA8(140, 255, 170, 255), 0.85f, st);
-    vita2d_pgf_draw_textf(pgf, 24, VIEW_H + 90, pale, 0.7f, "Card size %d px   camera view %d deg   detect %.1f ms   aircraft size %d%%   cam %x/%x/%x frames %d id %d",
-                          (int)ar_card_px, (int)AR_FOV_DEG[ar_fovi], ar_det_us / 1000.0f, (int)(ar_size * 100.0f + 0.5f), ar_rc_open, ar_rc_start, ar_rc_read, ar_frames, ar_lastframe);
+    vita2d_pgf_draw_textf(pgf, 24, VIEW_H + 90, pale, 0.7f, "Card size %d px   camera view %d deg   detect %.1f ms   aircraft size %d%%   cam %x/%x/%x act %d st %d frames %d id %d",
+                          (int)ar_card_px, (int)AR_FOV_DEG[ar_fovi], ar_det_us / 1000.0f, (int)(ar_size * 100.0f + 0.5f), ar_rc_open, ar_rc_start, ar_rc_read, ar_active, ar_rstat, ar_frames, ar_lastframe);
     vita2d_pgf_draw_text(pgf, 24, VIEW_H + 116, pale, 0.7f, "Up / Down: aircraft    Left / Right: turn it    L / R: size    Triangle: camera view");
     vita2d_pgf_draw_text(pgf, 24, VIEW_H + 138, pale, 0.7f, "X: choose this aircraft for flying    O: back to the hangar");
 }
