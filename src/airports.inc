@@ -156,6 +156,15 @@ static void draw_town_lights(void) {
         if (d.x * d.x + d.z * d.z > 7000.0f * 7000.0f) continue;
         draw_light(town_lights[i].x, town_lights[i].y, town_lights[i].z, 1.5f, win);
     }
+    unsigned int sodium = RGBA8(255, 196, 120, 255);                                       // lamps at both ends of every bridge
+    for (int i = 0; i < nbridges; i++) {
+        float dx = br_x[i] - cam.pos.x, dz = br_z[i] - cam.pos.z;
+        if (dx * dx + dz * dz > 6000.0f * 6000.0f) continue;
+        float L = br_len[i] - 36.0f;
+        for (int e = -1; e <= 1; e += 2)
+            for (int sd = -1; sd <= 1; sd += 2)
+                draw_light(br_x[i] + br_dx[i] * e * L * 0.5f - br_dz[i] * sd * br_hw[i], 6.5f, br_z[i] + br_dz[i] * e * L * 0.5f + br_dx[i] * sd * br_hw[i], 1.6f, sodium);
+    }
 }
 
 static void draw_redrock_all(void) {
@@ -509,6 +518,11 @@ static void draw_bridges(void) {
         float L = br_len[i] - 36.0f, hw = br_hw[i];                                    // L = the deck over the river and its banks
         float ux = br_dx[i], uz = br_dz[i], px = -uz, pz = ux, cx = br_x[i], cz = br_z[i];
         #define BP(a, b, y) v3(cx + ux * (a) + px * (b), (y), cz + uz * (a) + pz * (b))
+        for (int r = -1; r <= 1; r += 2)                                                 // foam round the piers
+            for (int c = -1; c <= 1; c += 2) {
+                float a0 = r * L * 0.24f, b0 = c * (hw - 2.2f);
+                ground_disc(cx + ux * a0 + px * b0, cz + uz * a0 + pz * b0, 2.8f, RGBA8(196, 222, 240, 255));
+            }
         // Piers: two rows of two square columns standing in the river.
         for (int r = -1; r <= 1; r += 2)
             for (int c = -1; c <= 1; c += 2) {
@@ -550,19 +564,71 @@ static void draw_bridges(void) {
             draw_world_poly(r2, 4, conc_d);
             draw_world_poly(r1, 4, conc);
         }
+        if (dx * dx + dz * dz < 1500.0f * 1500.0f) {                                    // steel trusses along both sides, the far side first
+            const unsigned int steel = RGBA8(98, 106, 118, 255), steel_l = RGBA8(136, 144, 156, 255);
+            float cs = (cam.pos.x - cx) * px + (cam.pos.z - cz) * pz;
+            const int NP = 8;
+            for (int k = 0; k < 2; k++) {
+                int s = (k == 0) ? (cs > 0.0f ? -1 : 1) : (cs > 0.0f ? 1 : -1);
+                float b0 = s * (hw + 0.2f), TH = H + 5.0f;
+                V3 chord[4] = { BP(-L * 0.5f, b0, TH), BP(L * 0.5f, b0, TH), BP(L * 0.5f, b0, TH + 0.7f), BP(-L * 0.5f, b0, TH + 0.7f) };
+                draw_world_poly(chord, 4, steel_l);
+                for (int q = 0; q < NP; q++) {
+                    float a0 = -L * 0.5f + L * q / NP, a1 = -L * 0.5f + L * (q + 1) / NP;
+                    float rise0 = (q & 1) ? H + 1.0f : TH, rise1 = (q & 1) ? TH : H + 1.0f;
+                    V3 dg[4] = { BP(a0 - 0.3f, b0, rise0 == TH ? TH : H + 1.0f), BP(a0 + 0.3f, b0, rise0 == TH ? TH : H + 1.0f), BP(a1 + 0.3f, b0, rise1 == TH ? TH : H + 1.0f), BP(a1 - 0.3f, b0, rise1 == TH ? TH : H + 1.0f) };
+                    draw_world_poly(dg, 4, steel);
+                }
+                for (int q = 0; q <= NP; q++) {
+                    float a0 = -L * 0.5f + L * q / NP;
+                    V3 post[4] = { BP(a0 - 0.3f, b0, H + 1.0f), BP(a0 + 0.3f, b0, H + 1.0f), BP(a0 + 0.3f, b0, TH), BP(a0 - 0.3f, b0, TH) };
+                    draw_world_poly(post, 4, steel_l);
+                }
+            }
+            for (int q = 0; q <= NP; q += 2) {                                          // cross beams over the deck
+                float a0 = -L * 0.5f + L * q / NP;
+                V3 beam[4] = { BP(a0 - 0.3f, -hw, (H + 5.0f)), BP(a0 + 0.3f, -hw, (H + 5.0f)), BP(a0 + 0.3f, hw, (H + 5.0f)), BP(a0 - 0.3f, hw, (H + 5.0f)) };
+                draw_world_poly(beam, 4, steel);
+            }
+        }
         #undef BP
     }
 }
 
+static float river_hw(int i) { return 11.0f + 24.0f * (float)i / (float)(nriver - 2); }     // narrow at the source, wider towards the mouth
 static void draw_river(void) {
     if (nriver < 2) return;
-    for (int i = 0; i + 1 < nriver; i++) {
-        float mx = (river_x[i] + river_x[i + 1]) * 0.5f - cam.pos.x, mz = (river_z[i] + river_z[i + 1]) * 0.5f - cam.pos.z;
-        if (mx * mx + mz * mz > 9000.0f * 9000.0f) continue;
-        float t = (float)i / (float)(nriver - 2);                                   // narrow at the source, wider towards the mouth
-        float hw = 11.0f + 24.0f * t;
-        ground_strip(river_x[i], river_z[i], river_x[i + 1], river_z[i + 1], hw + 10.0f, RGBA8(196, 184, 130, 255));    // sandy banks
-        ground_strip(river_x[i], river_z[i], river_x[i + 1], river_z[i + 1], hw, RGBA8(52, 108, 172, 255));
-    }
+    const unsigned int verge = RGBA8(84, 138, 72, 255), sand = RGBA8(196, 184, 130, 255), shallow = RGBA8(86, 142, 196, 255), deep = RGBA8(46, 98, 164, 255);
+    for (int pass = 0; pass < 5; pass++)
+        for (int i = 0; i + 1 < nriver; i++) {
+            float ax = river_x[i], az = river_z[i], bx = river_x[i + 1], bz = river_z[i + 1];
+            float mx = (ax + bx) * 0.5f - cam.pos.x, mz = (az + bz) * 0.5f - cam.pos.z, d2 = mx * mx + mz * mz;
+            if (d2 > 9000.0f * 9000.0f) continue;
+            float hw = river_hw(i), hw2 = river_hw(i + 1 < nriver - 1 ? i + 1 : i);
+            unsigned int col = 0; float w = 0.0f;
+            if (pass == 0) { if (d2 > 5500.0f * 5500.0f) continue; col = verge; w = hw + 26.0f; }          // wet grass beside the banks
+            else if (pass == 1) { col = sand; w = hw + 10.0f; }                                              // sandy banks
+            else if (pass == 2) { col = shallow; w = hw; }                                                   // the water, pale at the edges
+            else if (pass == 3) { if (d2 > 4000.0f * 4000.0f) continue; col = deep; w = hw * 0.62f; }       // and dark in the middle
+            else {
+                if (d2 > 2200.0f * 2200.0f) continue;                                                        // sandbars and streaks of foam, close up only
+                unsigned int h = hash2(i * 31 + 7, 11);
+                if ((h & 3) == 0) {
+                    float t = 0.35f + 0.3f * hf(h, 1), px = ax + (bx - ax) * t, pz = az + (bz - az) * t;
+                    float dx = bx - ax, dz = bz - az, len = sqrtf(dx * dx + dz * dz), side = (h & 4) ? 1.0f : -1.0f;
+                    float off = hw * 0.58f * side;
+                    ground_disc(px - dz / len * off, pz + dx / len * off, hw * 0.34f, sand);
+                }
+                for (int k = 0; k < 3; k++) {
+                    float t0 = 0.1f + 0.3f * k + 0.1f * hf(h, 2), t1 = t0 + 0.1f;
+                    float off = hw * (0.25f - 0.25f * k) * ((h >> (3 + k)) & 1 ? 1.0f : -1.0f);
+                    strip_off(ax + (bx - ax) * t0, az + (bz - az) * t0, ax + (bx - ax) * t1, az + (bz - az) * t1, off, 0.5f, RGBA8(170, 208, 236, 255));
+                }
+                continue;
+            }
+            ground_strip(ax, az, bx, bz, w, col);
+            ground_disc(ax, az, w, col);
+            if (i + 2 == nriver) ground_disc(bx, bz, w, col);
+        }
 }
 

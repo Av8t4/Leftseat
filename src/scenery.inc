@@ -189,6 +189,14 @@ static bool tree_ok(float x, float z) {
         ap_local(&AIRPORTS[AP_LANA], x, z, &lx, &lz);
         if (lx > -120.0f && lx < 260.0f && fabsf(lz) < AIRPORTS[AP_LANA].hl + 150.0f) return false;
     }
+    for (int j = 0; j + 1 < nriver; j++) {                                    // none in the river or on its banks
+        float ax = river_x[j], az = river_z[j], bx = river_x[j + 1], bz = river_z[j + 1];
+        if (fabsf(x - ax) > 1500.0f || fabsf(z - az) > 1500.0f) continue;
+        float sx = bx - ax, sz = bz - az, l2 = sx * sx + sz * sz, u = l2 > 1.0f ? clampf(((x - ax) * sx + (z - az) * sz) / l2, 0.0f, 1.0f) : 0.0f;
+        float qx = ax + sx * u - x, qz = az + sz * u - z;
+        float lim = 11.0f + 24.0f * (float)j / (float)(nriver - 2) + 16.0f;
+        if (qx * qx + qz * qz < lim * lim) return false;
+    }
     if (sea_depth(x, z) > -250.0f) return false;                             // no trees in the sea or on its beach
     {                                                                         // or on the spaceport and its build site
         float lx, lz;
