@@ -194,6 +194,7 @@ static const Airport AIRPORTS[AP_COUNT] = {
 };
 static int   ap_found;                                   // 1 once you have flown close to Gulf Point (saved with the scores)
 static int   found_msg_t;                                // frames left to show "DISCOVERED"
+static float sea_coast_x(float z);
 static float sea_depth(float x, float z);                // metres into the sea (negative on land); see spaceport.inc
 static int   ap_nshown(void);
 static void  space_check_found(void);
@@ -707,6 +708,40 @@ static void build_knowles(void) {
     }
 }
 
+// ---- the coast: sea stacks and islands, a lighthouse ---------------------------------------------------------
+#define LH_Z (-12500.0f)
+static void build_coast(void) {
+    static const float ZS[8] = { 22000.0f, 16500.0f, 9200.0f, 3000.0f, -4500.0f, -9800.0f, -16800.0f, -21800.0f };
+    for (int k = 0; k < 8 && nmounts < MAX_MOUNTS - 4; k++) {                          // sea stacks: little rock cones just off the beach
+        unsigned int h = hash2(k * 47 + 9, 211);
+        float z = ZS[k] + (hf(h, 0) - 0.5f) * 1800.0f, x = sea_coast_x(z) + 180.0f + 700.0f * hf(h, 1);
+        float hb = 50.0f + 110.0f * hf(h, 2), ht = 26.0f + 70.0f * hf(h, 3);
+        mounts[nmounts] = (Mount){ x, z, hb, ht };
+        add_mountain2(&mounts[nmounts], 112, 104, 96, 112, 104, 96);
+        nmounts++;
+    }
+    for (int k = 0; k < 2 && nmounts < MAX_MOUNTS - 2; k++) {                          // two low islands further out
+        float z = k ? -2600.0f : 12000.0f, x = sea_coast_x(z) + 3300.0f + 900.0f * k;
+        mounts[nmounts] = (Mount){ x, z, 620.0f + 160.0f * k, 70.0f + 26.0f * k };
+        add_mountain2(&mounts[nmounts], 150, 140, 104, 150, 140, 104);
+        nmounts++;
+    }
+    {                                                                                   // a lighthouse on the headland, with the keeper's house
+        float x = sea_coast_x(LH_Z) - 240.0f, z = LH_Z;
+        static const float R[4] = { 6.4f, 5.0f, 5.0f, 4.2f }, H[4] = { 0.0f, 12.0f, 18.0f, 28.0f };
+        add_lathe(x, z, R, H, 2, 6, 99, 238, 238, 240, 0, 0, 0);
+        static const float R2[2] = { 5.0f, 4.6f }, H2[2] = { 12.0f, 19.0f };
+        add_lathe(x, z, R2, H2, 2, 6, 99, 196, 52, 48, 0, 0, 0);
+        static const float R3[2] = { 4.6f, 4.0f }, H3[2] = { 19.0f, 28.0f };
+        add_lathe(x, z, R3, H3, 2, 6, 99, 238, 238, 240, 0, 0, 0);
+        static const float R4[3] = { 3.0f, 3.0f, 0.0f }, H4[3] = { 28.0f, 31.0f, 35.0f };
+        add_lathe(x, z, R4, H4, 3, 6, 1, 250, 232, 150, 196, 52, 48);
+        town_box(x, z, 11.0f, 11.0f, 35.0f);
+        add_gable(x - 36.0f, z + 6.0f, 18.0f, 11.0f, 5.0f, 3.5f, 226, 222, 210, 150, 62, 48);
+        town_box(x - 36.0f, z + 6.0f, 18.0f, 11.0f, 8.5f);
+    }
+}
+
 static void build_world(void) {
     srand(1990);
     nfaces = 0; nboxes = 0; nmesas = 0; ntowns = 0; ntown_lights = 0; ntb = 0; nriver = 0;
@@ -752,6 +787,7 @@ static void build_world(void) {
     build_pinecrest_country();
 #endif
     build_knowles();
+    build_coast();
     settle_mountains();
 }
 

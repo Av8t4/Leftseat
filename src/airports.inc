@@ -156,6 +156,14 @@ static void draw_town_lights(void) {
         if (d.x * d.x + d.z * d.z > 7000.0f * 7000.0f) continue;
         draw_light(town_lights[i].x, town_lights[i].y, town_lights[i].z, 1.5f, win);
     }
+    {                                                                                       // the lighthouse: a long white flash, then dark
+        float lx = sea_coast_x(LH_Z) - 240.0f, dx = lx - cam.pos.x, dz = LH_Z - cam.pos.z;
+        if (dx * dx + dz * dz < 40000.0f * 40000.0f && (frame_count % 150) < 40) {
+            light_far = 40000.0f;
+            draw_light(lx, 31.5f, LH_Z, 3.4f, RGBA8(255, 250, 220, 255));
+            light_far = 9000.0f;
+        }
+    }
     unsigned int sodium = RGBA8(255, 196, 120, 255);                                       // lamps at both ends of every bridge
     for (int i = 0; i < nbridges; i++) {
         float dx = br_x[i] - cam.pos.x, dz = br_z[i] - cam.pos.z;
