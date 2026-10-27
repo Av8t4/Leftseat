@@ -79,7 +79,9 @@ static void draw_scene(void) {
         }
         draw_lakes();
         draw_sea();
+        draw_main_road_shoulders();
         draw_roads(i0, j0, tr);
+        draw_main_road_marks();
         draw_river();
         draw_highway();
         draw_country_roads();
