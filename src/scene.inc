@@ -126,6 +126,7 @@ static void draw_scene(void) {
         float d2 = vdot(d, d), rad = f->rad;
         if (vdot(d, cam.f) < -rad) continue;                               // entirely behind us
         if (d2 > (cull + rad) * (cull + rad)) continue;                    // lost in the haze
+        if (f->maxd > 0.0f && d2 > f->maxd * f->maxd) continue;           // city detail: not worth drawing from far away
         if (f->top * f->top * FOCAL * FOCAL < 6.25f * d2) continue;        // too low or too far to show even a few pixels
         items[ni].dist = d2; items[ni].idx = i; ni++;
     }

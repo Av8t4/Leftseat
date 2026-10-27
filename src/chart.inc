@@ -168,6 +168,13 @@ static void draw_chart(vita2d_pgf *pgf) {
             float x = ch_sx(mesas[i].x), y = ch_sy(mesas[i].z), w = 4.0f * zs, h = 3.0f * zs;
             if (ch_inmap(x, y, -w)) pb_quad((P2){ x - w, y - h }, (P2){ x + w, y - h }, (P2){ x + w, y + h }, (P2){ x - w, y + h }, RGBA8(190, 100, 66, 255));
         }
+#if CITY_DETAIL > 0
+        {                                                                          // downtown Knowles
+            float x0 = ch_sx(CITY_X0), x1 = ch_sx(CITY_X1), y0 = ch_sy(CITY_Z1), y1 = ch_sy(CITY_Z0);
+            if (x1 > CH_MX && x0 < CH_MX + CH_MW && y1 > CH_MY && y0 < CH_MY + CH_MH)
+            { P2 q[4] = { { x0, y0 }, { x1, y0 }, { x1, y1 }, { x0, y1 } }; ch_poly(q, 4, RGBA8(176, 168, 140, 255)); }
+        }
+#endif
         for (int i = 0; i < ntowns; i++) {
             float x = ch_sx(town_x[i]), y = ch_sy(town_z[i]), w = 3.0f * zs;
             if (ch_inmap(x, y, -w)) pb_quad((P2){ x - w, y - w }, (P2){ x + w, y - w }, (P2){ x + w, y + w }, (P2){ x - w, y + w }, RGBA8(240, 214, 120, 255));

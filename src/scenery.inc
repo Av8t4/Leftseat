@@ -109,6 +109,15 @@ static bool in_lake(float x, float z, float grow) {
     return false;
 }
 
+// Downtown Knowles: the ground turns grey in and a little beyond the street grid.
+static float urban_k(float x, float z) {
+#if CITY_DETAIL > 0
+    float dx = fmaxf(fmaxf(CITY_X0 - x, x - CITY_X1), 0.0f), dz = fmaxf(fmaxf(CITY_Z0 - z, z - CITY_Z1), 0.0f);
+    return clampf(1.0f - sqrtf(dx * dx + dz * dz) / 500.0f, 0.0f, 1.0f);
+#else
+    return 0.0f;
+#endif
+}
 // Lush wet meadow round every lake, in a wandering band.
 static float wet_k(float x, float z) {
     float best = 0.0f;
@@ -147,7 +156,9 @@ static unsigned int field_color(int i, int j, bool dark) {
             col = blend_col(col, n > 0.5f ? RGBA8(196, 150, 106, 255) : RGBA8(122, 84, 60, 255), fabsf(n - 0.5f) * 0.9f * dd);
         }
     }
-    return fk <= 0.0f ? col : blend_col(col, dark ? FOREST_DARK[k] : FOREST_LIGHT[k], fk);
+    if (fk > 0.0f) col = blend_col(col, dark ? FOREST_DARK[k] : FOREST_LIGHT[k], fk);
+    float uk = urban_k(x, z);
+    return uk <= 0.0f ? col : blend_col(col, dark ? RGBA8(132, 136, 128, 255) : RGBA8(142, 146, 138, 255), uk * 0.85f);
 }
 // The same land, one colour per place, for the chart and the horizon.
 static unsigned int land_mid(float x, float z) {
@@ -156,7 +167,8 @@ static unsigned int land_mid(float x, float z) {
     col = blend_col(col, RGBA8(50, 132, 70, 255), wk * 0.75f);
     col = blend_col(col, RGBA8(170, 160, 100, 255), ck * 0.8f);
     col = blend_col(col, RGBA8(160, 116, 84, 255), dk);
-    return blend_col(col, RGBA8(40, 104, 52, 255), fk);
+    col = blend_col(col, RGBA8(40, 104, 52, 255), fk);
+    return blend_col(col, RGBA8(140, 144, 136, 255), urban_k(x, z) * 0.85f);
 }
 
 static void draw_roads(int i0, int j0, int tr) {
@@ -203,6 +215,7 @@ static bool tree_ok(float x, float z) {
         ap_local(&AIRPORTS[AP_SPACE], x, z, &lx, &lz);
         if (lx > -120.0f && lx < 1500.0f && lz > -700.0f && lz < 2500.0f) return false;
     }
+    if (x > CITY_X0 - 60.0f && x < CITY_X1 + 60.0f && z > CITY_Z0 - 60.0f && z < CITY_Z1 + 60.0f) return false;     // downtown
     if (fabsf(x - KW_FX) < 520.0f && fabsf(z - KW_FZ) < 330.0f) return false;      // the factory
     if (fabsf(x - KW_VX) < 480.0f && fabsf(z - KW_VZ) < 360.0f) return false;      // and its village
     if (fabsf(x) < 320.0f && fabsf(z) < 1400.0f) return false;              // airport

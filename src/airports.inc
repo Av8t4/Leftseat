@@ -472,10 +472,88 @@ static void draw_knowles_ground(void) {
         }
 }
 
+// Downtown Knowles: the street grid with pavements, crossings, parked cars, a park, and the roads out to the airfield and the main road.
+static void draw_downtown_ground(void) {
+#if CITY_DETAIL > 0
+    float dx = CITY_CX - cam.pos.x, dz = CITY_CZ - cam.pos.z, d2 = dx * dx + dz * dz;
+    if (d2 > 4500.0f * 4500.0f) return;
+    const unsigned int asph = RGBA8(78, 78, 84, 255), pave = RGBA8(176, 176, 178, 255);
+    const float S = CITY_S, X0 = CITY_X0, Z0 = CITY_Z0, X1 = CITY_X1, Z1 = CITY_Z1;
+    // the ground under the blocks, so the city reads grey rather than green
+    ground_strip(X0, (Z0 + Z1) * 0.5f, X1, (Z0 + Z1) * 0.5f, (Z1 - Z0) * 0.5f, RGBA8(150, 152, 146, 255));
+    {                                                                                  // the park
+        float px = X0 + (CITY_PARK_C + 0.5f) * S, pz = Z0 + (CITY_PARK_R + 0.5f) * S;
+        ground_strip(px - 62.0f, pz, px + 62.0f, pz, 62.0f, RGBA8(70, 150, 62, 255));
+        ground_strip(px - 62.0f, pz, px + 62.0f, pz, 2.2f, RGBA8(200, 190, 160, 255));
+        ground_strip(px, pz - 62.0f, px, pz + 62.0f, 2.2f, RGBA8(200, 190, 160, 255));
+        ground_disc(px + 26.0f, pz - 24.0f, 14.0f, RGBA8(70, 120, 176, 255));
+        ground_disc(px, pz, 5.0f, RGBA8(200, 190, 160, 255));
+    }
+    for (int pass = 0; pass < 3; pass++) {
+        if (pass == 2 && d2 > 1500.0f * 1500.0f) break;
+        for (int k = 0; k < CITY_NC + CITY_NR + 2; k++) {
+            bool avenue = k <= CITY_NC;
+            float pos = avenue ? X0 + k * S : Z0 + (k - CITY_NC - 1) * S;
+            float a0 = (avenue ? Z0 : X0) - 20.0f, a1 = (avenue ? Z1 : X1) + 20.0f;
+            float mid = avenue ? pos - cam.pos.x : pos - cam.pos.z;
+            if (fabsf(mid) > 1800.0f) continue;
+            #define SEG(off, half, col) do { if (avenue) ground_strip(pos + (off), a0, pos + (off), a1, (half), (col)); else ground_strip(a0, pos + (off), a1, pos + (off), (half), (col)); } while (0)
+            if (pass == 0) { SEG(-8.2f, 2.2f, pave); SEG(8.2f, 2.2f, pave); }
+            else if (pass == 1) SEG(0.0f, 6.0f, asph);
+            else if (fabsf(mid) < 600.0f) {
+                if (avenue) { ground_strip(pos - 5.0f, a0, pos - 5.0f, a1, 0.14f, PAINT_W); ground_strip(pos + 5.0f, a0, pos + 5.0f, a1, 0.14f, PAINT_W); ground_dashes(pos, a0, pos, a1, 0.14f, 4.0f, 12.0f, 260.0f, PAINT_Y); }
+                else        { ground_strip(a0, pos - 5.0f, a1, pos - 5.0f, 0.14f, PAINT_W); ground_strip(a0, pos + 5.0f, a1, pos + 5.0f, 0.14f, PAINT_W); ground_dashes(a0, pos, a1, pos, 0.14f, 4.0f, 12.0f, 260.0f, PAINT_Y); }
+            }
+            #undef SEG
+        }
+    }
+    if (d2 < 1200.0f * 1200.0f) {                                                      // zebra crossings at the crossings close to you, and parked cars in the core
+        for (int c = 0; c <= CITY_NC; c++)
+            for (int r = 0; r <= CITY_NR; r++) {
+                float x = X0 + c * S, z = Z0 + r * S, ddx = x - cam.pos.x, ddz = z - cam.pos.z;
+                if (ddx * ddx + ddz * ddz > 320.0f * 320.0f) continue;
+                for (int s = -1; s <= 1; s += 2)
+                    for (int q = -2; q <= 2; q++) {
+                        ground_strip(x + s * 8.5f, z + q * 2.0f, x + s * 10.5f, z + q * 2.0f, 0.6f, PAINT_W);
+                        ground_strip(x + q * 2.0f, z + s * 8.5f, x + q * 2.0f, z + s * 10.5f, 0.6f, PAINT_W);
+                    }
+            }
+        static const unsigned int CAR[6] = { RGBA8(200, 200, 204, 255), RGBA8(60, 62, 70, 255), RGBA8(176, 40, 44, 255), RGBA8(46, 82, 150, 255), RGBA8(150, 152, 158, 255), RGBA8(226, 226, 230, 255) };
+        for (int c = 0; c <= CITY_NC; c++) {
+            float x = X0 + c * S;
+            if (fabsf(x - cam.pos.x) > 260.0f) continue;
+            float z0 = fmaxf(Z0, floorf((cam.pos.z - 260.0f) / 14.0f) * 14.0f), z1 = fminf(Z1, cam.pos.z + 260.0f);
+            for (float z = z0; z < z1; z += 14.0f) {
+                unsigned int h = hash2((int)(x * 0.1f) + 3, (int)(z * 0.5f));
+                if ((h & 3) > 1) continue;
+                ground_strip(x + ((h & 4) ? 3.1f : -3.1f), z - 2.0f, x + ((h & 4) ? 3.1f : -3.1f), z + 2.0f, 0.95f, CAR[(h >> 8) % 6]);
+            }
+        }
+    }
+    if (d2 < 1400.0f * 1400.0f)                                                        // yards and driveways for the houses on the edge
+        for (int i = 0; i < ntb; i++) {
+            if (tb_town[i] != TB_CITY) continue;
+            float ddx = tb_x[i] - cam.pos.x, ddz = tb_z[i] - cam.pos.z;
+            if (ddx * ddx + ddz * ddz > 700.0f * 700.0f) continue;
+            float bx = tb_x[i], bz = tb_z[i], w = tb_w[i], d = tb_d[i];
+            unsigned int h = hash2((int)bx + 5, (int)bz - 9);
+            ground_strip(bx - w * 0.5f - 4.0f, bz, bx + w * 0.5f + 4.0f, bz, d * 0.5f + 4.0f, (h & 1) ? RGBA8(78, 156, 62, 255) : RGBA8(94, 160, 66, 255));
+            float zs = Z0 + roundf((bz - Z0) / S) * S;                                    // the nearest street, east-west
+            ground_strip(bx, bz, bx, zs + (bz > zs ? 7.0f : -7.0f), 1.3f, pave);
+        }
+    // roads out of town: east along the hangar row to the field, and south to the main east-west road
+    ground_strip(X1, Z0 + 3.0f * S, -140.0f, Z0 + 3.0f * S, 5.5f, asph);
+    ground_strip(X1, Z0 + 3.0f * S, -140.0f, Z0 + 3.0f * S, 0.15f, PAINT_Y);
+    ground_strip(X0 + 4.0f * S, Z0 - 10.0f, X0 + 4.0f * S, ROAD_Z, 5.5f, asph);
+    ground_strip(X0 + 4.0f * S, Z0 - 10.0f, X0 + 4.0f * S, ROAD_Z, 0.15f, PAINT_Y);
+#endif
+}
+
 // Two main streets and a little square in every town; close up, also pavements, crossings, a paved square and a yard and
 // path for every building.
 static void draw_town_streets(void) {
     draw_knowles_ground();
+    draw_downtown_ground();
     const unsigned int st = RGBA8(88, 88, 94, 255), sq = RGBA8(172, 160, 128, 255), pave = RGBA8(168, 168, 170, 255), zebra = RGBA8(230, 230, 232, 255);
     for (int n = 0; n < ntowns; n++) {
         float dx = town_x[n] - cam.pos.x, dz = town_z[n] - cam.pos.z, d2 = dx * dx + dz * dz;
