@@ -30,6 +30,12 @@ Your best scores and settings are kept in `ux0:data/skyhawk_scores.txt`, so upda
 
 The start menu is a big **Open World** button with a grid of tiles under it: Airport, Hangar, Weather, Time, Challenges, Options, Controls and Quit. Tap a tile, or move with the D-pad or left stick and press ✕. Pick an aircraft in the Hangar, set the airport, weather and time, then start flying.
 
+### AR view (the Hangar on your desk)
+
+In the Hangar, press **Square** (or tap **AR VIEW**) to switch on the Vita's back camera. Lay a card with a thick black square border on your desk and point the camera at it: the aircraft stands on the card. Use the Vita's own AR cards, or print `docs/ar_marker_a4.png` at 100% (a bigger card gives a steadier aircraft). Keep the whole black border in view and the card flat and matt.
+
+Up / Down change the aircraft, Left / Right turn it on the card, L / R change its size, Triangle steps the camera's field of view (60° is the usual best; if the aircraft seems to slide when you move the Vita, try another), X picks the aircraft for flying, O goes back. The green outline is what the game found; the red edge is the card's top (the aircraft's nose points that way).
+
 A typical takeoff in the K-4: flaps 10, full throttle, a little right rudder to hold the centre line, rotate at about 55 kt and climb at about 74 kt. Come in at about 65 kt with full flaps and flare just above the runway.
 
 | Input | Action |

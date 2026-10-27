@@ -89,6 +89,7 @@ static int  menu_ch_pick = -1;      // result: -1 = resume the running challenge
 static bool ch_running(void) { return ch_state == CH_FLYING || ch_state == CH_TOUCHED; }
 static int  menu_ap;                // airport picked for the open world (start and Triangle reset)
 static int  menu_ac;                // aircraft picked in the hangar for the next flight
+static int  ar_request;             // the hangar asked for the AR view (main.c starts it)
 static int  menu_hopen, menu_hsel;  // the hangar list is showing, and its highlighted row
 static float menu_hang;             // the turn of the aircraft in the hangar preview (radians)
 static float menu_hscroll;          // how far the hangar list is scrolled (pixels)
@@ -340,6 +341,7 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
         }
         if (pad->buttons & SCE_CTRL_LEFT)  menu_hang -= 0.035f;       // turn the picture
         if (pad->buttons & SCE_CTRL_RIGHT) menu_hang += 0.035f;
+        if (pressed & SCE_CTRL_SQUARE) { ar_request = 1; snd_event(EV_CONFIRM, 1.0f); }
         if (pressed & SCE_CTRL_CIRCLE) { menu_hopen = 0; snd_event(EV_CLICK, 1.0f); }
         if (pressed & SCE_CTRL_CROSS)  { menu_ac = menu_hsel; menu_hopen = 0; snd_event(EV_CONFIRM, 1.0f); }
         // Touch: tap a row to look at that aircraft, drag the list to scroll it, drag the picture to turn it, tap the buttons.
@@ -352,9 +354,11 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
                 if (hg_t.mode == 1) {
                     int row = (int)floorf((hg_t.ly - HG_LY + menu_hscroll) / HG_ROW);
                     if (row >= 0 && row < AC_COUNT) { menu_hsel = row; snd_event(EV_CLICK, 1.0f); }
-                } else if (hg_t.mode == 3 && hg_t.lx >= HG_PX && hg_t.lx <= HG_PX + 210.0f && hg_t.ly >= HG_BY && hg_t.ly <= HG_BY + HG_BH) {
+                } else if (hg_t.mode == 3 && hg_t.lx >= HG_PX && hg_t.lx <= HG_PX + 130.0f && hg_t.ly >= HG_BY && hg_t.ly <= HG_BY + HG_BH) {
                     menu_ac = menu_hsel; menu_hopen = 0; snd_event(EV_CONFIRM, 1.0f);
-                } else if (hg_t.mode == 3 && hg_t.lx >= HG_PX + 230.0f && hg_t.ly >= HG_BY && hg_t.ly <= HG_BY + HG_BH) {
+                } else if (hg_t.mode == 3 && hg_t.lx >= HG_PX + 140.0f && hg_t.lx <= HG_PX + 290.0f && hg_t.ly >= HG_BY && hg_t.ly <= HG_BY + HG_BH) {
+                    ar_request = 1; snd_event(EV_CONFIRM, 1.0f);
+                } else if (hg_t.mode == 3 && hg_t.lx >= HG_PX + 300.0f && hg_t.ly >= HG_BY && hg_t.ly <= HG_BY + HG_BH) {
                     menu_hopen = 0; snd_event(EV_CLICK, 1.0f);
                 }
             }
@@ -579,6 +583,35 @@ static void draw_title_block(float x, float y, unsigned int col) {
     }
 }
 
+// Shadow and model of the aircraft in `spec`, standing at the origin with the current camera: shared by the hangar picture and the AR view.
+static void hangar_draw_model(void) {
+    draw_plane_shadow();
+    npf = 0; pf_last = -1;
+    build_plane();
+    int ni = 0;
+    for (int k = 0; k < npf; k++) {
+        const PFace *pf = &pfaces[k];
+        if (pf->isdecal) continue;
+        if (!pf->twosided && vdot(pf->nrm, vsub(cam.pos, pf->c)) <= 0.0f) continue;
+        V3 d = vsub(pf->c, cam.pos);
+        float d2 = vdot(d, d);
+        if (pf->twosided && d2 > 1e-6f) { float dl = sqrtf(d2); dl -= 0.3f * (-vdot(pf->nrm, d) / dl); d2 = dl * dl; }
+        items[ni].dist = d2; items[ni].idx = MAX_FACES + k; ni++;
+    }
+    sort_items(ni);
+    for (int i = 0; i < ni; i++) {
+        const PFace *pf = &pfaces[items[i].idx - MAX_FACES];
+        if (pf->emit) draw_world_poly_emit(pf->p, pf->n, pf->color); else draw_world_poly(pf->p, pf->n, pf->color);
+        for (int d = 1; d <= pf->ndecals; d++) {
+            const PFace *dc = &pfaces[items[i].idx - MAX_FACES + d];
+            if (pf->twosided && !dc->emit && vdot(dc->nrm, vsub(cam.pos, dc->c)) <= 0.0f) continue;
+            if (dc->emit) draw_world_poly_emit(dc->p, dc->n, dc->color); else draw_world_poly(dc->p, dc->n, dc->color);
+        }
+    }
+    flush_batch();
+    npf = 0; pf_last = -1;
+}
+
 // The real 3D model of an aircraft, standing on a round pad, turned by `ang`, drawn in the picture box of the hangar. It borrows the
 // flight's camera and aircraft state for the moment and gives them back, so it is safe to call from the menu in the middle of a flight.
 static void draw_hangar_preview(int ac, float ang) {
@@ -605,31 +638,7 @@ static void draw_hangar_preview(int ac, float ang) {
         draw_world_poly(o, 8, RGBA8(52, 56, 66, 255));
         draw_world_poly(q, 8, RGBA8(112, 116, 126, 255));
     }
-    draw_plane_shadow();
-    npf = 0; pf_last = -1;
-    build_plane();
-    int ni = 0;
-    for (int k = 0; k < npf; k++) {
-        const PFace *pf = &pfaces[k];
-        if (pf->isdecal) continue;
-        if (!pf->twosided && vdot(pf->nrm, vsub(cam.pos, pf->c)) <= 0.0f) continue;
-        V3 d = vsub(pf->c, cam.pos);
-        float d2 = vdot(d, d);
-        if (pf->twosided && d2 > 1e-6f) { float dl = sqrtf(d2); dl -= 0.3f * (-vdot(pf->nrm, d) / dl); d2 = dl * dl; }
-        items[ni].dist = d2; items[ni].idx = MAX_FACES + k; ni++;
-    }
-    sort_items(ni);
-    for (int i = 0; i < ni; i++) {
-        const PFace *pf = &pfaces[items[i].idx - MAX_FACES];
-        if (pf->emit) draw_world_poly_emit(pf->p, pf->n, pf->color); else draw_world_poly(pf->p, pf->n, pf->color);
-        for (int d = 1; d <= pf->ndecals; d++) {
-            const PFace *dc = &pfaces[items[i].idx - MAX_FACES + d];
-            if (pf->twosided && !dc->emit && vdot(dc->nrm, vsub(cam.pos, dc->c)) <= 0.0f) continue;
-            if (dc->emit) draw_world_poly_emit(dc->p, dc->n, dc->color); else draw_world_poly(dc->p, dc->n, dc->color);
-        }
-    }
-    flush_batch();
-    npf = 0; pf_last = -1;
+    hangar_draw_model();
     pl = sv_pl; cam = sv_cam; spec = sv_spec; ac_flying = sv_ac; tod = sv_tod; g_focal = sv_f; g_near = sv_n; fog_vis = sv_vis; prop_phase = sv_ph;
 }
 
@@ -760,19 +769,18 @@ static void draw_menu(vita2d_pgf *pgf) {
         }
         {                                                                    // buttons
             bool chosen = (menu_hsel == menu_ac);
-            vita2d_draw_rectangle(HG_PX, HG_BY, 210, HG_BH, chosen ? RGBA8(40, 70, 60, 255) : RGBA8(30, 52, 96, 255));
-            vita2d_draw_rectangle(HG_PX + 230, HG_BY, HG_PW - 230, HG_BH, RGBA8(30, 52, 96, 255));
-            for (int b = 0; b < 2; b++) {
-                float bx = b ? HG_PX + 230 : HG_PX, bw = b ? HG_PW - 230 : 210;
-                vita2d_draw_rectangle(bx, HG_BY, bw, 1, gold); vita2d_draw_rectangle(bx, HG_BY + HG_BH - 1, bw, 1, gold);
-                vita2d_draw_rectangle(bx, HG_BY, 1, HG_BH, gold); vita2d_draw_rectangle(bx + bw - 1, HG_BY, 1, HG_BH, gold);
+            const float bxs[3] = { HG_PX, HG_PX + 140.0f, HG_PX + 300.0f }, bws[3] = { 130.0f, 150.0f, HG_PW - 300.0f };
+            const char *bl[3] = { chosen ? "SELECTED" : "SELECT", "AR VIEW", "BACK" };
+            for (int b = 0; b < 3; b++) {
+                unsigned int fillc = (b == 0 && chosen) ? RGBA8(40, 70, 60, 255) : (b == 1 ? RGBA8(36, 64, 110, 255) : RGBA8(30, 52, 96, 255));
+                vita2d_draw_rectangle(bxs[b], HG_BY, bws[b], HG_BH, fillc);
+                vita2d_draw_rectangle(bxs[b], HG_BY, bws[b], 1, gold); vita2d_draw_rectangle(bxs[b], HG_BY + HG_BH - 1, bws[b], 1, gold);
+                vita2d_draw_rectangle(bxs[b], HG_BY, 1, HG_BH, gold); vita2d_draw_rectangle(bxs[b] + bws[b] - 1, HG_BY, 1, HG_BH, gold);
+                vita2d_pgf_draw_text(pgf, (int)(bxs[b] + (bws[b] - vita2d_pgf_text_width(pgf, 1.0f, bl[b])) * 0.5f), HG_BY + 31, white, 1.0f, bl[b]);
             }
-            const char *l1 = chosen ? "SELECTED" : "SELECT", *l2 = "BACK";
-            vita2d_pgf_draw_text(pgf, (int)(HG_PX + (210 - vita2d_pgf_text_width(pgf, 1.1f, l1)) * 0.5f), HG_BY + 31, white, 1.1f, l1);
-            vita2d_pgf_draw_text(pgf, (int)(HG_PX + 230 + (HG_PW - 230 - vita2d_pgf_text_width(pgf, 1.1f, l2)) * 0.5f), HG_BY + 31, white, 1.1f, l2);
         }
         vita2d_pgf_draw_text(pgf, HG_LX, 508, pale, 0.66f, "Touch: tap an aircraft, drag the picture to turn it");
-        vita2d_pgf_draw_text(pgf, HG_LX, 525, pale, 0.66f, "Up / Down: choose   Left / Right: turn   X: select   O: back");
+        vita2d_pgf_draw_text(pgf, HG_LX, 525, pale, 0.66f, "Up / Down: choose   Left / Right: turn   X: select   Square: AR view   O: back");
     }
 
 
