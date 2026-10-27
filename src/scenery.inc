@@ -112,8 +112,7 @@ static bool in_lake(float x, float z, float grow) {
 // Downtown Knowles: the ground turns grey in and a little beyond the street grid.
 static float urban_k(float x, float z) {
 #if CITY_DETAIL > 0
-    float dx = fmaxf(fmaxf(CITY_X0 - x, x - CITY_X1), 0.0f), dz = fmaxf(fmaxf(CITY_Z0 - z, z - CITY_Z1), 0.0f);
-    return clampf(1.0f - sqrtf(dx * dx + dz * dz) / 500.0f, 0.0f, 1.0f);
+    return clampf(city_d(x, z) * 2.0f, 0.0f, 1.0f) * 0.6f;
 #else
     return 0.0f;
 #endif
@@ -215,7 +214,7 @@ static bool tree_ok(float x, float z) {
         ap_local(&AIRPORTS[AP_SPACE], x, z, &lx, &lz);
         if (lx > -120.0f && lx < 1500.0f && lz > -700.0f && lz < 2500.0f) return false;
     }
-    if (x > CITY_X0 - 60.0f && x < CITY_X1 + 60.0f && z > CITY_Z0 - 60.0f && z < CITY_Z1 + 60.0f) return false;     // downtown
+    if (city_d(x, z) > 0.07f) return false;                                  // downtown and its suburbs
     if (fabsf(x - KW_FX) < 520.0f && fabsf(z - KW_FZ) < 330.0f) return false;      // the factory
     if (fabsf(x - KW_VX) < 480.0f && fabsf(z - KW_VZ) < 360.0f) return false;      // and its village
     if (fabsf(x) < 320.0f && fabsf(z) < 1400.0f) return false;              // airport

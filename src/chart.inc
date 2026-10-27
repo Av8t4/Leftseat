@@ -169,10 +169,20 @@ static void draw_chart(vita2d_pgf *pgf) {
             if (ch_inmap(x, y, -w)) pb_quad((P2){ x - w, y - h }, (P2){ x + w, y - h }, (P2){ x + w, y + h }, (P2){ x - w, y + h }, RGBA8(190, 100, 66, 255));
         }
 #if CITY_DETAIL > 0
-        {                                                                          // downtown Knowles
-            float x0 = ch_sx(CITY_X0), x1 = ch_sx(CITY_X1), y0 = ch_sy(CITY_Z1), y1 = ch_sy(CITY_Z0);
-            if (x1 > CH_MX && x0 < CH_MX + CH_MW && y1 > CH_MY && y0 < CH_MY + CH_MH)
-            { P2 q[4] = { { x0, y0 }, { x1, y0 }, { x1, y1 }, { x0, y1 } }; ch_poly(q, 4, RGBA8(176, 168, 140, 255)); }
+        for (int r = 0; r < CITY_NR; r++) {                                                // downtown Knowles: the built-up blocks, a row at a time
+            float zc = CITY_Z0 + (r + 0.5f) * CITY_S, y0 = ch_sy(zc + CITY_S * 0.5f), y1 = ch_sy(zc - CITY_S * 0.5f);
+            if (y1 < CH_MY || y0 > CH_MY + CH_MH) continue;
+            int run = 0, c0 = 0;
+            for (int cc = 0; cc <= CITY_NC; cc++) {
+                bool on = cc < CITY_NC && city_d(CITY_X0 + (cc + 0.5f) * CITY_S, zc) > 0.20f;
+                if (run && !on) {
+                    float x0 = ch_sx(CITY_X0 + c0 * CITY_S), x1 = ch_sx(CITY_X0 + cc * CITY_S);
+                    P2 q[4] = { { x0, y0 }, { x1, y0 }, { x1, y1 }, { x0, y1 } };
+                    ch_poly(q, 4, RGBA8(176, 168, 140, 255));
+                    run = 0;
+                }
+                if (on && !run) { run = 1; c0 = cc; }
+            }
         }
 #endif
         for (int i = 0; i < ntowns; i++) {

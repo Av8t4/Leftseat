@@ -3,14 +3,19 @@
 
 typedef struct { float dist; int idx; } DrawItem;
 #define TREE_IDX0 (MAX_FACES + MAX_PFACES)      // items from here on are trees (index = TREE_IDX0 + position in trees[])
-static DrawItem items[MAX_FACES + MAX_PFACES + 256];
+#define LIGHT_IDX0 (TREE_IDX0 + 256)           // and from here on, lights (index = LIGHT_IDX0 + position in flights[])
+#define MAX_FLIGHTS 520
+typedef struct { float x, y, z, px, far; unsigned int col; } FLight;
+static FLight flights[MAX_FLIGHTS];
+static int nflights;
+static DrawItem items[MAX_FACES + MAX_PFACES + 256 + MAX_FLIGHTS];
 static int cmp_item(const void *a, const void *b) {
     float da = ((const DrawItem *)a)->dist, db = ((const DrawItem *)b)->dist;
     return (da < db) - (da > db);          // far to near
 }
 // Far-to-near order for the painter's algorithm. A radix sort on the float bits (distances are never negative, so their bit
 // patterns sort the same way the numbers do): linear time and stable, where qsort was about a third of the CPU time of a busy frame.
-static DrawItem items_tmp[MAX_FACES + MAX_PFACES + 256];
+static DrawItem items_tmp[MAX_FACES + MAX_PFACES + 256 + MAX_FLIGHTS];
 static void sort_items(int n) {
     DrawItem *src = items, *dst = items_tmp;
     for (int pass = 0; pass < 4; pass++) {
@@ -26,6 +31,37 @@ static void sort_items(int n) {
         DrawItem *t = src; src = dst; dst = t;
     }
     if (src != items) memcpy(items, src, (size_t)n * sizeof(DrawItem));
+}
+
+// After dark, the lights on and around buildings join the painter's queue, so a roof covers a light behind it and a light on a wall
+// shows in front of that wall. A light sorts a little nearer than its own distance, so it is drawn just after the building it sits on.
+static void add_flight(float x, float y, float z, float px, float far, unsigned int col, int *ni) {
+    float dx = x - cam.pos.x, dy = y - cam.pos.y, dz = z - cam.pos.z, d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 > far * far || nflights >= MAX_FLIGHTS) return;
+    if (dx * cam.f.x + dy * cam.f.y + dz * cam.f.z < 1.0f) return;                    // behind us
+    float d = sqrtf(d2) - 45.0f;
+    d = d < 1.0f ? 1.0f : d;
+    flights[nflights] = (FLight){ x, y, z, px, far, col };
+    items[*ni].dist = d * d; items[*ni].idx = LIGHT_IDX0 + nflights; (*ni)++;
+    nflights++;
+}
+static void collect_flights(int *ni) {
+    nflights = 0;
+    if (tod == TOD_DAY) return;
+    unsigned int win = RGBA8(255, 214, 130, 255), sodium = RGBA8(255, 196, 120, 255);
+    for (int i = 0; i < ntown_lights; i++) add_flight(town_lights[i].x, town_lights[i].y, town_lights[i].z, 1.5f, 3600.0f, win, ni);
+    for (int i = 0; i < nroof_lights; i++) {
+        const RoofLight *r = &roof_lights[i];
+        if (r->blink) { if ((frame_count % 70) < 40) add_flight(r->x, r->y, r->z, r->px, 16000.0f, r->col, ni); }
+        else add_flight(r->x, r->y, r->z, r->px, 6500.0f, r->col, ni);
+    }
+    for (int i = 0; i < nbridges; i++) {
+        float L = br_len[i] - 36.0f;
+        for (int e = -1; e <= 1; e += 2)
+            for (int sd = -1; sd <= 1; sd += 2)
+                add_flight(br_x[i] + br_dx[i] * e * L * 0.5f - br_dz[i] * sd * br_hw[i], 6.5f, br_z[i] + br_dz[i] * e * L * 0.5f + br_dx[i] * sd * br_hw[i], 1.6f, 3500.0f, sodium, ni);
+    }
+    if ((frame_count % 150) < 40) add_flight(sea_coast_x(LH_Z) - 240.0f, 31.5f, LH_Z, 3.4f, 40000.0f, RGBA8(255, 250, 220, 255), ni);   // the lighthouse
 }
 
 static void draw_scene(void) {
@@ -134,6 +170,7 @@ static void draw_scene(void) {
         V3 d = v3(trees[k].x - cam.pos.x, trees[k].y0 + trees[k].h * 0.4f - cam.pos.y, trees[k].z - cam.pos.z);
         items[ni].dist = vdot(d, d); items[ni].idx = TREE_IDX0 + k; ni++;
     }
+    collect_flights(&ni);
     npf = 0; pf_last = -1;
     if (view_mode != 0) build_plane();
     else {
@@ -162,7 +199,12 @@ static void draw_scene(void) {
     sort_items(ni);
     for (int i = 0; i < ni; i++) {
         int idx = items[i].idx;
-        if (idx >= TREE_IDX0) {
+        if (idx >= LIGHT_IDX0) {
+            const FLight *fl = &flights[idx - LIGHT_IDX0];
+            light_far = fl->far;
+            draw_light(fl->x, fl->y, fl->z, fl->px, fl->col);
+            light_far = 9000.0f;
+        } else if (idx >= TREE_IDX0) {
             draw_tree(&trees[idx - TREE_IDX0]);
         } else if (idx < MAX_FACES) {
             const Face *f = &faces[idx];
