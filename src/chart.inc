@@ -8,7 +8,7 @@ static ChTouch g_touch;                                                         
 #define CH_MY 10.0f
 #define CH_MW 600.0f
 #define CH_MH 524.0f
-#define CH_S0 (CH_MH / 48600.0f)                                                 // pixels per metre when the whole area is on show
+#define CH_S0 (CH_MH / 48600.0f)                                                 // pixels per meter when the whole area is on show
 #define CH_X0 (CH_MX + CH_MW + 16.0f)                                            // the side column
 #define CH_LT 84.0f                                                              // the airport list window
 #define CH_LB 398.0f
@@ -301,7 +301,7 @@ static void draw_chart(vita2d_pgf *pgf) {
             vita2d_draw_rectangle(bx, CH_BY, BW[i], CH_BH, RGBA8(30, 52, 96, 255));
             vita2d_draw_rectangle(bx, CH_BY, BW[i], 1, gold); vita2d_draw_rectangle(bx, CH_BY + CH_BH - 1, BW[i], 1, gold);
             vita2d_draw_rectangle(bx, CH_BY, 1, CH_BH, gold); vita2d_draw_rectangle(bx + BW[i] - 1, CH_BY, 1, CH_BH, gold);
-            if (i == 2) {                                                          // "centre on me": the same arrow that marks you on the map
+            if (i == 2) {                                                          // "center on me": the same arrow that marks you on the map
                 float cx = bx + BW[i] * 0.5f, cy = CH_BY + CH_BH * 0.5f;
                 pb_tri((P2){ cx, cy - 15.0f }, (P2){ cx - 8.0f, cy + 12.0f }, (P2){ cx + 8.0f, cy + 12.0f }, RGBA8(255, 220, 60, 255));
                 pb_flush();
@@ -312,7 +312,7 @@ static void draw_chart(vita2d_pgf *pgf) {
         }
     }
     vita2d_pgf_draw_text(pgf, x0, 482, dim, 0.68f, "Touch: drag the map, pinch to zoom, tap an airport");
-    vita2d_pgf_draw_text(pgf, x0, 502, dim, 0.68f, "D-pad / stick: move   L / R: zoom   X: centre on me");
+    vita2d_pgf_draw_text(pgf, x0, 502, dim, 0.68f, "D-pad / stick: move   L / R: zoom   X: center on me");
     vita2d_pgf_draw_text(pgf, x0, 522, dim, 0.68f, "Square: next airport   O / SELECT / START: resume");
 }
 

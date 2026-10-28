@@ -64,7 +64,7 @@ static void ar_open(int ac) {
 
 // Turn the smoothed pose into the game's camera: the card is the ground, the aircraft stands on its middle.
 // Card space: x right, y down, z away from you (into the table). Game space: x right, y up, z forward (nose along the card's top edge).
-// A card side is `side` metres of aircraft.
+// A card side is `side` meters of aircraft.
 static void ar_set_cam(float side) {
     float R[3][3], t[3];
     memcpy(R, ar_R, sizeof R); memcpy(t, ar_t, sizeof t);
@@ -167,7 +167,7 @@ static void ar_step(const SceCtrlData *pad, unsigned int pressed) {
 
 static void ar_draw(vita2d_pgf *pgf) {
     const unsigned int white = RGBA8(255, 255, 255, 255), gold = RGBA8(255, 206, 130, 255), pale = RGBA8(190, 205, 235, 255);
-    if (ar_tex) vita2d_draw_texture_scale(ar_tex, 0.0f, CY - ARD_H, 2.0f, 2.0f);              // picture centre on the 3D window's centre
+    if (ar_tex) vita2d_draw_texture_scale(ar_tex, 0.0f, CY - ARD_H, 2.0f, 2.0f);              // picture center on the 3D window's center
     else vita2d_draw_rectangle(0, 0, SCREEN_W, VIEW_H, RGBA8(20, 24, 34, 255));
     bool show = ar_have_pose && ar_lost < 30;
     if (show) {                                                                              // the aircraft on the card

@@ -1,4 +1,4 @@
-// Left Seat: flying with the Vita's motion sensor. Tilt the Vita like a control column: left / right is roll, top edge towards you is nose up.
+// Left Seat: flying with the Vita's motion sensor. Tilt the Vita like a control column: left / right is roll, top edge toward you is nose up.
 // The tilt is measured from the way you hold it when the flight starts (or when you press SELECT + Triangle), so any comfortable grip works.
 // Part of Left Seat's single translation unit: this file is #included by main.c, in order.
 
@@ -6,9 +6,9 @@ static int   gy_mode;                     // flight controls: 0 = sticks, 1 = gy
 static int   gy_rinv, gy_pinv;            // 1 = roll / pitch direction reversed
 static int   gy_sens = 1;                 // 0 = low (tilt far), 1 = medium, 2 = high (tilt a little)
 static float gy_f[3] = { 0.0f, 1.0f, 0.0f };   // the filtered direction of gravity in the Vita's own axes
-static float gy_n[3] = { 0.0f, 1.0f, 0.0f };   // ... as held when centred
+static float gy_n[3] = { 0.0f, 1.0f, 0.0f };   // ... as held when centerd
 static bool  gy_have, gy_ncal;
-static float gy_roll_deg, gy_pitch_deg;   // tilt from the centred position in degrees: roll right is positive, top edge away from you is positive
+static float gy_roll_deg, gy_pitch_deg;   // tilt from the centerd position in degrees: roll right is positive, top edge away from you is positive
 static float gy_ail, gy_ele;              // what the tilt asks for: -1..1 (aileron right positive, elevator nose up positive)
 
 static const float GY_FULL[3] = { 40.0f, 28.0f, 18.0f };      // degrees of tilt for full control
@@ -36,7 +36,7 @@ static void gyro_sample(void) {
     if (sqrtf(py0 * py0 + pz0 * pz0) > 0.3f && sqrtf(py * py + pz * pz) > 0.25f)
         gy_pitch_deg = atan2f(py0 * pz - pz0 * py, py0 * py + pz0 * pz) * 57.29578f;
     float full = GY_FULL[gy_sens < 0 ? 0 : (gy_sens > 2 ? 2 : gy_sens)];
-    float r = gy_roll_deg, p = -gy_pitch_deg;                      // pulling the top edge towards you is nose up
+    float r = gy_roll_deg, p = -gy_pitch_deg;                      // pulling the top edge toward you is nose up
     r = (fabsf(r) <= GY_DEAD) ? 0.0f : (r > 0.0f ? r - GY_DEAD : r + GY_DEAD);
     p = (fabsf(p) <= GY_DEAD) ? 0.0f : (p > 0.0f ? p - GY_DEAD : p + GY_DEAD);
     gy_ail = clampf(r / (full - GY_DEAD), -1.0f, 1.0f) * (gy_rinv ? -1.0f : 1.0f);

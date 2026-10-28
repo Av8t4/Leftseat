@@ -5,7 +5,7 @@
 /* ------------------------------------------------------------------ */
 /* The aircraft                                                         */
 /* ------------------------------------------------------------------ */
-// z forward, y up from the ground, origin under the centre of gravity. The windshield stands steeply (about 40 degrees).
+// z forward, y up from the ground, origin under the center of gravity. The windshield stands steeply (about 40 degrees).
 static const KS KS_K10[] = {
     {  4.45f, 0.42f, 1.40f, 2.00f, 1.70f, 2.4f, 2.4f, 2.3f },
     {  3.90f, 0.52f, 1.30f, 2.12f, 1.72f, 2.5f, 2.5f, 2.4f },
@@ -75,13 +75,13 @@ static void build_k10(void) {
         prism(sx * 2.90f, 1.94f, 0.18f, sx * 3.30f, 2.72f, 0.14f, 0.015f, 0.055f, 238, 240, 244);              // jury strut
         prism(sx * 0.96f, 1.32f, -0.45f, sx * 1.74f, 0.60f, -0.55f, 0.050f, 0.095f, p->metal[0], p->metal[1], p->metal[2]);   // main gear leg
         prism(sx * 0.96f, 0.98f, -0.22f, sx * 1.72f, 0.54f, -0.50f, 0.026f, 0.050f, p->metal[0], p->metal[1], p->metal[2]);   // brace
-        a_tyre(sx * 1.82f, 0.37f, -0.55f, 0.37f, 0.125f, sx, p);
+        a_tire(sx * 1.82f, 0.37f, -0.55f, 0.37f, 0.125f, sx, p);
         prism(sx * 0.58f, 1.70f, 3.40f, sx * 0.80f, 2.06f, 2.90f, 0.045f, 0.055f, 62, 62, 68);                  // exhaust stack
         prism(sx * 0.40f, 1.88f, -6.92f, sx * 1.55f, 2.26f, -6.96f, 0.020f, 0.045f, 238, 240, 244);              // tail strut
     }
     prism(0, 1.34f, 2.55f, 0, 0.34f, 2.75f, 0.042f, 0.065f, p->metal[0], p->metal[1], p->metal[2]);           // nose gear
     prism(0.0f, 0.52f, 2.84f, 0.0f, 0.46f, 2.66f, 0.014f, 0.024f, 20, 20, 24);
-    a_tyre(0, 0.30f, 2.75f, 0.30f, 0.075f, 0, p);
+    a_tire(0, 0.30f, 2.75f, 0.30f, 0.075f, 0, p);
     prism(0, 2.70f, -1.40f, 0, 3.12f, -1.78f, 0.006f, 0.013f, 40, 40, 48);                                    // antenna
     build_prop(0);
 }

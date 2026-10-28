@@ -50,12 +50,12 @@ static void draw_result(vita2d_pgf *pgf) {
         float d = chr.z + 1000.0f;
         char v[5][56];
         snprintf(v[0], 56, "%.1f m/s (%d fpm)", chr.sink, (int)(chr.sink * 196.85f));
-        snprintf(v[1], 56, "%.0f m %s of the centre line", fabsf(chr.x), chr.x < 0 ? "left" : "right");
+        snprintf(v[1], 56, "%.0f m %s of the center line", fabsf(chr.x), chr.x < 0 ? "left" : "right");
         if (d < 0) snprintf(v[2], 56, "%.0f m SHORT of the runway", -d);
         else       snprintf(v[2], 56, "%.0f m past the threshold", d);
         snprintf(v[3], 56, "heading %+.0f, bank %+.0f", chr.hdg_err, chr.bank_deg);
         snprintf(v[4], 56, "%d bounce%s%s", chr.bounces, chr.bounces == 1 ? "" : "s", chr.nose_first ? ", nose wheel first" : "");
-        static const char *label[5] = { "Sink rate", "Centre line", "Touchdown", "Attitude", "Penalties" };
+        static const char *label[5] = { "Sink rate", "Center line", "Touchdown", "Attitude", "Penalties" };
         int pts[5] = { chr.p_sink, chr.p_line, chr.p_point, chr.p_att, -chr.penalty };
         int mx[5]  = { 40, 25, 25, 10, 0 };
         for (int i = 0; i < 5; i++) {
@@ -142,7 +142,7 @@ static const char *op_desc(int r) {
     if (r == 0) return "Engine and effects volume";
     if (r == 1) return gy_mode ? "Tilt to fly (sticks still work)" : "The sticks fly the aircraft";
     if (r == 2) return gy_rinv ? "Tilting right rolls LEFT" : "Tilting right rolls right";
-    if (r == 3) return gy_pinv ? "Top edge towards you is nose DOWN" : "Top edge towards you is nose up";
+    if (r == 3) return gy_pinv ? "Top edge toward you is nose DOWN" : "Top edge toward you is nose up";
     return "How far you tilt for full control";
 }
 static int  menu_tod;              // time of day for the next flight: day, dusk or night
@@ -223,7 +223,7 @@ static const char *pk_l1(int kind, int i) {
     if (kind == 5) return T[i];
     if (kind == 7) return i ? "Tilt the Vita like a control column" : "Left stick pitch and roll, right stick throttle and rudder";
     if (kind == 9) return i ? "Tilt right to roll left" : "Tilt right to roll right";
-    if (kind == 10) return i ? "Top edge towards you is nose down" : "Top edge towards you is nose up";
+    if (kind == 10) return i ? "Top edge toward you is nose down" : "Top edge toward you is nose up";
     if (kind == 11) { static const char *const N[3] = { "Tilt about 40 degrees for full control", "Tilt about 28 degrees for full control", "Tilt about 18 degrees for full control" }; return N[i]; }
     if (kind == 8) {
         static char b[48];
@@ -250,8 +250,8 @@ static const char *pk_l2(int kind, int i) {
     }
     if (kind == 4) return W[i];
     if (kind == 5) return T[i];
-    if (kind == 7) return i ? "SELECT + Triangle centres the tilt in flight." : "The standard way to fly.";
-    if (kind == 9 || kind == 10 || kind == 11) return "Tilt the Vita and watch the bars. SELECT + Triangle centres it.";
+    if (kind == 7) return i ? "SELECT + Triangle centers the tilt in flight." : "The standard way to fly.";
+    if (kind == 9 || kind == 10 || kind == 11) return "Tilt the Vita and watch the bars. SELECT + Triangle centers it.";
     if (kind == 8) { static const char *const D[5] = { "Set how loud the engine and effects are.", "Choose sticks or tilt to steer the aircraft.", "Which way the Vita rolls the aircraft.", "Which way the Vita pitches the aircraft.", "How far you have to tilt for full control." }; return D[i]; }
     return S[i & 3];
 }
@@ -971,7 +971,7 @@ static void draw_menu(vita2d_pgf *pgf) {
             vita2d_pgf_draw_text(pgf, px - 24, OP_PY + 22, pale, 0.6f, "NOSE UP");
             vita2d_pgf_draw_text(pgf, px - 32, OP_PY + 206, pale, 0.6f, "NOSE DOWN");
             vita2d_pgf_draw_text(pgf, OP_PX + 14, OP_PY + OP_PH - 38, dimc, 0.6f, gy_have ? "Tilt the Vita: the bars show what it asks of the aircraft." : "No motion data");
-            vita2d_pgf_draw_text(pgf, OP_PX + 14, OP_PY + OP_PH - 18, dimc, 0.6f, "In flight, SELECT + Triangle centres the tilt.");
+            vita2d_pgf_draw_text(pgf, OP_PX + 14, OP_PY + OP_PH - 18, dimc, 0.6f, "In flight, SELECT + Triangle centers the tilt.");
         }
         vita2d_draw_rectangle(HG_LX, OP_DY, 210, HG_BH, RGBA8(30, 52, 96, 255));
         vita2d_draw_rectangle(HG_LX, OP_DY, 210, 1, gold); vita2d_draw_rectangle(HG_LX, OP_DY + HG_BH - 1, 210, 1, gold);
@@ -996,7 +996,7 @@ static void draw_menu(vita2d_pgf *pgf) {
             { "Square",                    "Landing gear up / down (K-30 and A22)" },
             { "Triangle",                  "Reset the aircraft (restart the attempt in a challenge)" },
             { "Select (tap)",              "Switch camera: cockpit / chase" },
-            { "Select + Triangle",         "Gyro controls: centre the tilt where the Vita is now" },
+            { "Select + Triangle",         "Gyro controls: center the tilt where the Vita is now" },
             { "Select (hold)",             "Chart (L / R scroll the list)" },
             { "L + R + Select",            "Invert the pitch axis" },
             { "START",                     "Pause and return to the menu" },

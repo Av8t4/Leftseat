@@ -57,7 +57,7 @@ static void ard_apply(const float h[8], float x, float y, float *u, float *v) {
     *v = (h[3] * x + h[4] * y + h[5]) / w;
 }
 
-// Grey picture and the "dark" map (a pixel that is clearly darker than the area around it, or simply very dark).
+// Gray picture and the "dark" map (a pixel that is clearly darker than the area around it, or simply very dark).
 // rows: the camera picture, `stride` bytes per row.
 static void ard_prepare(const uint8_t *img, int stride) {
     static uint8_t row[ARD_W * 4];
@@ -239,7 +239,7 @@ static bool ar_detect(const uint8_t *img, int stride, ArHit *out) {
         for (int e = 0; e < 4; e++) {
             int f = (e + 1) & 3;
             float ex = P[f][0] - P[e][0], ey = P[f][1] - P[e][1], L = sqrtf(ex * ex + ey * ey);
-            float nx = -ey / L, ny = ex / L;                               // towards the inside of a clockwise shape (y down)
+            float nx = -ey / L, ny = ex / L;                               // toward the inside of a clockwise shape (y down)
             for (int k = 0; k < 5; k++) {
                 float t = 0.2f + 0.15f * k, px = P[e][0] + ex * t + nx * 0.045f * L, py = P[e][1] + ey * t + ny * 0.045f * L;
                 dark_t++; if (ard_is_dark(px, py)) dark_n++;
@@ -265,8 +265,8 @@ static bool ar_detect(const uint8_t *img, int stride, ArHit *out) {
 }
 
 // The pose of the card from its four corners (picture pixels, in the order of the card: top left, top right, bottom right, bottom left),
-// for a camera of focal length `f` pixels with its centre in the middle of the picture. The card is a unit square lying in the x-y plane
-// (x to the right, y down, z away from you), centred on the origin. R is the card-to-camera turn, t the card centre in camera space.
+// for a camera of focal length `f` pixels with its center in the middle of the picture. The card is a unit square lying in the x-y plane
+// (x to the right, y down, z away from you), centerd on the origin. R is the card-to-camera turn, t the card center in camera space.
 static bool ar_pose(const float c[4][2], float f, float R[3][3], float t[3]) {
     float src[4][2] = { {-0.5f, -0.5f}, {0.5f, -0.5f}, {0.5f, 0.5f}, {-0.5f, 0.5f} }, dst[4][2], h[8];
     for (int i = 0; i < 4; i++) { dst[i][0] = (c[i][0] - ARD_W * 0.5f) / f; dst[i][1] = (c[i][1] - ARD_H * 0.5f) / f; }

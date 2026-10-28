@@ -92,11 +92,11 @@ static void reset_free(void)   { reset_plane_at(start_ap); }      // open world:
 static float stick(unsigned char v) {
     float f = ((int)v - 128) / 128.0f, a = fabsf(f);
     if (a < 0.12f) return 0.0f;                          // dead zone, with the response starting from zero at its edge
-    a = (a - 0.12f) / 0.88f;                             // (so there is no sudden step as the stick leaves the centre)
+    a = (a - 0.12f) / 0.88f;                             // (so there is no sudden step as the stick leaves the center)
     return f < 0.0f ? -a : a;
 }
 
-// Response curve: gentle near centre for fine control, full range at the ends.
+// Response curve: gentle near center for fine control, full range at the ends.
 static float shape(float x) { return 0.4f * x + 0.6f * x * fabsf(x); }
 
 static bool hit_scenery(void) {

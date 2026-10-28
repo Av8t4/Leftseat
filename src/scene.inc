@@ -105,7 +105,7 @@ static void draw_scene(void) {
     {
         int i0 = (int)floorf(cam.pos.x / TILE), j0 = (int)floorf(cam.pos.z / TILE);
         int tr = wx_tile_radius();
-        bool alltiles = fog_vis < 9000.0f;               // in haze the base colour fades, so draw every tile
+        bool alltiles = fog_vis < 9000.0f;               // in haze the base color fades, so draw every tile
         for (int dj = -tr; dj <= tr; dj++) {
             for (int di = -tr; di <= tr; di++) {
                 int i = i0 + di, j = j0 + dj;

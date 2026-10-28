@@ -1,4 +1,4 @@
-// Left Seat: a small kit for building smooth aircraft models: lofted fuselage sections, airfoil wings, tail surfaces, tyres.
+// Left Seat: a small kit for building smooth aircraft models: lofted fuselage sections, airfoil wings, tail surfaces, tires.
 // Used by the K-10 and the Jet 1.
 // Part of Left Seat's single translation unit: this file is #included by main.c, in order.
 
@@ -41,7 +41,7 @@ static void ks_ring(V3 *out, const KS *s, float xoff) {
 
 typedef struct { unsigned char body[3], a1[3], a2[3], lower[3], glass[3], tire[3], metal[3], tip[3]; } Paint;
 
-static void paint_face(const Paint *p, int e, float *r, float *g, float *b) {   // colour by where the face sits round the section
+static void paint_face(const Paint *p, int e, float *r, float *g, float *b) {   // color by where the face sits round the section
     int s = e <= 5 ? e : 11 - e;                                             // 0 top ... 5 belly, mirrored on the left
     const unsigned char *c = p->body; float k = 1.0f;
     if (s == 0) k = 1.0f; else if (s == 1) k = 0.97f; else if (s == 2) k = 0.95f;
@@ -262,8 +262,8 @@ static void a_stab(const AStab *H, int sx, float dy, const Paint *p) {
     pf_poly(6, sec[H->n - 1], &cc, p->tip[0], p->tip[1], p->tip[2], 0, 255);
 }
 
-// Tyre with a hub and brake disc.
-static void a_tyre(float cx, float cy, float cz, float rad, float hw, int side, const Paint *p) {
+// Tire with a hub and brake disc.
+static void a_tire(float cx, float cy, float cz, float rad, float hw, int side, const Paint *p) {
     enum { T = (MODEL_DETAIL >= 2) ? 14 : 10 };
     V3 r0[T], r1[T];
     for (int i = 0; i < T; i++) { float a = i * 2.0f * PI_F / T, y = cy + rad * cosf(a), z = cz + rad * sinf(a); r0[i] = MW(cx - hw, y, z); r1[i] = MW(cx + hw, y, z); }

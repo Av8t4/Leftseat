@@ -7,7 +7,7 @@
 #define CX         (SCREEN_W / 2.0f)
 #define CY         (VIEW_H / 2.0f)
 #define FOCAL      g_focal            // pixels; the tower camera zooms by changing this
-#define NEAR_Z     g_near             // metres; very close in the cockpit so the wings show from the seat
+#define NEAR_Z     g_near             // meters; very close in the cockpit so the wings show from the seat
 #define PI_F       3.14159265f
 #define G_ACC      9.81f
 #define DT         (1.0f / 60.0f)

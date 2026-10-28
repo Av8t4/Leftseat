@@ -28,7 +28,7 @@ static void pb_needle(float cx, float cy, float ang_deg, float len, float tail, 
     P2 rr = { cx + sa * hw, cy - ca * hw }, tl = { cx - ca * tail, cy - sa * tail };
     pb_quad(tip, l, tl, rr, col);
 }
-// Coloured band between two scale values.
+// Colored band between two scale values.
 static void pb_arc(float cx, float cy, float r0, float r1, float start, float sweep, float f0, float f1, unsigned int col) {
     int n = 2 + (int)(fabsf(sweep * (f1 - f0)) / 8.0f);
     for (int i = 0; i < n; i++) {

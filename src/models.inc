@@ -29,7 +29,7 @@ static int   npf, pf_last;
 static float prop_phase;
 static const V3 SUN = { 0.50f, 0.78f, 0.37f };
 
-// Colours (r, g, b) used by the model.
+// Colors (r, g, b) used by the model.
 #define C_WHITE  246, 247, 250
 #define C_LGRAY  218, 224, 234
 #define C_GRAY   150, 156, 168
@@ -40,7 +40,7 @@ static const V3 SUN = { 0.50f, 0.78f, 0.37f };
 #define C_STEEL  96, 102, 112
 #define C_YELLOW 246, 200, 44
 
-// Model space: x right, y up from the ground, z forward, origin under the centre of gravity.
+// Model space: x right, y up from the ground, z forward, origin under the center of gravity.
 // The aircraft pivots about a point 1.15 m above the wheels.
 static V3 MW(float x, float y, float z) {
     V3 o = v3(pl.pos.x, pl.pos.y + spec->piv_y, pl.pos.z);
@@ -309,7 +309,7 @@ static void prism(float ax, float ay, float az, float bx, float by, float bz, fl
     }
 }
 
-// Tyre: octagonal cylinder along the x axis.
+// Tire: octagonal cylinder along the x axis.
 static void wheel(float cx, float cy, float cz, float rad, float hw, int hub_side) {
     V3 r0[8], r1[8];
     for (int i = 0; i < 8; i++) {
@@ -411,7 +411,7 @@ static void build_k4(void) {
         prism(sx * 0.50f, 0.85f, 0.30f, sx * 2.70f, 2.04f, 0.12f, 0.022f, 0.075f, 232, 234, 240);   // wing strut
         prism(sx * 0.30f, 0.82f, -0.12f, sx * 1.18f, 0.42f, -0.14f, 0.030f, 0.070f, C_STEEL);        // main gear leg
         loft_body(PANT, 4, sx * 1.25f, EC_PANT, 0, 0);                                                // wheel fairing
-        wheel(sx * 1.25f, 0.30f, -0.14f, 0.30f, 0.07f, sx);                                           // tyre
+        wheel(sx * 1.25f, 0.30f, -0.14f, 0.30f, 0.07f, sx);                                           // tire
     }
     prism(0, 0.68f, 1.55f, 0, 0.30f, 1.62f, 0.030f, 0.045f, C_STEEL);                                 // nose gear
     wheel(0, 0.24f, 1.62f, 0.24f, 0.05f, 0);

@@ -3,7 +3,7 @@
 // Length 8.6 m, span 9.8 m, height 3.4 m.
 // Part of Left Seat's single translation unit: this file is #included by main.c, in order.
 
-// z forward, y up from the ground, origin under the centre of gravity.
+// z forward, y up from the ground, origin under the center of gravity.
 static const KS KS_A11[] = {                                                        // the cabin pod
     {   4.70f, 0.28f, 0.88f, 1.32f, 1.10f, 2.4f, 2.4f, 2.3f },
     {   4.30f, 0.50f, 0.80f, 1.60f, 1.20f, 2.5f, 2.5f, 2.4f },
@@ -73,10 +73,10 @@ static void a11_wings(const Paint *p) {
 // Fixed tricycle gear: each main leg comes down from the pod's belly, and the nose leg from under the nose.
 static void build_a11_gear(const Paint *p) {
     prism(0.0f, 1.00f, 4.00f, 0.0f, 0.24f, 3.95f, 0.04f, 0.07f, p->metal[0], p->metal[1], p->metal[2]);
-    a_tyre30(0.0f, 0.24f, 3.95f, 0.24f, 0.08f, p);
+    a_tire30(0.0f, 0.24f, 3.95f, 0.24f, 0.08f, p);
     for (int sx = -1; sx <= 1; sx += 2) {
         prism(sx * 1.00f, 0.95f, -0.55f, sx * 1.15f, 0.30f, -0.55f, 0.05f, 0.09f, p->metal[0], p->metal[1], p->metal[2]);
-        a_tyre30(sx * 1.15f, 0.30f, -0.55f, 0.30f, 0.10f, p);
+        a_tire30(sx * 1.15f, 0.30f, -0.55f, 0.30f, 0.10f, p);
     }
 }
 

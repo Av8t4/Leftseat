@@ -29,7 +29,7 @@ static void draw_overlays(vita2d_pgf *pgf) {
         else                    vita2d_pgf_draw_textf(pgf, 540, 28, gold, 0.8f, "%s CHALLENGE", CK_NAMES[ch_kind]);
         if (ch_state == CH_FLYING && ch_t < (ch_trip() ? 14.0f : 10.0f)) {
             static const char *const L1[CK_COUNT] = {
-                "Land smoothly near the aiming-point markings, on the centre line.",
+                "Land smoothly near the aiming-point markings, on the center line.",
                 "The engine has failed! Hold about 70 kt and glide to the runway.",
                 "Strong crosswind: point the nose into the wind to track the runway.",
                 "Take off and fly to Redrock Municipal, about 16 NM to the north-north-east.",

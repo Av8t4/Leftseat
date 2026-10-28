@@ -5,7 +5,7 @@
 /* Weather scenery: cloud puffs, a windsock and rain streaks            */
 /* ------------------------------------------------------------------ */
 
-// Cloud puffs on a drifting grid around the camera. Each is a low dome with a flat grey underside.
+// Cloud puffs on a drifting grid around the camera. Each is a low dome with a flat gray underside.
 static void build_clouds(void) {
     float inside = 0.0f;
     if (wx.cloud >= 0.12f) {
@@ -41,7 +41,7 @@ static void build_clouds(void) {
                     V3 t0[3] = { bc, ring0[j], ring0[k] };
                     V3 q[4]  = { ring0[j], ring0[k], ring1[k], ring1[j] };
                     V3 t1[3] = { ring1[j], ring1[k], apex };
-                    pf_poly(3, t0, &mid, cr * 0.74f, cg * 0.74f, cb * 0.76f, PF_EMIT, 255);   // soft grey underside
+                    pf_poly(3, t0, &mid, cr * 0.74f, cg * 0.74f, cb * 0.76f, PF_EMIT, 255);   // soft gray underside
                     pf_poly(4, q,  &mid, cr, cg, cb, 0, 255);
                     pf_poly(3, t1, &mid, cr, cg, cb, 0, 255);
                 }
@@ -91,7 +91,7 @@ static void build_windsock_at(float px, float pz) {
 
 static void build_windsock(void) { build_windsock_at(62.0f, -430.0f); }              // the one beside the home runway
 
-// Rain: streaks that fly out from the centre of the view.
+// Rain: streaks that fly out from the center of the view.
 static float wrapf(float x, float b) { return x - b * floorf(x / b + 0.5f); }
 
 // Rain falls through the world (slanted by the wind) and we fly through it. Each drop is a short streak whose

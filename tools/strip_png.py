@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Remove every optional chunk from a PNG (metadata, colour profiles, content-credential blocks, ...).
+"""Remove every optional chunk from a PNG (metadata, color profiles, content-credential blocks, ...).
 
 The PS Vita's icon loader can refuse PNGs that carry extra chunks and then shows a plain white icon.
 Only the chunks needed to draw the picture are kept: IHDR, PLTE, tRNS, IDAT and IEND.
