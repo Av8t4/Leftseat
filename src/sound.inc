@@ -85,11 +85,11 @@ static void snd_game_update(const SceCtrlData *pad) {
     memset(&in, 0, sizeof(in));                                     // every field starts at nothing, so nothing is left switched on
     in.volume = LEVELS[snd_level & 3];
     for (int e = 0; e < EV_COUNT; e++) { in.ev[e] = snd_evc[e]; in.ev_val[e] = snd_evv[e]; }
-    const bool flying = (game_state == ST_FLY);
+    const bool flying = (game_state == ST_FLY) && !chart_open;       // the chart pauses the flight, so it pauses the engine, wind and rain too
     in.aircraft_sound = flying ? 1 : 0;
     in.doppler = 1.0f;
 
-    if (!flying) {                                                  // in the menu or on the score card: only the clicks and jingles
+    if (!flying) {                                                  // in the menu, on the chart or on the score card: only the clicks and jingles
         was_flying = false;
         snd_in = in;
         return;
