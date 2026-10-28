@@ -137,10 +137,11 @@ static void snd_render(SndSt *s, const SndIn *inp, int16_t *out, int n) {
         const float far_k = view == 2 ? 1.0f / (1.0f + s->s_dist / 90.0f) : 1.0f;
         const float dop = view == 2 ? s->s_dop : 1.0f;
         const float eng_gain = (view == 0 ? 0.80f : (view == 1 ? 1.0f : 1.35f * far_k)) * s->s_on;
-        const float wind_gain = (view == 0 ? 1.0f : (view == 1 ? 0.55f : 0.12f * far_k)) * s->s_on;
+        const float wind_gain = (view == 0 ? (in.engine_kind == SND_JET ? 0.22f : 1.0f) : (view == 1 ? 0.55f : 0.12f * far_k)) * s->s_on;
         float a_e = view == 0 ? snd_lpa(520.0f + 2000.0f * s->s_load * bright) : snd_lpa(1500.0f + 3200.0f * s->s_load * bright);   // piston exhaust brightness
         float a_e2 = view == 0 ? snd_lpa(950.0f + 1700.0f * bright) : snd_lpa(1200.0f + 3000.0f * bright);
-        float a_cp = snd_lpa(3200.0f);                                           // the cabin muffles everything a little
+        const int jet_cab = (view == 0 && in.engine_kind == SND_JET);           // a jet's cabin is quiet: soft whine, a low hum, hardly any roar or wind
+        float a_cp = snd_lpa(jet_cab ? 1500.0f : 3200.0f);                       // the cabin muffles everything a little
         float a_chop = snd_lpa(450.0f + 500.0f * s->s_load);
         float a_wind = snd_lpa(70.0f + 11.0f * s->s_air);
         float a_rum = snd_lpa(170.0f), a_bump = snd_lpa(55.0f);
@@ -225,10 +226,10 @@ static void snd_render(SndSt *s, const SndIn *inp, int16_t *out, int n) {
                 float tone = sinf(6.2831853f * s->ph_w1) * 0.6f + sinf(6.2831853f * s->ph_w2) * 0.25f;
                 float tone_amp = (0.50f + 0.50f * n1) * 0.26f * (0.3f + 0.7f * run + 0.2f * (1.0f - run));
                 s->j_lp1 += (nz - s->j_lp1) * a_roar_hi; s->j_lp2 += (nz - s->j_lp2) * a_roar_lo;
-                float roar = (s->j_lp1 - s->j_lp2) * (0.12f + 0.88f * powf(n1, 1.7f)) * 1.3f * (0.35f + 0.65f * run);
+                float roar = (s->j_lp1 - s->j_lp2) * (0.12f + 0.88f * powf(n1, 1.7f)) * 1.3f * (0.35f + 0.65f * run) * (view == 0 ? 0.22f : 1.0f);
                 s->j_lp3 += (nz - s->j_lp3) * snd_lpa(110.0f);
                 float rumble = s->j_lp3 * powf(n1, 1.2f) * 0.8f;
-                ya += eng_gain * 0.50f * (tone * tone_amp + roar + rumble);
+                ya += eng_gain * 0.50f * (tone * tone_amp * (view == 0 ? 1.5f : 1.0f) + roar + rumble * (view == 0 ? 1.0f : 1.0f));
             }
             // ---------------- air noise
             s->w_lp1 += (nz - s->w_lp1) * a_wind; s->w_lp2 += (s->w_lp1 - s->w_lp2) * a_wind;
