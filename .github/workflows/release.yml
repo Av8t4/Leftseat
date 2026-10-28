@@ -84,7 +84,7 @@ jobs:
         run: printf '%b\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
 
       - name: Publish the release
-        uses: softprops/action-gh-release@v7
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           target_commitish: ${{ github.sha }}
