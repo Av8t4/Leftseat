@@ -15,7 +15,7 @@ static float sea_coast_x(float z) {
     float f = clampf((fabsf(z - SP_Z) - 2500.0f) / 4500.0f, 0.0f, 1.0f);
     return SEA_X + f * (640.0f * sinf(z * 0.00031f + 0.7f) + 270.0f * sinf(z * 0.00067f + 2.0f) + 110.0f * sinf(z * 0.0016f + 4.1f));
 }
-static float sea_depth(float x, float z) { return x - sea_coast_x(z); }          // metres into the sea (negative: on land)
+static float sea_depth(float x, float z) { return x - sea_coast_x(z); }          // meters into the sea (negative: on land)
 static float beach_w(float z) { return 90.0f + 100.0f * (0.5f + 0.5f * sinf(z * 0.0011f + 1.3f)) * (0.6f + 0.4f * sinf(z * 0.0037f)); }   // the beach is wider on the bays
 
 static unsigned int sea_col(float d, float mottle) {                             // shallows are pale, the deep sea dark; a little patchy
@@ -399,7 +399,7 @@ static void draw_spaceport_all(void) {
         ap_quad(a, 650.0f, 1620.0f, 900.0f, 1960.0f, conc);
         ap_quad(a, 574.0f, 1400.0f, 650.0f, 1420.0f, tw);
         ap_quad(a, 574.0f, 1740.0f, 760.0f, 1756.0f, tw);
-        for (float x = 60.0f; x < 1050.0f; x += 24.0f) ap_quad(a, x, 41.7f, x + 10.0f, 42.3f, RGBA8(235, 205, 70, 255));      // centre line
+        for (float x = 60.0f; x < 1050.0f; x += 24.0f) ap_quad(a, x, 41.7f, x + 10.0f, 42.3f, RGBA8(235, 205, 70, 255));      // center line
         for (float z = 70.0f; z < 2200.0f; z += 24.0f) ap_quad(a, 566.7f, z, 567.3f, z + 10.0f, RGBA8(235, 205, 70, 255));
         for (float x = 600.0f; x < 1050.0f; x += 24.0f) ap_quad(a, x, 406.7f, x + 10.0f, 407.3f, RGBA8(235, 205, 70, 255));
         ap_quad(a, 922.0f, 1180.0f, 936.0f, 1980.0f, tw);                        // service roads on the build site

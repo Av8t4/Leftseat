@@ -93,8 +93,8 @@ static const ATail AT_K30 = { 5, { 3.00f, 3.90f, 4.80f, 5.40f, 6.00f }, { -3.17f
                               { 0.17f, 0.15f, 0.12f, 0.10f, 0.08f }, 3.20f };
 static const AStab AH_K30 = { 3, { 0.00f, 1.40f, 2.60f }, { -5.40f, -6.15f, -6.90f }, { 2.00f, 1.50f, 1.00f }, { 0.13f, 0.10f, 0.08f }, 5.93f };
 
-// A solid tyre: tread, and a full sidewall and hub on BOTH sides, every face drawn from both sides (no see-through rim from any angle).
-static void a_tyre30(float cx, float cy, float cz, float rad, float hw, const Paint *p) {
+// A solid tire: tread, and a full sidewall and hub on BOTH sides, every face drawn from both sides (no see-through rim from any angle).
+static void a_tire30(float cx, float cy, float cz, float rad, float hw, const Paint *p) {
     enum { T = 14 };
     V3 r0[T], r1[T], i0[T], i1[T];
     for (int i = 0; i < T; i++) {
@@ -155,12 +155,12 @@ static void build_k30_gear(const Paint *p) {
     {                                                                           // nose gear: swings back and up into the nose
         float wy = 1.18f + (0.33f - 1.18f) * g, wz = 3.90f + (4.95f - 3.90f) * g;
         prism(0.0f, 1.05f, 5.00f, 0.0f, wy, wz, 0.045f, 0.075f, p->metal[0], p->metal[1], p->metal[2]);
-        a_tyre30(0.0f, wy, wz, 0.30f, 0.09f, p);
+        a_tire30(0.0f, wy, wz, 0.30f, 0.09f, p);
     }
-    for (int sx = -1; sx <= 1; sx += 2) {                                       // main gear: folds in towards the centreline
+    for (int sx = -1; sx <= 1; sx += 2) {                                       // main gear: folds in toward the centerline
         float wx = 0.45f + (1.50f - 0.45f) * g, wy = 1.22f + (0.33f - 1.22f) * g;
         prism(sx * 1.00f, 1.42f, -0.40f, sx * wx, wy, -0.40f, 0.060f, 0.10f, p->metal[0], p->metal[1], p->metal[2]);
-        a_tyre30(sx * wx, wy, -0.40f, 0.33f, 0.11f, p);
+        a_tire30(sx * wx, wy, -0.40f, 0.33f, 0.11f, p);
     }
 }
 

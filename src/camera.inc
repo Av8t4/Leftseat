@@ -90,7 +90,7 @@ static void draw_poly_ex(const V3 *p, int n, unsigned int color, bool emit) {
         s[i].x = CX + FOCAL * q[i].x / q[i].z;
         s[i].y = CY - FOCAL * q[i].y / q[i].z;
     }
-    float cd = 0.0f;                                   // fog: blend toward the haze colour with distance
+    float cd = 0.0f;                                   // fog: blend toward the haze color with distance
     for (int i = 0; i < m; i++) cd += sqrtf(q[i].x * q[i].x + q[i].y * q[i].y + q[i].z * q[i].z);
     if (!emit) color = tod_apply(color);
     color = wx_fog_apply(color, cd / m);

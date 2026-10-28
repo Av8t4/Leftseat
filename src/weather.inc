@@ -1,4 +1,4 @@
-// Left Seat: weather state, wind, fog and sky colours.
+// Left Seat: weather state, wind, fog and sky colors.
 // Part of Left Seat's single translation unit: this file is #included by main.c, in order.
 
 /* ------------------------------------------------------------------ */
@@ -101,14 +101,14 @@ static const char *wx_label(void) {
     return WX_NAMES[best];
 }
 
-// Per-frame fog colour, visibility and sky colour.
+// Per-frame fog color, visibility and sky color.
 // ---- Time of day: fixed for a flight, chosen in the menu -----------------------------------
 enum { TOD_DAY = 0, TOD_DUSK, TOD_NIGHT, TOD_COUNT };
 static const char *const TOD_NAMES[TOD_COUNT] = { "DAY", "DUSK", "NIGHT" };
 static int   tod = TOD_DAY;
-static float sky_r = 118.0f, sky_g = 176.0f, sky_b = 236.0f;       // sky colour straight overhead this frame
+static float sky_r = 118.0f, sky_g = 176.0f, sky_b = 236.0f;       // sky color straight overhead this frame
 
-// Colour of a lit surface at this time of day. Lights and other glowing things do not use this.
+// Color of a lit surface at this time of day. Lights and other glowing things do not use this.
 static unsigned int tod_apply(unsigned int col) {
     if (tod == TOD_DAY) return col;
     float r = (float)(col & 255u), g = (float)((col >> 8) & 255u), b = (float)((col >> 16) & 255u);
@@ -123,11 +123,11 @@ static void wx_frame_setup(void) {
     float gl = clampf(wx.cloud * 1.1f, 0.0f, 1.0f), dk = clampf(wx.rain * 0.85f, 0.0f, 1.0f);
     float r = 196.0f + (178.0f - 196.0f) * gl, g = 214.0f + (184.0f - 214.0f) * gl, b = 236.0f + (194.0f - 236.0f) * gl;
     r += (92.0f - r) * dk; g += (98.0f - g) * dk; b += (112.0f - b) * dk;
-    float wr = 232.0f - 70.0f * wx.rain;                          // inside a cloud everything goes white-grey
+    float wr = 232.0f - 70.0f * wx.rain;                          // inside a cloud everything goes white-gray
     r += (wr - r) * cloud_fx; g += (wr + 2.0f - g) * cloud_fx; b += (wr + 8.0f - b) * cloud_fx;
     r += (244.0f - r) * wx_flash; g += (246.0f - g) * wx_flash; b += (255.0f - b) * wx_flash;
     fog_r = r; fog_g = g; fog_b = b;
-    if (tod != TOD_DAY) {                                         // haze takes on the evening / night colours
+    if (tod != TOD_DAY) {                                         // haze takes on the evening / night colors
         unsigned int fc = tod_apply(RGBA8((int)fog_r, (int)fog_g, (int)fog_b, 255));
         fog_r = (float)(fc & 255u); fog_g = (float)((fc >> 8) & 255u); fog_b = (float)((fc >> 16) & 255u);
     }
@@ -141,7 +141,7 @@ static void wx_frame_setup(void) {
     vita2d_set_clear_color(RGBA8((int)sr, (int)sg, (int)sb, 255));
 }
 
-// Blend a colour toward the fog colour for something `dist` metres away.
+// Blend a color toward the fog color for something `dist` meters away.
 static unsigned int wx_fog_apply(unsigned int col, float dist) {
     float k = dist / fog_vis;
     if (k * k < 0.0039f && wx_flash <= 0.0f) return col;      // 1 - exp(-x) is never more than x, so this is the "< 0.004: no fog" case without the exp

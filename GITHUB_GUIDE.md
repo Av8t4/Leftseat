@@ -79,4 +79,4 @@ Every push builds a fresh VPK on the Actions tab. Builds from earlier pushes sta
 - `build/`, `.vpk` and `.self` files are listed in `.gitignore`, so build output never gets uploaded.
 - `fixpad.sh` can edit `src/pad.c` during a build. That only happens inside the GitHub build and is harmless.
 - Your commits show your email address. To hide it: Settings > Emails > **Keep my email addresses private**.
-- The licence in `LICENSE` is MIT with your name on it. Left Seat is homebrew and needs a modified Vita.
+- The license in `LICENSE` is MIT with your name on it. Left Seat is homebrew and needs a modified Vita.

@@ -23,7 +23,7 @@ static void add_face(int n, const V3 *pts, float r, float g, float b) {
         f->rad = fmaxf(f->rad, sqrtf(dx * dx + dy * dy + dz * dz));
     }
 
-    // Fixed "sun" lighting baked into the colour (flat shading).
+    // Fixed "sun" lighting baked into the color (flat shading).
     V3 nrm = vcross(vsub(pts[1], pts[0]), vsub(pts[2], pts[0]));
     float len = sqrtf(vdot(nrm, nrm));
     float shade = 0.7f;
@@ -61,7 +61,7 @@ static void add_building(float x, float z, float w, float d, float h,
 #define MT_STEP 0.65f   // fraction of height where rock turns to snow
 #define MT_TOP  0.35f   // half-width of the snow base relative to hb
 
-// Mountains are built in two steps: the callers below only record a mountain and its colours; once the rivers, roads
+// Mountains are built in two steps: the callers below only record a mountain and its colors; once the rivers, roads
 // and towns exist, settle_mountains() moves any mountain that sits on top of one of them and then builds the faces.
 static float mt_col[MAX_MOUNTS][6];
 static bool  mt_has[MAX_MOUNTS];
@@ -77,7 +77,7 @@ static void add_mountain2(const Mount *mp, float r, float g, float b, float cr, 
 // agree without storing anything). The footprint is a square turned by up to 45 degrees; it is shrunk so it fits about the same
 // patch of ground as an unturned one.
 typedef struct { float c, s, hw, ht, yh; } MtShape;
-static unsigned int land_mid(float x, float z);                   // the land colour of a place, see scenery.inc
+static unsigned int land_mid(float x, float z);                   // the land color of a place, see scenery.inc
 static MtShape mt_shape(const Mount *m) {
     unsigned int h = hash2((int)floorf(m->x / 3.0f) + 13, (int)floorf(m->z / 3.0f) - 5);
     float a = (hf(h, 0) - 0.5f) * PI_F * 0.5f, c = cosf(a), s = sinf(a);
@@ -109,7 +109,7 @@ static void emit_mountain(Mount m, float r, float g, float b, float cr, float cg
         }
         return;
     }
-    // A mountain: the lower slopes take the colour of the land they stand on (woods, scrub or desert), then bare rock, then the cap.
+    // A mountain: the lower slopes take the color of the land they stand on (woods, scrub or desert), then bare rock, then the cap.
     float yb = fminf(m.h * 0.17f, yh * 0.5f), kb = (hb - ht) * yb / yh, hbb = hb - kb;
     unsigned int lc = land_mid(m.x, m.z);
     float lr = (float)(lc & 255u) * 0.72f, lg = (float)((lc >> 8) & 255u) * 0.72f, lb = (float)((lc >> 16) & 255u) * 0.72f;
@@ -160,7 +160,7 @@ static float mountain_surface(const Mount *m, float x, float z) {
 }
 
 // Solid of revolution around a vertical axis. Ring i has radius rad[i] at height hgt[i];
-// gaps from `split` upwards use the second colour. Rings of radius 0 become a point.
+// gaps from `split` upwards use the second color. Rings of radius 0 become a point.
 static void add_lathe(float cx, float cz, const float *rad, const float *hgt, int nrings, int sides, int split,
                       float r, float g, float b, float r2, float g2, float b2) {
     for (int i = 0; i + 1 < nrings; i++) {
@@ -196,7 +196,7 @@ static const Airport AIRPORTS[AP_COUNT] = {
 static int   ap_found;                                   // 1 once you have flown close to Gulf Point (saved with the scores)
 static int   found_msg_t;                                // frames left to show "DISCOVERED"
 static float sea_coast_x(float z);
-static float sea_depth(float x, float z);                // metres into the sea (negative on land); see spaceport.inc
+static float sea_depth(float x, float z);                // meters into the sea (negative on land); see spaceport.inc
 static int   ap_nshown(void);
 static void  space_check_found(void);
 static void  build_spaceport(void);
@@ -268,7 +268,7 @@ static void road_poly(const float *p, int npts, int dirt, int seed) {      // p 
     for (int i = 0; i + 1 < npts; i++) road_leg(p[i * 2], p[i * 2 + 1], p[i * 2 + 2], p[i * 2 + 3], dirt, i == 0, seed + i);
 }
 
-// Bridges where a road crosses the river: centre, direction along the road, length along it and half width across it.
+// Bridges where a road crosses the river: center, direction along the road, length along it and half width across it.
 #define MAX_BRIDGES 10
 static float br_x[MAX_BRIDGES], br_z[MAX_BRIDGES], br_dx[MAX_BRIDGES], br_dz[MAX_BRIDGES], br_len[MAX_BRIDGES], br_hw[MAX_BRIDGES];
 static int   nbridges;
@@ -555,7 +555,7 @@ static void build_countryside(void) {
             road_poly(sp, 2, 0, 5 + n);
         }
         const Airport *P = &AIRPORTS[AP_PINECREST];
-        V3 p0 = ap_pt(P, 80.0f, 0.0f, 10.0f), p1 = ap_pt(P, 80.0f, 0.0f, 1300.0f), p2 = ap_pt(P, 220.0f, 0.0f, 3600.0f);   // out along the valley, towards home
+        V3 p0 = ap_pt(P, 80.0f, 0.0f, 10.0f), p1 = ap_pt(P, 80.0f, 0.0f, 1300.0f), p2 = ap_pt(P, 220.0f, 0.0f, 3600.0f);   // out along the valley, toward home
         float gp[10] = { p0.x, p0.z, p1.x, p1.z, p2.x, p2.z, -11800.0f, 2200.0f, -8500.0f, -1700.0f };   // (the east-west road is at z = -1700)
         road_poly(gp, 5, 1, 2);
         nbridges = 0;                                                      // where the roads and the highway cross the river
@@ -567,7 +567,7 @@ static void build_countryside(void) {
 }
 #endif
 
-// Does a square mountain footprint (centre x,z, half width hb) sit on a river, road, highway, town or airport?
+// Does a square mountain footprint (center x,z, half width hb) sit on a river, road, highway, town or airport?
 static bool seg_hits_square(float ax, float az, float bx, float bz, float cx, float cz, float h) {
     float t0 = 0.0f, t1 = 1.0f, dx = bx - ax, dz = bz - az;
     float p[4] = { -dx, dx, -dz, dz }, q[4] = { ax - (cx - h), (cx + h) - ax, az - (cz - h), (cz + h) - az };
@@ -630,11 +630,11 @@ static void settle_mountains(void) {
 }
 
 // ---- Knowles Works: the big factory and its village, east of the field -------------------------------------
-#define KW_FX 1750.0f            // factory hall centre
+#define KW_FX 1750.0f            // factory hall center
 #define KW_FZ (-1000.0f)
 #define KW_HW 320.0f             // half length of the hall (x)
 #define KW_HD 125.0f             // half depth (z)
-#define KW_VX 2950.0f            // village centre
+#define KW_VX 2950.0f            // village center
 #define KW_VZ (-1000.0f)
 static void build_knowles(void) {
     const float FX = KW_FX, FZ = KW_FZ;
@@ -750,7 +750,7 @@ static void build_city(void) {
     for (int c = 0; c <= CITY_NC; c++)
         for (int r = 0; r < CITY_NR; r++) {
             float x = CITY_X0 + c * CITY_S, z = CITY_Z0 + (r + 0.5f) * CITY_S;
-            if (city_d(x, z) + 0.05f * (hf(hash2(c * 7 + 1, r * 5 + 3), 0) - 0.5f) > 0.16f || c == 7) city_av[c] |= 1u << r;      // the centre avenue runs the whole way
+            if (city_d(x, z) + 0.05f * (hf(hash2(c * 7 + 1, r * 5 + 3), 0) - 0.5f) > 0.16f || c == 7) city_av[c] |= 1u << r;      // the center avenue runs the whole way
         }
     for (int r = 0; r <= CITY_NR; r++)
         for (int c = 0; c < CITY_NC; c++) {

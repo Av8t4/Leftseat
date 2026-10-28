@@ -94,10 +94,10 @@ static void build_jet1(void) {
     a_vtail(-1, dv - rv, p);
     for (int sx = -1; sx <= 1; sx += 2) {
         prism(sx * 0.26f, 0.50f, -0.20f, sx * 0.76f, 0.19f, -0.25f, 0.030f, 0.060f, p->metal[0], p->metal[1], p->metal[2]);   // main gear leg
-        a_tyre(sx * 0.80f, 0.15f, -0.25f, 0.15f, 0.05f, sx, p);
+        a_tire(sx * 0.80f, 0.15f, -0.25f, 0.15f, 0.05f, sx, p);
     }
     prism(0, 0.52f, 1.46f, 0, 0.16f, 1.50f, 0.024f, 0.040f, p->metal[0], p->metal[1], p->metal[2]);           // nose gear
-    a_tyre(0, 0.13f, 1.50f, 0.13f, 0.04f, 0, p);
+    a_tire(0, 0.13f, 1.50f, 0.13f, 0.04f, 0, p);
     float g = clampf((pl.n1 - 0.25f) / 0.75f, 0.0f, 1.0f);                    // the exhaust glows when the engine is working hard
     if (g > 0.02f && pl.fuel > 0.0f && !engine_failed) {
         V3 d[8];

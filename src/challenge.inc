@@ -3,7 +3,7 @@
 
 /* ------------------------------------------------------------------ */
 /* Landing challenge: start on final approach and get scored on the     */
-/* touchdown (sink rate, centre line, touchdown point, attitude).       */
+/* touchdown (sink rate, center line, touchdown point, attitude).       */
 /* ------------------------------------------------------------------ */
 
 #ifndef SCORE_PATH
@@ -152,7 +152,7 @@ static void challenge_begin_engine(void) {
     const float V = spec->glide_ms, gam = spec->glide_gamma;
     float th = frand(-0.95f, 0.95f), D = frand(3000.0f, 3700.0f);
     pl.pos = v3(D * sinf(th), frand(spec->eng_h0, spec->eng_h1), -1000.0f - D * cosf(th));
-    float psi = atan2f(-pl.pos.x, -1800.0f - pl.pos.z);          // facing a point on the extended centre line, short of the runway
+    float psi = atan2f(-pl.pos.x, -1800.0f - pl.pos.z);          // facing a point on the extended center line, short of the runway
     float cl = G_ACC * cosf(gam) / (KL * V * V);
     float alpha = (cl - FLAP_CL[0]) / CLA + ALPHA0;
     set_axes(psi, gam + alpha, 0.0f);
@@ -209,7 +209,7 @@ static void challenge_touchdown(void) {
 static void challenge_score(void) {
     const Airport *L = &AIRPORTS[ch_land_ap];
     float sc = clampf(L->hl / 1000.0f, 0.25f, 1.0f);                    // the target area shrinks on a short runway
-    float d = chr.z + L->hl;                                            // metres past the threshold
+    float d = chr.z + L->hl;                                            // meters past the threshold
     float lo = 150.0f * sc, hi = 450.0f * sc, tail = 550.0f * sc;       // the engine-out window is wider: there is no second chance
     if (ch_kind == CK_ENGINE) { lo = 60.0f * sc; hi = 650.0f * sc; tail = 700.0f * sc; }
     float pt;
@@ -260,7 +260,7 @@ static void challenge_finish(bool crashed, const char *why) {
     scores_save();
 }
 
-// Bearing (degrees from north) and distance (metres) from the aircraft to an airport.
+// Bearing (degrees from north) and distance (meters) from the aircraft to an airport.
 static void ap_bearing(const Airport *a, float *brg_deg, float *dist_m) {
     float dx = a->cx - pl.pos.x, dz = a->cz - pl.pos.z;
     *dist_m = sqrtf(dx * dx + dz * dz);

@@ -326,7 +326,7 @@ static void ground_strip(float x0, float z0, float x1, float z1, float half, uns
     draw_world_poly(q, 4, col);
 }
 
-// A strip beside the line from A to B, off to one side by `off` metres (left of the direction of travel when positive).
+// A strip beside the line from A to B, off to one side by `off` meters (left of the direction of travel when positive).
 static void strip_off(float ax, float az, float bx, float bz, float off, float half, unsigned int col) {
     float dx = bx - ax, dz = bz - az, len = sqrtf(dx * dx + dz * dz);
     if (len < 0.01f) return;
@@ -339,7 +339,7 @@ static void ground_disc(float x, float z, float r, unsigned int col) {
     for (int k = 0; k < 8; k++) { float a = (k + 0.5f) * PI_F / 4.0f; p[k] = v3(x + r * 1.04f * cosf(a), 0.03f, z + r * 1.04f * sinf(a)); }
     draw_world_poly(p, 8, col);
 }
-// Dashes along A to B: `dash` metres of paint every `pitch` metres, only the ones within `reach` of the camera.
+// Dashes along A to B: `dash` meters of paint every `pitch` meters, only the ones within `reach` of the camera.
 static void ground_dashes(float ax, float az, float bx, float bz, float half, float dash, float pitch, float reach, unsigned int col) {
     float dx = bx - ax, dz = bz - az, len = sqrtf(dx * dx + dz * dz);
     if (len < 1.0f) return;
@@ -352,7 +352,7 @@ static void ground_dashes(float ax, float az, float bx, float bz, float half, fl
 }
 static const unsigned int PAINT_W = RGBA8(228, 228, 230, 255), PAINT_Y = RGBA8(226, 200, 70, 255);
 
-// The two long roads past the airfield: a gravel shoulder under the tarmac, white edge lines and a dashed centre line on top.
+// The two long roads past the airfield: a gravel shoulder under the tarmac, white edge lines and a dashed center line on top.
 static void draw_main_road_shoulders(void) {
     const unsigned int sh = RGBA8(120, 114, 98, 255);
     ground_strip(ROAD_X, cam.pos.z - 3000.0f, ROAD_X, cam.pos.z + 3000.0f, 6.2f, sh);
@@ -400,7 +400,7 @@ static void draw_highway(void) {
             if (d2 < 3000.0f * 3000.0f) {
                 strip_off(ax, az, bx, bz, 4.7f, 0.2f, PAINT_W);                                                           // edge lines
                 strip_off(ax, az, bx, bz, -4.7f, 0.2f, PAINT_W);
-                strip_off(ax, az, bx, bz, 0.3f, 0.12f, PAINT_Y);                                                          // double yellow centre, broken near
+                strip_off(ax, az, bx, bz, 0.3f, 0.12f, PAINT_Y);                                                          // double yellow center, broken near
                 strip_off(ax, az, bx, bz, -0.3f, 0.12f, PAINT_Y);
             }
         }
@@ -624,7 +624,7 @@ static void draw_town_streets(void) {
     }
 }
 
-// Bridges: a raised deck on piers, abutments at both ends, sloping approach ramps with earth banks, parapets and a centre line.
+// Bridges: a raised deck on piers, abutments at both ends, sloping approach ramps with earth banks, parapets and a center line.
 static void draw_bridges(void) {
     const float H = 2.4f, RAMP = 30.0f;
     const unsigned int road = RGBA8(90, 90, 96, 255), conc = RGBA8(150, 150, 156, 255), conc_d = RGBA8(112, 112, 118, 255),
@@ -669,7 +669,7 @@ static void draw_bridges(void) {
         }
         V3 deck[4] = { BP(-L * 0.5f, -hw, H), BP(L * 0.5f, -hw, H), BP(L * 0.5f, hw, H), BP(-L * 0.5f, hw, H) };
         draw_world_poly(deck, 4, road);
-        for (int k = 0; k < 6; k++) {                                                   // dashed centre line
+        for (int k = 0; k < 6; k++) {                                                   // dashed center line
             float a0 = -L * 0.5f + (k + 0.15f) * L / 6.0f, a1 = a0 + L / 6.0f * 0.5f;
             V3 d[4] = { BP(a0, -0.25f, H + 0.03f), BP(a1, -0.25f, H + 0.03f), BP(a1, 0.25f, H + 0.03f), BP(a0, 0.25f, H + 0.03f) };
             draw_world_poly(d, 4, line);
@@ -712,7 +712,7 @@ static void draw_bridges(void) {
     }
 }
 
-static float river_hw(int i) { return 11.0f + 24.0f * (float)i / (float)(nriver - 2); }     // narrow at the source, wider towards the mouth
+static float river_hw(int i) { return 11.0f + 24.0f * (float)i / (float)(nriver - 2); }     // narrow at the source, wider toward the mouth
 static void draw_river(void) {
     if (nriver < 2) return;
     const unsigned int verge = RGBA8(84, 138, 72, 255), sand = RGBA8(196, 184, 130, 255), shallow = RGBA8(86, 142, 196, 255), deep = RGBA8(46, 98, 164, 255);

@@ -34,8 +34,8 @@ typedef struct {
     float turb;               // 0..1: gusts and bumps
     float misfire;            // 0..1: sputtering
     int   view;               // 0 cockpit, 1 chase, 2 tower
-    float doppler;            // pitch change from the aircraft moving towards or away from the tower
-    float distance;           // metres to the aircraft (tower view)
+    float doppler;            // pitch change from the aircraft moving toward or away from the tower
+    float distance;           // meters to the aircraft (tower view)
     int   aircraft_sound;     // 0 in the menu: the engine is silent
     unsigned ev[EV_COUNT];    // event counters: the game adds one each time something happens
     float    ev_val[EV_COUNT];// how strong it was

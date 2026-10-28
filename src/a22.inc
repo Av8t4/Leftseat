@@ -3,7 +3,7 @@
 // Length 10.2 m, span 13.2 m, height 3.9 m.
 // Part of Left Seat's single translation unit: this file is #included by main.c, in order.
 
-// z forward, y up from the ground, origin under the centre of gravity.
+// z forward, y up from the ground, origin under the center of gravity.
 static const KS KS_A22[] = {                                                        // the crew pod
     {  3.80f, 0.30f, 0.92f, 1.52f, 1.22f, 2.4f, 2.4f, 2.3f },
     {  3.30f, 0.58f, 0.84f, 1.80f, 1.30f, 2.5f, 2.5f, 2.4f },
@@ -69,7 +69,7 @@ static void a22_init(void) {
     sw_make(&AW_A22, 7, 0.00f, 6.60f, 0.90f, 2.60f, -1.00f, 1.60f, 0.150f, 0.075f, 2.10f, 0.015f, 0, 4);
     AW_A22.tipcol[0] = 122; AW_A22.tipcol[1] = 64; AW_A22.tipcol[2] = 160;
 }
-typedef struct { int n; float rx, ry, rzl, rch, tx, ty, tzl, tch, th; } AVTail;      // one half of the inverted-V tail: root at the centre line, tip on a boom
+typedef struct { int n; float rx, ry, rzl, rch, tx, ty, tzl, tch, th; } AVTail;      // one half of the inverted-V tail: root at the center line, tip on a boom
 static const AVTail AV_A22 = { 5, 0.00f, 3.95f, -5.20f, 1.30f, 4.05f, 2.30f, -4.90f, 1.70f, 0.075f };
 static const Paint P_A22 = { {246,247,250}, {122,64,160}, {250,200,60}, {226,230,238}, {58,104,156}, {26,26,30}, {96,102,112}, {122,64,160} };
 #define A22_X 2.45f                                                                  // the engines and booms stand this far out
@@ -82,7 +82,7 @@ static void a22_wings(const Paint *p) {
     a_wing_sw(&AW_A22, -1, dL, p, true);
 }
 
-// One half of the inverted-V tail: a panel running from a peak on the centre line down and out to the top of a boom. Each
+// One half of the inverted-V tail: a panel running from a peak on the center line down and out to the top of a boom. Each
 // panel is a "ruddervator": the trailing edge moves for pitch and, the other way round on the two sides, for yaw.
 static void a_vtail22(const AVTail *V, int sx, float dn, const Paint *p) {
     V3 sec[5][6];
@@ -91,7 +91,7 @@ static void a_vtail22(const AVTail *V, int sx, float dn, const Paint *p) {
     for (int k = 0; k < V->n; k++) {
         float u = (float)k / (V->n - 1);
         float cx = sx * (V->rx + dx * u), cy = V->ry + dy * u, zl = V->rzl + (V->tzl - V->rzl) * u, c = V->rch + (V->tch - V->rch) * u, t = V->th;
-        float d = (k == V->n - 1) ? 0.4f * dn : dn * fminf(1.0f, u / 0.5f);          // nothing moves at the centre line, so the two halves can never touch
+        float d = (k == V->n - 1) ? 0.4f * dn : dn * fminf(1.0f, u / 0.5f);          // nothing moves at the center line, so the two halves can never touch
         sec[k][0] = MW(cx, cy, zl);
         sec[k][1] = MW(cx + nx * t * 0.9f, cy + ny * t * 0.9f, zl - 0.18f * c);
         sec[k][2] = MW(cx + nx * (t * 0.9f + d * 0.4f), cy + ny * (t * 0.9f + d * 0.4f), zl - 0.60f * c);
@@ -124,12 +124,12 @@ static void build_a22_gear(const Paint *p) {
     {
         float wy = 0.95f + (0.30f - 0.95f) * g, wz = 2.80f + (3.20f - 2.80f) * g;
         prism(0.0f, 1.00f, 3.10f, 0.0f, wy, wz, 0.045f, 0.075f, p->metal[0], p->metal[1], p->metal[2]);
-        a_tyre30(0.0f, wy, wz, 0.27f, 0.085f, p);
+        a_tire30(0.0f, wy, wz, 0.27f, 0.085f, p);
     }
     for (int sx = -1; sx <= 1; sx += 2) {
         float wy = 1.62f + (0.38f - 1.62f) * g, wz = -1.00f + (-0.30f + 1.00f) * g;
         prism(sx * A22_X, 1.40f, -0.25f, sx * A22_X, wy, wz, 0.06f, 0.10f, p->metal[0], p->metal[1], p->metal[2]);
-        a_tyre30(sx * A22_X, wy, wz, 0.38f, 0.12f, p);
+        a_tire30(sx * A22_X, wy, wz, 0.38f, 0.12f, p);
     }
 }
 

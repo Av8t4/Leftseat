@@ -1,11 +1,11 @@
-// Left Seat: landing gear springs, tyre friction and ground strikes.
+// Left Seat: landing gear springs, tire friction and ground strikes.
 // Part of Left Seat's single translation unit: this file is #included by main.c, in order.
 
 /* ------------------------------------------------------------------ */
 /* Landing gear: three spring-and-damper legs, so touchdown is gradual  */
 /* ------------------------------------------------------------------ */
 
-// Wheel-bottom positions in model space (x right, y up from the compressed tyre, z forward).
+// Wheel-bottom positions in model space (x right, y up from the compressed tire, z forward).
 // The negative heights are the extra leg length that compresses under weight, so the aircraft
 // sits at about pos.y = 0 when parked.
 // (The legs, springs and inertias belong to the aircraft: see aircraft.inc.)
@@ -24,7 +24,7 @@ static V3 body_pt(float x, float y, float z) {          // model space -> world 
     return vadd(o, vscale(pl.f, z));
 }
 
-// Adds the gear's push, pitch/roll moments and tyre friction. Returns the deepest compression.
+// Adds the gear's push, pitch/roll moments and tire friction. Returns the deepest compression.
 static float gear_forces(bool braking, float *dq, float *dp, float *dr, V3 *acc) {
     V3 piv = v3(pl.pos.x, pl.pos.y + spec->piv_y, pl.pos.z);
     V3 om = vadd(vadd(vscale(pl.r, -pl.pitchrate), vscale(pl.f, -pl.rollrate)), vscale(pl.u, pl.yawrate));
@@ -48,7 +48,7 @@ static float gear_forces(bool braking, float *dq, float *dp, float *dr, V3 *acc)
         *dp += -vdot(tau, pl.f) / IXX_M;                            // roll-right positive
         *dr +=  vdot(tau, pl.u) / IZZ_M;                            // nose-right positive
     }
-    if (nmain > 0.0f) {                                             // tyres: rolling drag, brakes, side grip
+    if (nmain > 0.0f) {                                             // tires: rolling drag, brakes, side grip
         V3 hd = v3(pl.f.x, 0.0f, pl.f.z);
         float hl = sqrtf(vdot(hd, hd));
         hd = hl > 1e-3f ? vscale(hd, 1.0f / hl) : v3(0.0f, 0.0f, 1.0f);

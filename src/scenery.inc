@@ -29,7 +29,7 @@ static float vn(float x, float z, int seed) {
     return a + (b - a) * sx + (c - a) * sz + (a - b - c + d) * sx * sz;
 }
 // The land turns to red desert toward Redrock: 0 = farmland, 1 = full desert. The edge is wandering rather than round: noise pushes
-// it in and out by several kilometres, so the desert has bays and fingers, and dry patches lie scattered beyond it.
+// it in and out by several kilometers, so the desert has bays and fingers, and dry patches lie scattered beyond it.
 static float desert_k(float x, float z) {
     float d = sat_dist(x, z, AIRPORTS[AP_REDROCK].cx, AIRPORTS[AP_REDROCK].cz);
     float w = (vn(x / 5200.0f, z / 5200.0f, 3) - 0.5f) * 2.0f + (vn(x / 2100.0f, z / 2100.0f, 9) - 0.5f);
@@ -57,7 +57,7 @@ static float forest_k(float x, float z) {
 }
 // Dry sandy scrub along the coast of the sea, thickest at the shore and thinning inland in an uneven band.
 static float coast_k(float x, float z) {
-    float in = -sea_depth(x, z) + (vn(x / 3600.0f, z / 3600.0f, 59) - 0.5f) * 4200.0f;       // metres inland, pushed about
+    float in = -sea_depth(x, z) + (vn(x / 3600.0f, z / 3600.0f, 59) - 0.5f) * 4200.0f;       // meters inland, pushed about
     float t = clampf((6500.0f - in) / 6500.0f, 0.0f, 1.0f);
     return t * t * (3.0f - 2.0f * t);
 }
@@ -109,7 +109,7 @@ static bool in_lake(float x, float z, float grow) {
     return false;
 }
 
-// Downtown Knowles: the ground turns grey in and a little beyond the street grid.
+// Downtown Knowles: the ground turns gray in and a little beyond the street grid.
 static float urban_k(float x, float z) {
 #if CITY_DETAIL > 0
     return clampf(city_d(x, z) * 2.0f, 0.0f, 1.0f) * 0.6f;
@@ -159,7 +159,7 @@ static unsigned int field_color(int i, int j, bool dark) {
     float uk = urban_k(x, z);
     return uk <= 0.0f ? col : blend_col(col, dark ? RGBA8(132, 136, 128, 255) : RGBA8(142, 146, 138, 255), uk * 0.85f);
 }
-// The same land, one colour per place, for the chart and the horizon.
+// The same land, one color per place, for the chart and the horizon.
 static unsigned int land_mid(float x, float z) {
     unsigned int col = RGBA8(64, 146, 54, 255);
     float wk = wet_k(x, z), ck = coast_k(x, z), dk = desert_k(x, z), fk = forest_k(x, z);
@@ -408,11 +408,11 @@ static void draw_cockpit_frame(void) {
     fill_poly2d(head, 4, dark);
     P2 sill[4] = { {0, VH}, {0, VH - 16}, {960, VH - 16}, {960, VH} };                     // window sill all round
     fill_poly2d(sill, 4, dark);
-    float centre = cabin_rel(0.0f);
-    if (fabsf(centre) < 100.0f) {                                                          // glareshield over the instrument panel
+    float center = cabin_rel(0.0f);
+    if (fabsf(center) < 100.0f) {                                                          // glareshield over the instrument panel
         static const float AZ[5] = { -45.0f, -22.0f, 0.0f, 22.0f, 45.0f }, HH[5] = { 16, 21, 25, 21, 16 };
         P2 dash[7];
-        for (int k = 0; k < 5; k++) { dash[k].x = cabin_x(centre + AZ[k]); dash[k].y = VH - HH[k]; }
+        for (int k = 0; k < 5; k++) { dash[k].x = cabin_x(center + AZ[k]); dash[k].y = VH - HH[k]; }
         dash[5].x = dash[4].x; dash[5].y = VH;
         dash[6].x = dash[0].x; dash[6].y = VH;
         fill_poly2d(dash, 7, dark);

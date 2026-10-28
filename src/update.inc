@@ -42,8 +42,8 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
             sel_hold = 0;
         }
     }
-    if (gy_mode && (pad->buttons & SCE_CTRL_SELECT) && (pressed & SCE_CTRL_TRIANGLE)) {      // SELECT + Triangle: centre the tilt controls where the Vita is now
-        if (!ff_sub) { gyro_recenter(); gear_say("GYRO CENTRED"); }
+    if (gy_mode && (pad->buttons & SCE_CTRL_SELECT) && (pressed & SCE_CTRL_TRIANGLE)) {      // SELECT + Triangle: center the tilt controls where the Vita is now
+        if (!ff_sub) { gyro_recenter(); gear_say("GYRO CENTERD"); }
         sel_used = true; pressed &= ~SCE_CTRL_TRIANGLE;
     }
     if (pressed & SCE_CTRL_TRIANGLE) { if (game_mode == MODE_LANDING) challenge_begin(); else reset_free(); return; }
@@ -260,7 +260,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
         float sh = sinf(pl.hdg_g), ch = cosf(pl.hdg_g);
         pl.pos.x += sh * pl.gs * DT;
         pl.pos.z += ch * pl.gs * DT;
-        pl.pos.y -= pl.pos.y * 0.2f;                             // settle onto the tyres smoothly
+        pl.pos.y -= pl.pos.y * 0.2f;                             // settle onto the tires smoothly
         if (fabsf(pl.pos.y) < 0.002f) pl.pos.y = 0.0f;
         pl.vel = v3(sh * pl.gs, 0.0f, ch * pl.gs);
         set_axes(pl.hdg_g, pl.gpitch, 0.0f);
