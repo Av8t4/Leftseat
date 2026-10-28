@@ -11,6 +11,8 @@
 #include <psp2/ctrl.h>
 #include <psp2/touch.h>
 #include <psp2/motion.h>
+#include <psp2/camera.h>
+#include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/processmgr.h>
 #include <vita2d.h>
 
@@ -49,6 +51,8 @@
 #include "overlays.inc"
 #include "chart.inc"
 #include "menu.inc"
+#include "ardetect.inc"
+#include "ar.inc"
 #include "sound.inc"
 
 // New landing challenge with the weather chosen in the menu (it stays fixed during the attempt).
@@ -111,8 +115,16 @@ int main(void) {
             pressed &= ~SCE_CTRL_START;                                            // (not a "back to the menu")
         }
 
-        if (game_state == ST_MENU) {
+        if (game_state == ST_MENU && ar_on) {
+            ar_step(&pad, pressed);                                   // the AR view in the hangar: camera, card, aircraft
+            vita2d_start_drawing();
+            vita2d_clear_screen();
+            if (ar_on) ar_draw(pgf); else draw_menu(pgf);      // (O in the AR view closes it)
+            vita2d_end_drawing();
+            vita2d_swap_buffers();
+        } else if (game_state == ST_MENU) {
             int act = menu_update(&pad, pressed);
+            if (ar_request) { ar_request = 0; ar_open(menu_hsel); act = 0; }
             if (act == 2) break;
             if (act == 1) {
                 int pick = (menu_wx == WX_COUNT) ? (frame_count / 3) % WX_COUNT : menu_wx;
@@ -139,7 +151,7 @@ int main(void) {
 
             vita2d_start_drawing();
             vita2d_clear_screen();
-            draw_menu(pgf);
+            if (ar_on) ar_draw(pgf); else draw_menu(pgf);
             vita2d_end_drawing();
             vita2d_swap_buffers();
         } else if (chart_open && game_state == ST_FLY) {              // the chart: the flight is paused while you look at it
