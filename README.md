@@ -178,7 +178,7 @@ Bounces and a nose-wheel-first landing cost points, and a crash scores 0. Your b
 
 **Weather** can be clear, breezy, overcast, fog, rain, storm or random. Random starts anywhere and drifts from one kind to another. Wind, gusts and turbulence move the aircraft, clouds drift and can be flown through, and fog cuts visibility. Rain falls with the wind, and storms flash with lightning.
 
-**Time of day** can be day, dusk or night. Dusk has a glowing orange horizon and a low sun. Night has a dark sky with a moon and stars, lit airports, glowing glide-slope lights, lit towns and a landing light.
+**Time of day** can be day, dusk or night. Dusk has a glowing orange horizon and a low sun. Night has a dark sky with a moon and stars, lit airports, glowing glide-slope lights, lit towns and a landing light. Every aircraft carries navigation lights (red left, green right, white tail), a flashing red beacon and white wingtip strobes, which you can see in the chase view.
 
 **Sound** is made on the fly from what the aircraft is doing, so there are no audio files:
 
