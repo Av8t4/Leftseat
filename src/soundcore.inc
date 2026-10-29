@@ -56,6 +56,8 @@ typedef struct {
     unsigned last_ev[EV_COUNT];
     SndVoice voice[10];
     float lp_out, cp_lp, cp_lp2;
+    float rz[4][2];                // the exhaust / blade resonances (fixed pitches, like the body of a real engine)
+    int   cyl;                     // which cylinder fires next
 } SndSt;
 
 static float snd_rnd(SndSt *s) { s->rng ^= s->rng << 13; s->rng ^= s->rng >> 17; s->rng ^= s->rng << 5; return (float)(s->rng & 0xFFFFFF) / 8388608.0f - 1.0f; }
@@ -135,20 +137,33 @@ static void snd_render(SndSt *s, const SndIn *inp, int16_t *out, int n) {
         const float far_k = view == 2 ? 1.0f / (1.0f + s->s_dist / 90.0f) : 1.0f;
         const float dop = view == 2 ? s->s_dop : 1.0f;
         const float eng_gain = (view == 0 ? 0.80f : (view == 1 ? 1.0f : 1.35f * far_k)) * s->s_on;
-        const float wind_gain = (view == 0 ? 1.0f : (view == 1 ? 0.55f : 0.12f * far_k)) * s->s_on;
+        const float wind_gain = (view == 0 ? (in.engine_kind == SND_JET ? 0.22f : 1.0f) : (view == 1 ? 0.55f : 0.12f * far_k)) * s->s_on;
         float a_e = view == 0 ? snd_lpa(520.0f + 2000.0f * s->s_load * bright) : snd_lpa(1500.0f + 3200.0f * s->s_load * bright);   // piston exhaust brightness
         float a_e2 = view == 0 ? snd_lpa(950.0f + 1700.0f * bright) : snd_lpa(1200.0f + 3000.0f * bright);
-        float a_cp = snd_lpa(3200.0f);                                           // the cabin muffles everything a little
+        const int jet_cab = (view == 0 && in.engine_kind == SND_JET);           // a jet's cabin is quiet: soft whine, a low hum, hardly any roar or wind
+        float a_cp = snd_lpa(jet_cab ? 1500.0f : 3200.0f);                       // the cabin muffles everything a little
         float a_chop = snd_lpa(450.0f + 500.0f * s->s_load);
-        float a_wind = snd_lpa(110.0f + 24.0f * s->s_air);
+        float a_wind = snd_lpa(70.0f + 11.0f * s->s_air);
         float a_rum = snd_lpa(170.0f), a_bump = snd_lpa(55.0f);
+        // Each firing (or propeller blade passing) rings a few fixed resonances. This is what makes it sound like an engine and not hiss:
+        // the pitch you hear is the firing rate, and the ringing sits at 250 to 2000 Hz where a small speaker can play it.
+        static const float RZ_F[4] = { 260.0f, 560.0f, 1000.0f, 1750.0f }, RZ_BW[4] = { 70.0f, 110.0f, 170.0f, 300.0f };
+        float rz_a1[4], rz_a2[4], rz_w[4];
+        {
+            static const float W0[4] = { 0.90f, 1.00f, 0.85f, 0.50f };
+            for (int q = 0; q < 4; q++) {
+                float r = expf(-3.14159265f * RZ_BW[q] / SND_RATE);
+                rz_a1[q] = 2.0f * r * cosf(6.2831853f * RZ_F[q] / SND_RATE); rz_a2[q] = -r * r;
+                rz_w[q] = W0[q] * (q >= 2 ? (view == 0 ? 0.55f : 1.0f) : 1.0f) * (1.0f - r) * 2.2f;
+            }
+        }
         float f_fire = s->s_rpm / 60.0f * 2.0f * dop, f_bp = (in.engine_kind == SND_PISTON ? s->s_rpm / 60.0f * 2.0f : s->s_prop / 60.0f * (float)(in.blades > 0 ? in.blades : 2)) * dop;
         float f_w1 = (480.0f + 1500.0f * s->s_n1) * dop * (1.0f + 0.012f * sinf(6.2831853f * s->ph_lfo2 * 4.7f));   // turboprop whine, with a little flutter
         float f_j1 = (480.0f + 4300.0f * powf(snd_clampf(s->s_n1, 0.0f, 1.1f), 1.15f)) * dop;                // jet spool tone
         float n1 = snd_clampf(s->s_n1, 0.0f, 1.1f);
         float a_hiss_hi = snd_lpa(3000.0f * (0.6f + 0.4f * bright)), a_hiss_lo = snd_lpa(900.0f);
         float a_roar_hi = snd_lpa(650.0f + 2300.0f * n1 * (0.6f + 0.4f * bright)), a_roar_lo = snd_lpa(130.0f + 150.0f * n1);
-        float wind_amp = powf(snd_clampf(s->s_air / 80.0f, 0.0f, 1.4f), 1.7f) * 0.62f * (1.0f + 0.08f * s->s_flaps);
+        float wind_amp = powf(snd_clampf(s->s_air / 80.0f, 0.0f, 1.4f), 1.7f) * 0.42f * (1.0f + 0.08f * s->s_flaps);
         float whistle = snd_clampf((s->s_air - 55.0f) / 55.0f, 0.0f, 1.0f);
         float rain_amp = s->s_rain * (0.10f + 0.22f * snd_clampf(s->s_air / 60.0f, 0.0f, 1.0f)) * (view == 0 ? 1.0f : 0.35f) * s->s_on;
         float roll_amp = in.on_ground ? snd_clampf(s->s_gs / 38.0f, 0.0f, 1.2f) * (0.20f + 0.65f * in.rough) * (view == 0 ? 0.9f : 0.5f) * s->s_on : 0.0f;
@@ -160,17 +175,29 @@ static void snd_render(SndSt *s, const SndIn *inp, int16_t *out, int n) {
             float nz = snd_rnd(s);
             // ---------------- engine
             if (in.engine_kind == SND_PISTON) {
+                static const float CYL[4] = { 1.00f, 0.80f, 0.92f, 0.72f };           // the cylinders are never quite alike
+                float imp = 0.0f;
                 s->ph_fire += f_fire * dt;
-                if (s->ph_fire >= 1.0f) { s->ph_fire -= 1.0f; s->cyc_amp = 0.86f + 0.14f * (snd_rnd(s) * 0.5f + 0.5f) * 2.0f * 0.5f + 0.06f * snd_rnd(s); }
+                if (s->ph_fire >= 1.0f) {
+                    s->ph_fire -= 1.0f;
+                    s->cyc_amp = 0.86f + 0.14f * (snd_rnd(s) * 0.5f + 0.5f) * 2.0f * 0.5f + 0.06f * snd_rnd(s);
+                    imp = s->cyc_amp * CYL[s->cyl & 3] * (0.55f + 0.55f * s->s_load) * run * (in.misfire > 0.01f ? s->s_gate : 1.0f);
+                    s->cyl++;
+                }
                 float pos = s->ph_fire * 1024.0f; int i0 = (int)pos; float fr = pos - i0;
                 float th = s->tab[i0 & 1023] * (1.0f - fr) + s->tab[(i0 + 1) & 1023] * fr;
                 float body = th * s->cyc_amp * (0.55f + 0.55f * s->s_load) * run * (in.misfire > 0.01f ? s->s_gate : 1.0f);
                 s->e_lp += (body - s->e_lp) * a_e; s->e_lp2 += (s->e_lp - s->e_lp2) * a_e2;
+                float ring = 0.0f;
+                for (int q = 0; q < 4; q++) {
+                    float yq = rz_a1[q] * s->rz[q][0] + rz_a2[q] * s->rz[q][1] + imp * 6.0f;
+                    s->rz[q][1] = s->rz[q][0]; s->rz[q][0] = yq; ring += yq * rz_w[q];
+                }
                 s->ph_bp += f_bp * dt; if (s->ph_bp >= 1.0f) s->ph_bp -= 1.0f;
                 float chop = 0.5f + 0.5f * sinf(6.2831853f * s->ph_bp); chop *= chop;
                 s->c_lp += (nz - s->c_lp) * a_chop;
-                float prop_noise = s->c_lp * chop * (0.30f + 0.40f * s->s_load + 0.0030f * s->s_air);
-                ya += eng_gain * (1.35f * s->e_lp2 + 1.10f * prop_noise * (s->s_rpm > 300.0f ? 1.0f : 0.0f));
+                float prop_noise = s->c_lp * chop * (0.14f + 0.18f * s->s_load + 0.0015f * s->s_air);
+                ya += eng_gain * (0.55f * s->e_lp2 + 0.70f * ring + 0.9f * prop_noise * (s->s_rpm > 300.0f ? 1.0f : 0.0f));
             } else if (in.engine_kind == SND_TURBOPROP) {
                 s->ph_w1 += f_w1 * dt; if (s->ph_w1 >= 1.0f) s->ph_w1 -= 1.0f;
                 float whine = sinf(6.2831853f * s->ph_w1) * 0.60f + sinf(12.566371f * s->ph_w1) * 0.10f;
@@ -186,17 +213,23 @@ static void snd_render(SndSt *s, const SndIn *inp, int16_t *out, int n) {
                 s->r_lp1 += (nz - s->r_lp1) * snd_lpa(160.0f);
                 s->r_lp2 += (nz - s->r_lp2) * snd_lpa(420.0f);                                                       // the turbine growl
                 float throb = 1.0f + 0.10f * sinf(6.2831853f * s->ph_bp / (float)(in.blades > 0 ? in.blades : 3));      // the whole engine pulses at the propeller's turn
-                ya += eng_gain * 0.45f * throb * (whine * whine_amp * (0.6f + 0.4f * bright) + hiss * 0.30f + prop_part * 0.85f + s->r_lp1 * 0.14f * n1 + s->r_lp2 * 0.45f * (0.2f + 0.8f * n1));
+                float imp = 0.0f; { static float pb_prev = 0.0f; float ph3 = s->ph_bp * (float)(in.blades > 0 ? in.blades : 3); float fl = ph3 - floorf(ph3); if (fl < pb_prev) imp = 0.7f * (0.35f + 0.65f * s->s_load) * (s->s_prop > 200.0f ? 1.0f : 0.3f); pb_prev = fl; }
+                float ring = 0.0f;
+                for (int q = 0; q < 4; q++) {
+                    float yq = rz_a1[q] * s->rz[q][0] + rz_a2[q] * s->rz[q][1] + imp * 6.0f;
+                    s->rz[q][1] = s->rz[q][0]; s->rz[q][0] = yq; ring += yq * rz_w[q];
+                }
+                ya += eng_gain * 0.45f * throb * (whine * whine_amp * 1.5f * (0.6f + 0.4f * bright) + hiss * 0.12f + prop_part * 0.45f + ring * 1.0f + s->r_lp1 * 0.10f * n1 + s->r_lp2 * 0.22f * (0.2f + 0.8f * n1));
             } else {
                 s->ph_w1 += f_j1 * dt; if (s->ph_w1 >= 1.0f) s->ph_w1 -= 1.0f;
                 s->ph_w2 += f_j1 * 2.013f * dt; if (s->ph_w2 >= 1.0f) s->ph_w2 -= 1.0f;
                 float tone = sinf(6.2831853f * s->ph_w1) * 0.6f + sinf(6.2831853f * s->ph_w2) * 0.25f;
-                float tone_amp = (0.50f + 0.50f * n1) * 0.17f * (0.3f + 0.7f * run + 0.2f * (1.0f - run));
+                float tone_amp = (0.50f + 0.50f * n1) * 0.26f * (0.3f + 0.7f * run + 0.2f * (1.0f - run));
                 s->j_lp1 += (nz - s->j_lp1) * a_roar_hi; s->j_lp2 += (nz - s->j_lp2) * a_roar_lo;
-                float roar = (s->j_lp1 - s->j_lp2) * (0.16f + 0.84f * powf(n1, 1.7f)) * 2.0f * (0.35f + 0.65f * run);
+                float roar = (s->j_lp1 - s->j_lp2) * (0.12f + 0.88f * powf(n1, 1.7f)) * 1.3f * (0.35f + 0.65f * run) * (view == 0 ? 0.22f : 1.0f);
                 s->j_lp3 += (nz - s->j_lp3) * snd_lpa(110.0f);
                 float rumble = s->j_lp3 * powf(n1, 1.2f) * 0.8f;
-                ya += eng_gain * 0.50f * (tone * tone_amp + roar + rumble);
+                ya += eng_gain * 0.50f * (tone * tone_amp * (view == 0 ? 1.5f : 1.0f) + roar + rumble * (view == 0 ? 1.0f : 1.0f));
             }
             // ---------------- air noise
             s->w_lp1 += (nz - s->w_lp1) * a_wind; s->w_lp2 += (s->w_lp1 - s->w_lp2) * a_wind;
