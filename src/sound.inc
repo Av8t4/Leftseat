@@ -97,12 +97,13 @@ static void snd_game_update(const SceCtrlData *pad) {
     if (!was_flying) {                                              // just (re)started flying: forget what was going on before
         was_flying = true;
         prev_ground = pl.on_ground; prev_crashed = pl.crashed; prev_flaps = (int)(pl.flaps + 0.5f);
-        prev_dead = (pl.fuel <= 0.0f || engine_failed); fail_t = 99.0f; air_t = 0.0f; thunder_t = -1.0f; prev_flash = wx_flash; fly_t = 0.0f;
+        prev_dead = !ENG_RUN; fail_t = 99.0f; air_t = 0.0f; thunder_t = -1.0f; prev_flash = wx_flash; fly_t = 0.0f;
     }
 
     // --- the engine
-    const bool dead = (pl.fuel <= 0.0f || engine_failed);
-    if (dead && !prev_dead) fail_t = 0.0f;                          // it has just stopped: a piston engine coughs for a couple of seconds first
+    const bool dead = !ENG_RUN;
+    const bool spinning = (eng_cranking || (eng_n > 0.03f && !engine_failed));                  // the starter is turning it, or it is still running down
+    if (dead && !prev_dead && !pl.on_ground) fail_t = 0.0f;                          // it has just stopped: a piston engine coughs for a couple of seconds first
     if (!dead) fail_t = 99.0f;
     prev_dead = dead;
     if (fail_t < 99.0f) fail_t += dtf;
@@ -110,6 +111,7 @@ static void snd_game_update(const SceCtrlData *pad) {
         case 1: case 4:                                             // turboprop (K-10, A22): the propeller speed gives the gas generator speed
             in.engine_kind = SND_TURBOPROP; in.blades = 3; in.prop_rpm = pl.rpm;
             in.n1 = clampf(0.36f + 0.64f * (pl.rpm - spec->rpm_idle) / spec->rpm_thr, 0.30f, 1.05f);
+            if (eng_n < 0.999f) in.n1 = fminf(in.n1, fmaxf(0.06f, pl.rpm / fmaxf(spec->rpm_idle, 1.0f) * 0.36f));       // starting or running down: well below idle
             in.load = clampf((in.n1 - 0.30f) / 0.70f, 0.0f, 1.0f);
             break;
         case 2: case 3:                                             // jet (Jet 1, K-30): the dial reads per cent N1
@@ -119,8 +121,9 @@ static void snd_game_update(const SceCtrlData *pad) {
             in.engine_kind = SND_PISTON; in.blades = 2; in.rpm = pl.rpm;
             in.load = clampf((pl.rpm - 600.0f) / 1800.0f, 0.0f, 1.0f);
     }
-    in.engine_ok = (!dead && !pl.crashed) ? 1 : 0;
-    if (dead && spec->model == 0 && fail_t < 2.5f && !pl.crashed) { in.engine_ok = 1; in.misfire = 1.0f - fail_t / 2.5f; }    // sputtering, then silence
+    in.engine_ok = ((!dead || spinning) && !pl.crashed) ? 1 : 0;
+    if (dead && eng_piston() && fail_t < 2.5f && !pl.crashed) { in.engine_ok = 1; in.misfire = 1.0f - fail_t / 2.5f; }
+    if (eng_cranking && eng_piston() && !pl.crashed) in.misfire = 0.85f;                         // the engine chugs while the starter turns it over    // sputtering, then silence
 
     // --- the air and the ground
     in.airspeed = pl.crashed ? 0.0f : pl.speed;

@@ -164,7 +164,7 @@ static void plane_glow(V3 c, float px, unsigned int col) {
 }
 
 static void draw_plane_lights(void) {
-    if (pl.crashed) return;
+    if (pl.crashed || !sw.batt) return;
     const AcLights *L = &AC_LIGHTS[ac_flying];
     const bool night = (tod != TOD_DAY);
     const unsigned int redc = RGBA8(255, 50, 40, 255), grnc = RGBA8(60, 255, 110, 255), whtc = RGBA8(255, 252, 235, 255);
@@ -177,15 +177,15 @@ static void draw_plane_lights(void) {
     V3 wl = body_pt(-L->wx, L->wy, L->wz), wr = body_pt(L->wx, L->wy, L->wz);
     V3 dl = vsub(cam.pos, wl), dr = vsub(cam.pos, wr);
     float ll = sqrtf(vdot(dl, dl)) + 0.01f, lr = sqrtf(vdot(dr, dr)) + 0.01f;
-    lt[n].p = wl; lt[n].col = redc; lt[n].vis = vdot(dl, pl.r) < 0.30f * ll; lt[n].bright = false; n++;
-    lt[n].p = wr; lt[n].col = grnc; lt[n].vis = vdot(dr, pl.r) > -0.30f * lr; lt[n].bright = false; n++;
-    lt[n].p = wl; lt[n].col = whtc; lt[n].vis = strobe_l; lt[n].bright = true; n++;       // strobes ride on the wingtips
-    lt[n].p = wr; lt[n].col = whtc; lt[n].vis = strobe_r; lt[n].bright = true; n++;
+    lt[n].p = wl; lt[n].col = redc; lt[n].vis = lt_nav() && vdot(dl, pl.r) < 0.30f * ll; lt[n].bright = false; n++;
+    lt[n].p = wr; lt[n].col = grnc; lt[n].vis = lt_nav() && vdot(dr, pl.r) > -0.30f * lr; lt[n].bright = false; n++;
+    lt[n].p = wl; lt[n].col = whtc; lt[n].vis = strobe_l && lt_strobe(); lt[n].bright = true; n++;       // strobes ride on the wingtips
+    lt[n].p = wr; lt[n].col = whtc; lt[n].vis = strobe_r && lt_strobe(); lt[n].bright = true; n++;
     for (int i = 0; i < L->ntail; i++) {
         V3 p = body_pt(L->tx[i], L->ty[i], L->tz[i]), d = vsub(cam.pos, p);
-        lt[n].p = p; lt[n].col = whtc; lt[n].vis = vdot(d, pl.f) < 0.25f * (sqrtf(vdot(d, d)) + 0.01f); lt[n].bright = false; n++;
+        lt[n].p = p; lt[n].col = whtc; lt[n].vis = lt_nav() && vdot(d, pl.f) < 0.25f * (sqrtf(vdot(d, d)) + 0.01f); lt[n].bright = false; n++;
     }
-    lt[n].p = body_pt(L->bx, L->by, L->bz); lt[n].col = redc; lt[n].vis = beacon_on; lt[n].bright = true; n++;
+    lt[n].p = body_pt(L->bx, L->by, L->bz); lt[n].col = redc; lt[n].vis = beacon_on && lt_beacon(); lt[n].bright = true; n++;
     for (int i = 0; i < n; i++) {
         if (!lt[i].vis) continue;
         float k = lt[i].bright ? 1.5f : 1.0f;
@@ -197,7 +197,7 @@ static void draw_plane_lights(void) {
 }
 
 static void draw_landing_light(void) {
-    if (tod == TOD_DAY || pl.crashed) return;
+    if (tod == TOD_DAY || pl.crashed || !lt_landing()) return;
     float eye = pl.pos.y + 1.6f;
     if (eye > 450.0f) return;
     V3 b = vnorm(vadd(pl.f, vscale(pl.u, -0.06f)));                            // beam points a little below the nose

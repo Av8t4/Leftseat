@@ -226,12 +226,12 @@ static void build_wing(int sx, float ail_dy, float flap_dy) {
     V3 tc = avgv(sec[3], 5);
     V3 nl[4] = { vadd(tc, vscale(pl.f, 0.05f)), vadd(tc, vscale(pl.u, 0.05f)),
                  vadd(tc, vscale(pl.f, -0.05f)), vadd(tc, vscale(pl.u, -0.05f)) };
-    pf_poly(4, nl, NULL, sx < 0 ? 255 : 40, sx < 0 ? 40 : 255, 40, PF_DECAL | PF_EMIT, 255);   // nav light
-    bool flash = (((frame_count + (sx < 0 ? 0 : 7)) / 3) % 17) == 0;                         // wingtip strobe
+    { const bool on = lt_nav(); pf_poly(4, nl, NULL, on ? (sx < 0 ? 255 : 40) : 96, on ? (sx < 0 ? 40 : 255) : 96, on ? 40 : 100, on ? (PF_DECAL | PF_EMIT) : PF_DECAL, 255); }   // nav light
+    bool flash = lt_strobe() && (((frame_count + (sx < 0 ? 0 : 7)) / 3) % 17) == 0;                         // wingtip strobe
     V3 te = sec[3][2];
     V3 sl[4] = { vadd(te, vscale(pl.f, 0.07f)), vadd(te, vscale(pl.u, 0.07f)),
                  vadd(te, vscale(pl.f, -0.07f)), vadd(te, vscale(pl.u, -0.07f)) };
-    pf_poly(4, sl, NULL, flash ? 255 : 80, flash ? 255 : 80, flash ? 255 : 84, PF_DECAL | PF_EMIT, 255);
+    pf_poly(4, sl, NULL, flash ? 255 : 80, flash ? 255 : 80, flash ? 255 : 84, lt_strobe() ? (PF_DECAL | PF_EMIT) : PF_DECAL, 255);
 }
 
 static void build_htail(int sx, float dy) {
@@ -281,11 +281,11 @@ static void build_fin(float rud) {
     }
     V3 cc = avgv(sec[1], 4);
     pf_poly(4, sec[2], &cc, C_NAVY, 0, 255);
-    bool strobe = ac_lights > 0 && ((frame_count / 6) % 10) == 0;                         // blinking beacon / strobe (off with the lights)
+    bool strobe = lt_beacon() && ((frame_count / 6) % 10) == 0;                         // blinking beacon / strobe (off with the lights)
     V3 tc = avgv(sec[2], 4);
     V3 lq[4] = { vadd(tc, vscale(pl.r, 0.05f)), vadd(tc, vscale(pl.f, -0.08f)),
                  vadd(tc, vscale(pl.r, -0.05f)), vadd(tc, vscale(pl.f, 0.04f)) };
-    if (ac_lights > 0) pf_poly(4, lq, NULL, strobe ? 255 : 150, strobe ? 255 : 40, strobe ? 255 : 40, PF_DECAL | PF_EMIT, 255);
+    pf_poly(4, lq, NULL, strobe ? 255 : (lt_beacon() ? 150 : 70), strobe ? 255 : (lt_beacon() ? 40 : 70), strobe ? 255 : (lt_beacon() ? 40 : 74), lt_beacon() ? (PF_DECAL | PF_EMIT) : PF_DECAL, 255);
 }
 
 // Straight bar from a to b (model space) with a small rectangular section.

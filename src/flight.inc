@@ -44,8 +44,8 @@ static void orthonormalize(void) {
 static float thrust_accel(float throttle, float V) {
     float f = clampf(1.0f - V / THRUST_V0, 0.0f, 1.0f);
     if (spec->thr_exp == 1.0f && spec->thr_idle == 0.0f) return TSTAT * throttle * f;       // propeller aircraft
-    bool running = (pl.fuel > 0.0f && !engine_failed);                                       // a jet: nonlinear, with some thrust at idle
-    float t = spec->thr_idle * (running ? 1.0f : 0.0f) + (1.0f - spec->thr_idle) * powf(throttle, spec->thr_exp);
+    bool running = ENG_RUN;                                                                  // a jet: nonlinear, with some thrust at idle
+    float t = spec->thr_idle * (running ? eng_n : 0.0f) + (1.0f - spec->thr_idle) * powf(throttle, spec->thr_exp);
     return TSTAT * t * f;
 }
 
@@ -77,10 +77,11 @@ static void reset_plane_at(int ap) {
     pl.hdg = pl.hdg_g = a->hdg;                 // (hdg_g is the heading the ground roll steers from)
     pl.on_ground = true;
     pl.fuel = FUEL_FULL;
+    sw_cold();                                         // cold and dark: the engine has to be started
     pl.gear = 1.0f; pl.gear_cmd = true;               // (always starts with the gear down)
     engine_failed = false;
     ntrk = 0; trk_i = 0; trk_t = 0;
-    pl.rpm = spec->rpm_idle;
+    pl.rpm = 0.0f;                                     // (cold: the engine is stopped)
     pl.touched = true;
     set_axes(a->hdg, 0, 0);
     chase_dir = pl.f;

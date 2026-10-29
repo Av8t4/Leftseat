@@ -1,5 +1,5 @@
 // Left Seat: flying with the Vita's motion sensor. Tilt the Vita like a control column: left / right is roll, top edge toward you is nose up.
-// The tilt is measured from the way you hold it when the flight starts (or when you press D-pad down + Circle), so any comfortable grip works.
+// The tilt is measured from the way you hold it when the flight starts (or when you press SELECT + Triangle), so any comfortable grip works.
 // Part of Left Seat's single translation unit: this file is #included by main.c, in order.
 
 static int   gy_mode;                     // flight controls: 0 = sticks, 1 = gyro (tilt)
