@@ -224,11 +224,11 @@ static void draw_switch_panel(vita2d_pgf *pgf) {
     const bool piston = eng_piston();
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, SCREEN_H - VIEW_H, RGBA8(48, 48, 54, 255));
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, 3, RGBA8(120, 120, 128, 255));
-    static const char *const LBL[SWI_N] = { "BATTERY", "", "", "START", "BEACON", "NAV", "STROBE", "LANDING", "TAXI", "PITOT HEAT", "AVIONICS", "CABIN", "" };
-    const char *pump = piston ? "FUEL PUMP" : "FUEL", *ign = piston ? "MAGNETOS" : "IGNITION";
-    vita2d_pgf_draw_text(pgf, 22, VIEW_H + 20, dim, 0.5f, "ENGINE");
-    vita2d_pgf_draw_text(pgf, 298, VIEW_H + 20, dim, 0.5f, "LIGHTS");
-    vita2d_pgf_draw_text(pgf, 640, VIEW_H + 20, dim, 0.5f, "SYSTEMS");
+    static const char *const LBL[SWI_N] = { "BATTERY", "", "", "START", "BEACON", "NAV", "STROBE", "LANDING", "TAXI", "PITOT", "AVIONICS", "CABIN", "" };
+    const char *pump = piston ? "PUMP" : "FUEL", *ign = piston ? "MAGS" : "IGNITION";
+    vita2d_pgf_draw_text(pgf, 22, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, "ENGINE");
+    vita2d_pgf_draw_text(pgf, 298, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, "LIGHTS");
+    vita2d_pgf_draw_text(pgf, 640, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, "SYSTEMS");
     for (int i = 0; i < SWI_N; i++) {
         float x, y, w, h; sw_cell(i, &x, &y, &w, &h);
         const float cx = x + w * 0.5f;
@@ -240,7 +240,7 @@ static void draw_switch_panel(vita2d_pgf *pgf) {
             vita2d_draw_rectangle(x + 6, y + 22, w - 12, 2, RGBA8(255, 255, 255, 70));
             int tw = vita2d_pgf_text_width(pgf, 0.6f, "QUICK"); vita2d_pgf_draw_text(pgf, cx - tw / 2, y + 41, txt, 0.6f, "QUICK");
             tw = vita2d_pgf_text_width(pgf, 0.6f, "START"); vita2d_pgf_draw_text(pgf, cx - tw / 2, y + 58, txt, 0.6f, "START");
-            const char *t = "ready to fly"; tw = vita2d_pgf_text_width(pgf, 0.42f, t); vita2d_pgf_draw_text(pgf, cx - tw / 2, y + h - 10, dim, 0.42f, t);
+            const char *t = "ready to fly"; tw = vita2d_pgf_text_width(pgf, 0.55f, t); vita2d_pgf_draw_text(pgf, cx - tw / 2, y + h - 8, RGBA8(200, 204, 214, 255), 0.55f, t);
             continue;
         }
         if (i == SWI_START) {                                                   // a push button: hold it to turn the engine over
@@ -260,15 +260,18 @@ static void draw_switch_panel(vita2d_pgf *pgf) {
             pb_flush();
             vita2d_draw_fill_circle(cx, ty, 7.0f, on ? RGBA8(230, 232, 238, 255) : RGBA8(170, 172, 182, 255));
         }
-        int tw = vita2d_pgf_text_width(pgf, 0.42f, lb);
-        vita2d_pgf_draw_text(pgf, cx - tw / 2, y + h - 10, txt, 0.42f, lb);
+        const int tw1 = vita2d_pgf_text_width(pgf, 1.0f, lb);                       // as big as fits under the switch
+        float sc = tw1 > 0 ? 54.0f / (float)tw1 : 0.6f;
+        if (sc > 0.62f) sc = 0.62f;
+        const int tw = (int)(tw1 * sc);
+        vita2d_pgf_draw_text(pgf, cx - tw / 2, y + h - 8, RGBA8(245, 246, 250, 255), sc, lb);
     }
     const char *st = ENG_RUN ? "ENGINE RUNNING" : (eng_cranking ? "STARTING..." : (eng_n > 0.05f ? "ENGINE RUNNING DOWN" : "ENGINE OFF"));
     vita2d_pgf_draw_text(pgf, 22, VIEW_H + 138, ENG_RUN ? RGBA8(120, 230, 140, 255) : RGBA8(255, 190, 80, 255), 0.55f, st);
     const char *hint = ENG_RUN ? "Double-tap the back of the Vita to see the gauges again"
-                               : (piston ? "To start: BATTERY, FUEL PUMP and MAGNETOS on, then hold START" : "To start: BATTERY, FUEL and IGNITION on, then hold START");
-    int hw = vita2d_pgf_text_width(pgf, 0.5f, hint);
-    vita2d_pgf_draw_text(pgf, SCREEN_W - 22 - hw, VIEW_H + 138, dim, 0.5f, hint);
+                               : (piston ? "To start: BATTERY, PUMP and MAGS on, then hold START" : "To start: BATTERY, FUEL and IGNITION on, then hold START");
+    int hw = vita2d_pgf_text_width(pgf, 0.55f, hint);
+    vita2d_pgf_draw_text(pgf, SCREEN_W - 22 - hw, VIEW_H + 138, RGBA8(190, 194, 206, 255), 0.55f, hint);
 }
 
 static void draw_panel(vita2d_pgf *pgf) {
