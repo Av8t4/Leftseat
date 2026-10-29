@@ -67,6 +67,7 @@ static int    nmounts = NUM_MOUNTS;
 static bool   invert_pitch;
 static int    frame_count;
 static float  g_focal = 520.0f;
+static int    ac_lights = 2;         // aircraft lights (D-pad down + Square): 2 = all on, 1 = navigation lights and beacon, 0 = off
 static float  g_near  = 2.0f;
 static int    view_mode;        // 0 cockpit, 1 chase, 2 control tower
 static float  trk_x[300], trk_z[300];   // breadcrumbs of where you have flown, for the chart

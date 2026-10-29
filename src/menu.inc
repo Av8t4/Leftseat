@@ -250,8 +250,8 @@ static const char *pk_l2(int kind, int i) {
     }
     if (kind == 4) return W[i];
     if (kind == 5) return T[i];
-    if (kind == 7) return i ? "SELECT + Triangle centers the tilt in flight." : "The standard way to fly.";
-    if (kind == 9 || kind == 10 || kind == 11) return "Tilt the Vita and watch the bars. SELECT + Triangle centers it.";
+    if (kind == 7) return i ? "D-pad down + Circle centers the tilt in flight." : "The standard way to fly.";
+    if (kind == 9 || kind == 10 || kind == 11) return "Tilt the Vita and watch the bars. D-pad down + Circle centers it.";
     if (kind == 8) { static const char *const D[5] = { "Set how loud the engine and effects are.", "Choose sticks or tilt to steer the aircraft.", "Which way the Vita rolls the aircraft.", "Which way the Vita pitches the aircraft.", "How far you have to tilt for full control." }; return D[i]; }
     return S[i & 3];
 }
@@ -971,7 +971,7 @@ static void draw_menu(vita2d_pgf *pgf) {
             vita2d_pgf_draw_text(pgf, px - 24, OP_PY + 22, pale, 0.6f, "NOSE UP");
             vita2d_pgf_draw_text(pgf, px - 32, OP_PY + 206, pale, 0.6f, "NOSE DOWN");
             vita2d_pgf_draw_text(pgf, OP_PX + 14, OP_PY + OP_PH - 38, dimc, 0.6f, gy_have ? "Tilt the Vita: the bars show what it asks of the aircraft." : "No motion data");
-            vita2d_pgf_draw_text(pgf, OP_PX + 14, OP_PY + OP_PH - 18, dimc, 0.6f, "In flight, SELECT + Triangle centers the tilt.");
+            vita2d_pgf_draw_text(pgf, OP_PX + 14, OP_PY + OP_PH - 18, dimc, 0.6f, "In flight, D-pad down + Circle centers the tilt.");
         }
         vita2d_draw_rectangle(HG_LX, OP_DY, 210, HG_BH, RGBA8(30, 52, 96, 255));
         vita2d_draw_rectangle(HG_LX, OP_DY, 210, 1, gold); vita2d_draw_rectangle(HG_LX, OP_DY + HG_BH - 1, 210, 1, gold);
@@ -990,18 +990,19 @@ static void draw_menu(vita2d_pgf *pgf) {
             { "L / R",                     "Look left / right (chase view: both swing the camera to the front)" },
             { "Circle / Cross",            "Flaps down / up" },
             { "D-pad left / right",        "Pitch trim: a tap is a fine step, hold for more" },
-            { "D-pad down (in the air)",   "Trim for level flight at your current airspeed" },
-            { "D-pad down (on the ground)", "Wheel brakes" },
+            { "D-pad down (hold)",         "Wheel brakes on the ground. It is also the shift key for the three rows below" },
+            { "D-pad down + Triangle",     "Trim for level flight at your current airspeed (in the air)" },
+            { "D-pad down + Circle",       "Gyro controls: center the tilt where the Vita is now" },
             { "D-pad up",                  "Fast forward x2 / x5 / normal (free flight only)" },
             { "Square",                    "Landing gear up / down (K-30 and A22)" },
+            { "D-pad down + Square",       "Aircraft lights: all on / navigation and beacon / off" },
             { "Triangle",                  "Reset the aircraft (restart the attempt in a challenge)" },
             { "Select (tap)",              "Switch camera: cockpit / chase" },
-            { "Select + Triangle",         "Gyro controls: center the tilt where the Vita is now" },
-            { "Select (hold)",             "Chart (L / R scroll the list)" },
+                        { "Select (hold)",             "Chart (L / R scroll the list)" },
             { "L + R + Select",            "Invert the pitch axis" },
             { "START",                     "Pause and return to the menu" },
             { "Select + START",            "Save a screenshot (ux0:data/leftseat_001.png, 002, ...)" } };
-        const int nk = (int)(sizeof(KEYS) / sizeof(KEYS[0])), rowh = 22;
+        const int nk = (int)(sizeof(KEYS) / sizeof(KEYS[0])), rowh = 21;
         int h = 52 + nk * rowh + 88, top = (SCREEN_H - h) / 2;
         vita2d_draw_rectangle(60, top, 840, h, gold);
         vita2d_draw_rectangle(64, top + 4, 832, h - 8, RGBA8(10, 22, 56, 255));

@@ -73,15 +73,17 @@ The same list is in the game under **Controls**.
 | Right stick left / right | Rudder |
 | L / R | Look left / right. In the chase view, both together swing the camera round to the front |
 | D-pad up | Fast forward in free flight: tap for x2, again for x5, again for normal |
-| D-pad down | Wheel brakes on the ground. In the air, trim for level flight at your current speed (let go of the stick afterwards) |
+| D-pad down (hold) | Wheel brakes on the ground. It is also the shift key: hold it and press ○, △ or □ for the three actions below |
+| D-pad down + △ | In the air, trim for level flight at your current speed (let go of the stick afterwards) |
+| D-pad down + ○ | Center the gyro controls (when flying by tilt; otherwise ○ still lowers the flaps) |
 | D-pad left / right | Pitch trim: a tap is a fine step, hold for more |
 | ○ / ✕ | Flaps down / up |
 | □ | Landing gear up / down (K-30 and Ashley Twin only) |
+| D-pad down + □ | Aircraft lights: all on, navigation and beacon only, or off |
 | △ | Reset the aircraft, or restart the attempt in a challenge |
 | Select (tap) | Switch between cockpit and chase camera |
 | Select (hold) | Open the chart. The flight pauses while it is open |
 | L + R + Select | Invert the pitch axis |
-| Select + △ | Center the gyro controls |
 | START | Pause and go back to the menu |
 | Select + START | Save a screenshot to `ux0:data/` (`leftseat_001.png`, ...) |
 
@@ -93,7 +95,7 @@ The same list is in the game under **Controls**.
 
 In **Options**, set **Controls** to **Gyro**. Tilt the Vita like a control column: left or right rolls, and the top edge toward you is nose up.
 
-- It measures from the way you were holding the Vita when the flight started, so any comfortable grip works. Select + △ centers it again at any time.
+- It measures from the way you were holding the Vita when the flight started, so any comfortable grip works. D-pad down + ○ centers it again at any time.
 - The tilt adds to the sticks, so you can still use them. Throttle and rudder stay on the right stick.
 - Options also has **Gyro Roll** and **Gyro Pitch** to reverse a direction, and **Sensitivity** (how far you tilt for full control: about 40, 28 or 18 degrees).
 - The Tilt Test panel on that screen shows the Vita turning with you, so you can check the directions before you fly.

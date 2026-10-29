@@ -42,9 +42,25 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
             sel_hold = 0;
         }
     }
-    if (gy_mode && (pad->buttons & SCE_CTRL_SELECT) && (pressed & SCE_CTRL_TRIANGLE)) {      // SELECT + Triangle: center the tilt controls where the Vita is now
-        if (!ff_sub) { gyro_recenter(); gear_say("GYRO CENTERD"); }
-        sel_used = true; pressed &= ~SCE_CTRL_TRIANGLE;
+    // D-pad down is the "shift" key: hold it with the left thumb and press a face button with the right.
+    //   Down + Square: aircraft lights (all on -> nav and beacon -> off)     Down + Triangle: trim for level flight
+    //   Down + Circle: center the gyro controls (only when flying by tilt; otherwise Circle still lowers the flaps)
+    // (Down on its own is still the wheel brake on the ground.)
+    bool trim_req = false;
+    if (pad->buttons & SCE_CTRL_DOWN) {
+        if (pressed & SCE_CTRL_SQUARE) {
+            if (!ff_sub) {
+                ac_lights = (ac_lights + 2) % 3;
+                gear_say(ac_lights == 2 ? "LIGHTS: ALL ON" : (ac_lights == 1 ? "LIGHTS: NAV AND BEACON" : "LIGHTS: OFF"));
+                snd_event(EV_CLICK, 1.0f);
+            }
+            pressed &= ~SCE_CTRL_SQUARE;
+        }
+        if (pressed & SCE_CTRL_TRIANGLE) { trim_req = true; pressed &= ~SCE_CTRL_TRIANGLE; }
+        if (gy_mode && (pressed & SCE_CTRL_CIRCLE)) {
+            if (!ff_sub) { gyro_recenter(); gear_say("GYRO CENTERED"); }
+            pressed &= ~SCE_CTRL_CIRCLE;
+        }
     }
     if (pressed & SCE_CTRL_TRIANGLE) { if (game_mode == MODE_LANDING) challenge_begin(); else reset_free(); return; }
     wx_update();                                       // the weather keeps changing, even after a crash
@@ -79,8 +95,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
     if (pressed & SCE_CTRL_CROSS)  { if (pl.flaps > 0) pl.flaps--; }
     {   // Pitch trim. Everything is measured in degrees of angle of attack, so it feels the same in every aircraft:
         // a tap on D-pad left / right nudges the trim by a tenth of a degree and holding it speeds up after a moment.
-        // D-pad down in the air (the wheel brake, which does nothing up there) trims for level flight at the airspeed
-        // you have right now.
+        // D-pad down + Triangle in the air trims for level flight at the airspeed you have right now.
         static int trim_hold;
         bool tl = (pad->buttons & SCE_CTRL_LEFT) != 0, tr = (pad->buttons & SCE_CTRL_RIGHT) != 0;
         float per_deg = (PI_F / 180.0f) * PITCH_MA / PITCH_MD;                 // trim units per degree of angle of attack
@@ -93,7 +108,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
                 pl.trim += dir * (0.8f + k * 9.2f) * per_deg * DT;
             }
         } else trim_hold = 0;
-        if ((pressed & SCE_CTRL_DOWN) && !pl.on_ground && pl.pos.y > 30.0f) {   // the angle of attack that holds the weight at this airspeed
+        if (trim_req && !pl.on_ground && pl.pos.y > 30.0f) {                       // the angle of attack that holds the weight at this airspeed
             V3 va = vsub(pl.vel, wx_wind_at(pl.pos));
             float V = fmaxf(sqrtf(vdot(va, va)), 20.0f);
             float mfl = WEIGHT_FULL / (WEIGHT_FULL - spec->lb_per_gal * (FUEL_FULL - pl.fuel));
