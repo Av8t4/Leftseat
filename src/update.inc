@@ -164,7 +164,8 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
         float rd = spec->yaw_pow * pl.rud * eff - spec->yaw_damp * pl.yawrate
                    + spec->weathercock * beta * eff                                   // weathercock stability
                    - 0.3f * pl.ail * eff                                 // adverse yaw
-                   - spec->pfactor * thr * clampf(1.0f - eff, 0.0f, 1.0f);       // engine torque / P-factor
+                   - spec->pfactor * thr * clampf((1.4f - V / sqrtf(G_ACC / (KL * CL_MAX))) / 0.5f, 0.0f, 1.0f);   // engine torque / P-factor: strong
+                                                                                                       // near the stall speed, gone by about 1.4 x that
         float tbe = fminf(eff, 1.0f);                   // turbulence shakes the aircraft
         qd += wx.turb * 0.9f * wx_noise(3.1f * wx_time + 1.0f) * tbe;
         pd += wx.turb * 1.2f * wx_noise(2.3f * wx_time + 5.0f) * tbe;
