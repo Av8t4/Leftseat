@@ -80,8 +80,9 @@ The same list is in the game under **Controls**.
 | △ | Reset the aircraft, or restart the attempt in a challenge |
 | Select (tap) | Switch between cockpit and chase camera |
 | Select (hold) | Open the chart. The flight pauses while it is open |
-| L + R + Select | Invert the pitch axis |
 | Select + △ | Center the gyro controls |
+| L + R + Select | Invert the pitch axis |
+| Double-tap the back of the Vita | Swap the gauges for the switch panel, and back (see below) |
 | START | Pause and go back to the menu |
 | Select + START | Save a screenshot to `ux0:data/` (`leftseat_001.png`, ...) |
 
@@ -178,7 +179,7 @@ Bounces and a nose-wheel-first landing cost points, and a crash scores 0. Your b
 
 **Weather** can be clear, breezy, overcast, fog, rain, storm or random. Random starts anywhere and drifts from one kind to another. Wind, gusts and turbulence move the aircraft, clouds drift and can be flown through, and fog cuts visibility. Rain falls with the wind, and storms flash with lightning.
 
-**Time of day** can be day, dusk or night. Dusk has a glowing orange horizon and a low sun. Night has a dark sky with a moon and stars, lit airports, glowing glide-slope lights, lit towns and a landing light.
+**Time of day** can be day, dusk or night. Dusk has a glowing orange horizon and a low sun. Night has a dark sky with a moon and stars, lit airports, glowing glide-slope lights, lit towns and a landing light. Every aircraft carries navigation lights (red left, green right, white tail), a flashing red beacon and white wingtip strobes, which you can see in the chase view. They are switched on the switch panel.
 
 **Sound** is made on the fly from what the aircraft is doing, so there are no audio files:
 
@@ -195,6 +196,12 @@ The cockpit is more muffled than the chase view. Volume is in Options (Off, Low,
 Select switches between two cameras. In the **cockpit** you sit in the left seat with the engine cowling and propeller blur ahead of you. The windshield and door frame slide across as you look left and right with L / R, and the wings, struts and moving flaps and ailerons show out of the side windows. The **chase** view shows the detailed 3D aircraft with moving control surfaces, flaps and propeller.
 
 The instrument panel has round gauges (airspeed with colored arcs, attitude indicator, altimeter, heading, vertical speed, engine speed and fuel), a slip indicator, and throttle, flap and trim levers.
+
+**The switch panel.** Double-tap the back of the Vita and the gauges give way to the cockpit switches. Double-tap again to bring the gauges back. Tap a switch on the touch screen to flip it. The panel has the engine switches (battery, fuel, ignition and a START button), the aircraft lights (beacon, navigation, strobes, landing and taxi) and a few extra switches that do nothing yet (pitot heat, avionics, cabin). The QUICK START button turns everything on and starts the engine at once.
+
+**Starting the engine.** Every flight on the ground begins cold and dark: all the switches are off and the engine is stopped. To start it, turn on the battery, the fuel pump and the magnetos, then hold the START button until the engine catches. The turboprops and jets work the same way with fuel and ignition, but they take a few seconds longer to light and spool up. Turn off the magnetos (piston) or the fuel (turbine) to shut the engine down. The lights need the battery on. Challenges start in the air with the engine running and the lights on. Your switches stay as you left them when you return from the menu, and a reset (△), a new aircraft or a new airport puts them back to cold and dark.
+
+If your Vita's back pad is not responding, or the double tap is too fussy, two quick taps on the instrument panel with the touch screen do the same thing. You can change how fast the two taps must follow each other (or turn the back pad off) in **Options**, under Switch Panel.
 
 ## Building from source
 
@@ -261,7 +268,8 @@ src/night.inc      dusk and night: sky, sun, moon, stars, airport lights, landin
 src/airports.inc   airports, highway, roads, river, bridges, town and downtown streets
 src/spaceport.inc  the east coast and sea, and the hidden place
 src/scene.inc      drawing one frame of the 3D scene, including sorted night lights
-src/panel.inc      instrument panel and gear lights
+src/switches.inc   the engine start-up and the touch handling for the switch panel
+src/panel.inc      instrument panel, switch panel and gear lights
 src/overlays.inc   on-screen messages and warnings
 src/gyro.inc       flying by tilt: reads the motion sensor
 src/chart.inc      the pausable, touch-screen chart shown when you hold Select

@@ -116,10 +116,10 @@ static int  menu_psnd;              // the volume when the sound picker opened (
 // ---- Options: one screen with every setting on it, each shown as a row of buttons ----
 static int  menu_oopen;             // the options screen is showing
 static int  menu_osel;              // its highlighted row
-#define OP_N   5
+#define OP_N   6
 #define OP_X   44.0f
 #define OP_Y   76.0f
-#define OP_ROW 66.0f
+#define OP_ROW 57.0f
 #define OP_CX  236.0f                // where the buttons of a row start, and their total width
 #define OP_CW  320.0f
 #define OP_CH  44.0f
@@ -128,14 +128,14 @@ static int  menu_osel;              // its highlighted row
 #define OP_PY  76.0f
 #define OP_PW  332.0f
 #define OP_PH  330.0f
-static const int OP_COUNT[OP_N] = { 4, 2, 2, 2, 3 };
-static const char *const OP_NAME[OP_N] = { "SOUND", "CONTROLS", "GYRO ROLL", "GYRO PITCH", "SENSITIVITY" };
+static const int OP_COUNT[OP_N] = { 4, 2, 2, 2, 3, 4 };
+static const char *const OP_NAME[OP_N] = { "SOUND", "CONTROLS", "GYRO ROLL", "GYRO PITCH", "SENSITIVITY", "SWITCH PANEL" };
 static const char *const OP_CHIP[OP_N][4] = { { "OFF", "LOW", "MEDIUM", "HIGH" }, { "STICKS", "GYRO", "", "" }, { "NORMAL", "REVERSED", "", "" },
-                                              { "NORMAL", "REVERSED", "", "" }, { "LOW", "MEDIUM", "HIGH", "" } };
-static int op_get(int r) { return r == 0 ? (snd_level & 3) : (r == 1 ? gy_mode : (r == 2 ? gy_rinv : (r == 3 ? gy_pinv : gy_sens))); }
+                                              { "NORMAL", "REVERSED", "", "" }, { "LOW", "MEDIUM", "HIGH", "" }, { "OFF", "FAST", "NORMAL", "SLOW" } };
+static int op_get(int r) { return r == 0 ? (snd_level & 3) : (r == 1 ? gy_mode : (r == 2 ? gy_rinv : (r == 3 ? gy_pinv : (r == 4 ? gy_sens : (sw_dt & 3))))); }
 static void op_set(int r, int v) {
     if (v < 0 || v >= OP_COUNT[r] || v == op_get(r)) return;
-    if (r == 0) snd_level = v; else if (r == 1) { gy_mode = v; if (v) gyro_recenter(); } else if (r == 2) gy_rinv = v; else if (r == 3) gy_pinv = v; else gy_sens = v;
+    if (r == 0) snd_level = v; else if (r == 1) { gy_mode = v; if (v) gyro_recenter(); } else if (r == 2) gy_rinv = v; else if (r == 3) gy_pinv = v; else if (r == 4) gy_sens = v; else sw_dt = v;
     scores_save(); snd_event(EV_CLICK, 1.0f);
 }
 static const char *op_desc(int r) {
@@ -143,7 +143,8 @@ static const char *op_desc(int r) {
     if (r == 1) return gy_mode ? "Tilt to fly (sticks still work)" : "The sticks fly the aircraft";
     if (r == 2) return gy_rinv ? "Tilting right rolls LEFT" : "Tilting right rolls right";
     if (r == 3) return gy_pinv ? "Top edge toward you is nose DOWN" : "Top edge toward you is nose up";
-    return "How far you tilt for full control";
+    if (r == 4) return "How far you tilt for full control";
+    return sw_dt == 0 ? "Off: tap the panel twice with the touch screen" : "Double-tap the back to swap gauges and switches";
 }
 static int  menu_tod;              // time of day for the next flight: day, dusk or night
 static int  menu_wx;               // starting weather: 0..WX_COUNT-1, or WX_COUNT for random
@@ -926,7 +927,7 @@ static void draw_menu(vita2d_pgf *pgf) {
         vita2d_pgf_draw_text(pgf, OP_X, 54, white, 1.3f, "OPTIONS");
         for (int r = 0; r < OP_N; r++) {
             float ry = OP_Y + r * OP_ROW;
-            bool f = (r == menu_osel), gyrow = (r >= 2);
+            bool f = (r == menu_osel), gyrow = (r >= 2 && r <= 4);
             vita2d_draw_rectangle(OP_X, ry, OP_CX + OP_CW + 14.0f - OP_X, OP_ROW - 6.0f, f ? RGBA8(22, 46, 104, 255) : RGBA8(14, 30, 70, 255));
             if (f) vita2d_draw_rectangle(OP_X, ry, 6, OP_ROW - 6.0f, gold);
             unsigned int nc = f ? white : dimc;
@@ -996,12 +997,13 @@ static void draw_menu(vita2d_pgf *pgf) {
             { "Square",                    "Landing gear up / down (K-30 and A22)" },
             { "Triangle",                  "Reset the aircraft (restart the attempt in a challenge)" },
             { "Select (tap)",              "Switch camera: cockpit / chase" },
-            { "Select + Triangle",         "Gyro controls: center the tilt where the Vita is now" },
             { "Select (hold)",             "Chart (L / R scroll the list)" },
+            { "Select + Triangle",         "Gyro controls: center the tilt where the Vita is now" },
             { "L + R + Select",            "Invert the pitch axis" },
+            { "Double-tap the back",       "Switch panel: engine start-up and lights (tap again for the gauges)" },
             { "START",                     "Pause and return to the menu" },
             { "Select + START",            "Save a screenshot (ux0:data/leftseat_001.png, 002, ...)" } };
-        const int nk = (int)(sizeof(KEYS) / sizeof(KEYS[0])), rowh = 22;
+        const int nk = (int)(sizeof(KEYS) / sizeof(KEYS[0])), rowh = 21;
         int h = 52 + nk * rowh + 88, top = (SCREEN_H - h) / 2;
         vita2d_draw_rectangle(60, top, 840, h, gold);
         vita2d_draw_rectangle(64, top + 4, 832, h - 8, RGBA8(10, 22, 56, 255));

@@ -66,7 +66,7 @@ static void draw_overlays(vita2d_pgf *pgf) {
         vita2d_pgf_draw_text(pgf, (SCREEN_W - w1) / 2, 130, RGBA8(255, 210, 90, 255), 1.3f, t1);
         vita2d_pgf_draw_text(pgf, (SCREEN_W - w2) / 2, 162, RGBA8(235, 240, 250, 255), 0.95f, t2);
     }
-    if (spec->retract && !pl.crashed && gear_msg_t > 0) {                 // gear refusals ("too fast" etc.): top right
+    if (!pl.crashed && gear_msg_t > 0) {               // gear refusals ("too fast" etc.): top right
         int mw = vita2d_pgf_text_width(pgf, 0.8f, gear_msg);
         vita2d_pgf_draw_text(pgf, SCREEN_W - mw - 20, 68, RGBA8(255, 150, 60, 255), 0.8f, gear_msg);
     }

@@ -43,7 +43,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
         }
     }
     if (gy_mode && (pad->buttons & SCE_CTRL_SELECT) && (pressed & SCE_CTRL_TRIANGLE)) {      // SELECT + Triangle: center the tilt controls where the Vita is now
-        if (!ff_sub) { gyro_recenter(); gear_say("GYRO CENTERD"); }
+        if (!ff_sub) { gyro_recenter(); gear_say("GYRO CENTERED"); }
         sel_used = true; pressed &= ~SCE_CTRL_TRIANGLE;
     }
     if (pressed & SCE_CTRL_TRIANGLE) { if (game_mode == MODE_LANDING) challenge_begin(); else reset_free(); return; }
@@ -79,8 +79,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
     if (pressed & SCE_CTRL_CROSS)  { if (pl.flaps > 0) pl.flaps--; }
     {   // Pitch trim. Everything is measured in degrees of angle of attack, so it feels the same in every aircraft:
         // a tap on D-pad left / right nudges the trim by a tenth of a degree and holding it speeds up after a moment.
-        // D-pad down in the air (the wheel brake, which does nothing up there) trims for level flight at the airspeed
-        // you have right now.
+        // D-pad down in the air trims for level flight at the airspeed you have right now.
         static int trim_hold;
         bool tl = (pad->buttons & SCE_CTRL_LEFT) != 0, tr = (pad->buttons & SCE_CTRL_RIGHT) != 0;
         float per_deg = (PI_F / 180.0f) * PITCH_MA / PITCH_MD;                 // trim units per degree of angle of attack
@@ -93,7 +92,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
                 pl.trim += dir * (0.8f + k * 9.2f) * per_deg * DT;
             }
         } else trim_hold = 0;
-        if ((pressed & SCE_CTRL_DOWN) && !pl.on_ground && pl.pos.y > 30.0f) {   // the angle of attack that holds the weight at this airspeed
+        if ((pressed & SCE_CTRL_DOWN) && !pl.on_ground && pl.pos.y > 30.0f) {                       // the angle of attack that holds the weight at this airspeed
             V3 va = vsub(pl.vel, wx_wind_at(pl.pos));
             float V = fmaxf(sqrtf(vdot(va, va)), 20.0f);
             float mfl = WEIGHT_FULL / (WEIGHT_FULL - spec->lb_per_gal * (FUEL_FULL - pl.fuel));
@@ -121,13 +120,15 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
 
     // Fuel: the engine quits when the tanks run dry; a lighter plane flies a little better.
     float mf  = WEIGHT_FULL / (WEIGHT_FULL - spec->lb_per_gal * (FUEL_FULL - pl.fuel));
-    float thr = (pl.fuel > 0.0f && !engine_failed) ? pl.throttle : 0.0f;
+    engine_step();                                     // the start-up: starter, ignition, spin-up and shutdown
+    float thr = ENG_RUN ? pl.throttle : 0.0f;
+    if (spec->spool_up <= 0.0f) thr *= eng_n;          // (a propeller engine builds up its power as it spins up)
     if (spec->spool_up > 0.0f) {                       // a jet engine answers the throttle with a delay
         float tau = thr > pl.n1 ? spec->spool_up : spec->spool_down;
         pl.n1 += (thr - pl.n1) * (1.0f - expf(-DT / tau));
         thr = pl.n1;
     }
-    pl.fuel = fmaxf(0.0f, pl.fuel - (spec->burn_idle + spec->burn_full * thr) / 3600.0f * DT);
+    if (ENG_RUN) pl.fuel = fmaxf(0.0f, pl.fuel - (spec->burn_idle + spec->burn_full * thr) / 3600.0f * DT);
 
     V3 wv = wx_wind_at(pl.pos);                        // moving air mass
 
@@ -163,7 +164,8 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
         float rd = spec->yaw_pow * pl.rud * eff - spec->yaw_damp * pl.yawrate
                    + spec->weathercock * beta * eff                                   // weathercock stability
                    - 0.3f * pl.ail * eff                                 // adverse yaw
-                   - spec->pfactor * thr * clampf(1.0f - eff, 0.0f, 1.0f);       // engine torque / P-factor
+                   - spec->pfactor * thr * clampf((1.4f - V / sqrtf(G_ACC / (KL * CL_MAX))) / 0.5f, 0.0f, 1.0f);   // engine torque / P-factor: strong
+                                                                                                       // near the stall speed, gone by about 1.4 x that
         float tbe = fminf(eff, 1.0f);                   // turbulence shakes the aircraft
         qd += wx.turb * 0.9f * wx_noise(3.1f * wx_time + 1.0f) * tbe;
         pd += wx.turb * 1.2f * wx_noise(2.3f * wx_time + 5.0f) * tbe;
@@ -293,8 +295,12 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
     pl.vs    = pl.vel.y;
     {                                                  // engine speed follows throttle and airspeed
         float target;
-        if (pl.fuel > 0.0f && !engine_failed) target = spec->rpm_idle + spec->rpm_thr * thr + spec->rpm_air * pl.speed * (0.3f + 0.7f * thr);
-        else                target = pl.on_ground ? 0.0f : fminf(spec->windmill_k * pl.speed, spec->windmill_cap);   // windmilling
+        if (ENG_RUN) target = (spec->rpm_idle + spec->rpm_thr * thr + spec->rpm_air * pl.speed * (0.3f + 0.7f * thr)) * eng_n;
+        else {
+            target = pl.on_ground ? 0.0f : fminf(spec->windmill_k * pl.speed, spec->windmill_cap);   // windmilling
+            target = fmaxf(target, spec->rpm_idle * eng_n);                                          // (a jet takes a while to run down)
+            if (eng_cranking) target = fmaxf(target, 0.30f * spec->rpm_idle);                        // the starter turns it over
+        }
         pl.rpm += (clampf(target, 0.0f, spec->rpm_cap) - pl.rpm) * 0.08f;
     }
 

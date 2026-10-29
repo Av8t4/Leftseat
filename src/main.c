@@ -31,6 +31,7 @@
 #include "soundcore.inc"
 #include "gyro.inc"
 #include "challenge.inc"
+#include "switches.inc"
 #include "update.inc"
 #include "models.inc"
 #include "modelkit.inc"
@@ -88,6 +89,7 @@ int main(void) {
 
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
     sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);     // the chart uses the touch screen
+    sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, SCE_TOUCH_SAMPLING_STATE_START);      // the switch panel opens with a double tap on the back
     sceMotionReset(); sceMotionStartSampling();                                          // the motion sensor, for flying by tilt
     build_world();
     reset_plane();
@@ -107,6 +109,12 @@ int main(void) {
             for (int i = 0; i < (int)td.reportNum && g_touch.n < 2; i++) {
                 g_touch.x[g_touch.n] = td.report[i].x * 0.5f; g_touch.y[g_touch.n] = td.report[i].y * 0.5f; g_touch.id[g_touch.n] = td.report[i].id; g_touch.n++;
             }
+        }
+        int back_n = 0;
+        {
+            SceTouchData bd;                                                   // the back pad: only how many fingers are on it
+            sceTouchPeek(SCE_TOUCH_PORT_BACK, &bd, 1);
+            back_n = (int)bd.reportNum;
         }
         gyro_sample();
         unsigned int pressed = pad.buttons & ~prev.buttons;
@@ -184,6 +192,7 @@ int main(void) {
             if (game_mode != MODE_FREE) ff_level = 0;                         // fast forward is for free flight only, never in a challenge
             else if (pressed & SCE_CTRL_UP) ff_level = (ff_level + 1) % 3;   // D-pad up: normal -> x2 -> x5 -> normal
             unsigned long long pt0 = sceKernelGetProcessTimeWide();
+            sw_input(g_touch.n, g_touch.x, g_touch.y, g_touch.id, back_n);
             update(&pad, pressed);
             challenge_update();
             for (int k = 1; k < FF_MULT[ff_level] && !pl.crashed && ch_state != CH_DONE; k++) {   // fast forward: extra sim steps, no new button presses

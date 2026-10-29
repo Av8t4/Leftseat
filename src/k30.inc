@@ -28,17 +28,17 @@ static void a_wing_sw(const AWingS *W, int sx, const float *dy, const Paint *p, 
             if (tip && (e == 0 || e == 1 || e == 7)) { r = W->tipcol[0] * M[e]; g = W->tipcol[1] * M[e]; b = W->tipcol[2] * M[e]; }
             pf_poly(4, q, &cc[k], r, g, b, PF_TWO, 255);       // every face is drawn from both sides: with a big control-surface deflection on a thin panel, the "which way does it face" test can flip
             if (e == 2 && W->hinge[k]) decal_quad(A, B, C, D, 0.0f, 0.04f, 0.0f, 1.0f, 112, 118, 128);
-            if (e == 7 && k == 3 && sx < 0 && light) decal_quad(A, B, C, D, 0.15f, 0.85f, 0.15f, 0.60f, 255, 250, 215);   // landing light
+            if (e == 7 && k == 3 && sx < 0 && light && lt_landing()) decal_quad(A, B, C, D, 0.15f, 0.85f, 0.15f, 0.60f, 255, 250, 215);   // landing light
         }
     int n1 = W->n - 1;
     pf_poly(8, sec[n1], &cc[n1 - 1], W->tipcol[0], W->tipcol[1], W->tipcol[2], 0, 255);
     V3 tc = avgv(sec[n1], 8);
     V3 nl[4] = { vadd(tc, vscale(pl.f, 0.05f)), vadd(tc, vscale(pl.u, 0.05f)), vadd(tc, vscale(pl.f, -0.05f)), vadd(tc, vscale(pl.u, -0.05f)) };
-    pf_poly(4, nl, NULL, sx < 0 ? 255 : 40, sx < 0 ? 40 : 255, 40, PF_DECAL | PF_EMIT, 255);                    // navigation light
-    bool flash = (((frame_count + (sx < 0 ? 0 : 7)) / 3) % 17) == 0;
+    { const bool on = lt_nav(); pf_poly(4, nl, NULL, on ? (sx < 0 ? 255 : 40) : 96, on ? (sx < 0 ? 40 : 255) : 96, on ? 40 : 100, on ? (PF_DECAL | PF_EMIT) : PF_DECAL, 255); }                    // navigation light
+    bool flash = lt_strobe() && (((frame_count + (sx < 0 ? 0 : 7)) / 3) % 17) == 0;
     V3 te = sec[n1][4];
     V3 sl[4] = { vadd(te, vscale(pl.f, 0.07f)), vadd(te, vscale(pl.u, 0.07f)), vadd(te, vscale(pl.f, -0.07f)), vadd(te, vscale(pl.u, -0.07f)) };
-    pf_poly(4, sl, NULL, flash ? 255 : 80, flash ? 255 : 80, flash ? 255 : 84, PF_DECAL | PF_EMIT, 255);      // strobe
+    pf_poly(4, sl, NULL, flash ? 255 : 80, flash ? 255 : 80, flash ? 255 : 84, lt_strobe() ? (PF_DECAL | PF_EMIT) : PF_DECAL, 255);      // strobe
 }
 
 static void sw_make(AWingS *W, int n, float xr, float xt, float lr, float lt, float tr, float tt, float thr, float tht, float y0, float dih, int h0, int h1) {

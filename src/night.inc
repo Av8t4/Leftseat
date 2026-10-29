@@ -135,9 +135,69 @@ static void draw_night_lights(void) {
     }
 }
 
-// The aircraft's landing light: a soft pool of light on the ground where the beam lands.
+// The aircraft's own lights, seen from outside (chase and tower views): a red light on the left wingtip, green on the right, white
+// at the tail, a red beacon that flashes about once a second, and white wingtip strobes. Each is a small bright dot with a soft glow
+// that stays visible from far away, so you can pick out an aircraft in the dark. Like the real ones, the red and green lights can only
+// be seen from their own side and the white tail light only from behind and the sides.
+typedef struct { float wx, wy, wz; float tx[2], ty[2], tz[2]; int ntail; float bx, by, bz; } AcLights;
+static const AcLights AC_LIGHTS[AC_COUNT] = {
+    /* K-4      */ { 5.50f, 2.23f,  0.74f, { 0.00f, 0.00f }, { 2.72f, 0.00f }, { -4.78f, 0.00f }, 1, 0.00f, 2.80f, -4.35f },
+    /* K-10     */ { 7.94f, 2.91f,  0.70f, { 0.00f, 0.00f }, { 4.15f, 0.00f }, { -7.86f, 0.00f }, 1, 0.00f, 4.62f, -6.85f },
+    /* Jet 1    */ { 2.74f, 0.905f, 0.33f, { 0.00f, 0.00f }, { 1.48f, 0.00f }, { -3.12f, 0.00f }, 1, 0.00f, 1.84f, -0.50f },
+    /* K-30     */ { 7.20f, 1.72f, -1.66f, { 0.00f, 0.00f }, { 3.00f, 0.00f }, { -7.40f, 0.00f }, 1, 0.00f, 6.12f, -5.80f },
+    /* Ashley A22 */ { 6.60f, 2.22f, 2.53f, { -4.05f, 4.05f }, { 2.29f, 2.29f }, { -7.05f, -7.05f }, 2, 0.00f, 4.08f, -5.43f },
+    /* Ashley A11 */ { 4.90f, 1.17f, -0.41f, { 0.00f, 0.00f }, { 3.05f, 0.00f }, { -5.70f, 0.00f }, 1, 0.00f, 3.34f, -1.62f },
+};
+
+// A round glow: an octagon that always faces the camera, at least `px` pixels across from its middle to its edge.
+static void plane_glow(V3 c, float px, unsigned int col) {
+    V3 d = vsub(c, cam.pos);
+    float cz = vdot(d, cam.f);
+    if (cz < 1.0f || cz > 9000.0f) return;
+    float s = fmaxf(0.10f, cz * px / FOCAL);
+    V3 q[8];
+    for (int i = 0; i < 8; i++) {
+        float a = (i + 0.5f) * (PI_F / 4.0f);
+        q[i] = vadd(c, vadd(vscale(cam.r, cosf(a) * s), vscale(cam.u, sinf(a) * s)));
+    }
+    draw_world_poly_emit(q, 8, col);
+}
+
+static void draw_plane_lights(void) {
+    if (pl.crashed || !sw.batt) return;
+    const AcLights *L = &AC_LIGHTS[ac_flying];
+    const bool night = (tod != TOD_DAY);
+    const unsigned int redc = RGBA8(255, 50, 40, 255), grnc = RGBA8(60, 255, 110, 255), whtc = RGBA8(255, 252, 235, 255);
+    const bool beacon_on = ((frame_count / 6) % 10) == 0;                             // same timing as the beacon patch on the model
+    const bool strobe_l = (((frame_count) / 3) % 17) == 0, strobe_r = (((frame_count + 7) / 3) % 17) == 0;
+    const float core = night ? 2.6f : 1.8f, halo = night ? 11.0f : 5.0f;
+    const int ha = night ? 95 : 55;
+    struct { V3 p; unsigned int col; int vis; bool bright; } lt[8];
+    int n = 0;
+    V3 wl = body_pt(-L->wx, L->wy, L->wz), wr = body_pt(L->wx, L->wy, L->wz);
+    V3 dl = vsub(cam.pos, wl), dr = vsub(cam.pos, wr);
+    float ll = sqrtf(vdot(dl, dl)) + 0.01f, lr = sqrtf(vdot(dr, dr)) + 0.01f;
+    lt[n].p = wl; lt[n].col = redc; lt[n].vis = lt_nav() && vdot(dl, pl.r) < 0.30f * ll; lt[n].bright = false; n++;
+    lt[n].p = wr; lt[n].col = grnc; lt[n].vis = lt_nav() && vdot(dr, pl.r) > -0.30f * lr; lt[n].bright = false; n++;
+    lt[n].p = wl; lt[n].col = whtc; lt[n].vis = strobe_l && lt_strobe(); lt[n].bright = true; n++;       // strobes ride on the wingtips
+    lt[n].p = wr; lt[n].col = whtc; lt[n].vis = strobe_r && lt_strobe(); lt[n].bright = true; n++;
+    for (int i = 0; i < L->ntail; i++) {
+        V3 p = body_pt(L->tx[i], L->ty[i], L->tz[i]), d = vsub(cam.pos, p);
+        lt[n].p = p; lt[n].col = whtc; lt[n].vis = lt_nav() && vdot(d, pl.f) < 0.25f * (sqrtf(vdot(d, d)) + 0.01f); lt[n].bright = false; n++;
+    }
+    lt[n].p = body_pt(L->bx, L->by, L->bz); lt[n].col = redc; lt[n].vis = beacon_on && lt_beacon(); lt[n].bright = true; n++;
+    for (int i = 0; i < n; i++) {
+        if (!lt[i].vis) continue;
+        float k = lt[i].bright ? 1.5f : 1.0f;
+        unsigned int c = lt[i].col, rgb = c & 0x00FFFFFFu;
+        plane_glow(lt[i].p, halo * k, rgb | ((unsigned)(ha / 2) << 24));           // a wide faint glow,
+        plane_glow(lt[i].p, halo * 0.55f * k, rgb | ((unsigned)ha << 24));         // a tighter one,
+        plane_glow(lt[i].p, core * k, c);                                          // and the bright centre
+    }
+}
+
 static void draw_landing_light(void) {
-    if (tod == TOD_DAY || pl.crashed) return;
+    if (tod == TOD_DAY || pl.crashed || !lt_landing()) return;
     float eye = pl.pos.y + 1.6f;
     if (eye > 450.0f) return;
     V3 b = vnorm(vadd(pl.f, vscale(pl.u, -0.06f)));                            // beam points a little below the nose

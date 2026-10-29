@@ -76,6 +76,32 @@ static float  chart_scroll;       // how far the airport list on the chart is sc
 static bool   chart_open;        // the chart is open (hold Select): the flight is paused while it is
 static void   chart_begin(void);
 static bool   engine_failed;     // the engine has stopped (engine-out challenge), whatever the fuel gauge says
+
+// The switch panel (double-tap the back of the Vita): the cockpit switches and the engine start-up.
+typedef struct { bool batt, pump, ign, beacon, nav, strobe, landing, taxi, pitot, avionics, cabin; } Switches;
+static Switches sw;
+static bool   eng_on;            // the engine is burning fuel (it has been started and not shut down)
+static float  eng_n;             // 0..1: how far the engine has spun up (it takes a moment after the start, and runs down after a shutdown)
+static float  eng_crank_t;       // seconds the starter has been turning the engine over
+static bool   starter_held;      // the START button is held down
+static bool   eng_cranking;      // the starter is turning the engine over right now
+static bool   sw_open;           // the switch panel is showing instead of the gauges
+static int    sw_dt = 2;         // double-tap speed for opening it: 0 off, 1 fast, 2 normal, 3 slow
+#define ENG_RUN (pl.fuel > 0.0f && !engine_failed && eng_on)
+static inline bool lt_nav(void)     { return sw.batt && sw.nav; }
+static inline bool lt_strobe(void)  { return sw.batt && sw.strobe; }
+static inline bool lt_beacon(void)  { return sw.batt && sw.beacon; }
+static inline bool lt_landing(void) { return sw.batt && sw.landing; }
+// Cold and dark: everything off and the engine stopped (a new flight, or Triangle).
+static void sw_cold(void) {
+    memset(&sw, 0, sizeof(sw));
+    eng_on = false; eng_n = 0.0f; eng_crank_t = 0.0f; starter_held = false; eng_cranking = false;
+}
+// Everything on and the engine running (challenges, which start in the air, and the QUICK START button).
+static void sw_run_all(void) {
+    sw.batt = sw.pump = sw.ign = sw.beacon = sw.nav = sw.strobe = sw.landing = sw.avionics = true;
+    eng_on = true; eng_n = 1.0f; eng_crank_t = 0.0f; eng_cranking = false;
+}
 static int    view_banner;      // frames left to show the view name
 static float  look_ang;         // head / camera turn from straight ahead (radians, right is positive)
 static V3     chase_dir = { 0.0f, 0.0f, 1.0f };

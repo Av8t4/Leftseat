@@ -55,6 +55,7 @@ static void scores_load(void) {
         if (!strcmp(key, "gyro_roll_rev")) { gy_rinv = v != 0; continue; }
         if (!strcmp(key, "gyro_pitch_rev")) { gy_pinv = v != 0; continue; }
         if (!strcmp(key, "gyro_sens")) { if (v >= 0 && v < 3) gy_sens = v; continue; }
+        if (!strcmp(key, "panel_tap")) { if (v >= 0 && v < 4) sw_dt = v; continue; }
         if (!strcmp(key, "sound")) { if (v >= 0 && v < 4) snd_level = v; continue; }            // the volume setting
         for (int a = 0; a < AC_COUNT; a++)
             for (int k = 0; k < CK_COUNT; k++) {
@@ -69,7 +70,7 @@ static void scores_save(void) {
     FILE *f = fopen(SCORE_PATH, "w");
     if (!f) return;
     fprintf(f, "sound=%d\n", snd_level);
-    fprintf(f, "gyro=%d\ngyro_roll_rev=%d\ngyro_pitch_rev=%d\ngyro_sens=%d\n", gy_mode, gy_rinv, gy_pinv, gy_sens);
+    fprintf(f, "gyro=%d\ngyro_roll_rev=%d\ngyro_pitch_rev=%d\ngyro_sens=%d\npanel_tap=%d\n", gy_mode, gy_rinv, gy_pinv, gy_sens, sw_dt);
     fprintf(f, "found_gps=%d\n", ap_found);
     for (int a = 0; a < AC_COUNT; a++)
         for (int k = 0; k < CK_COUNT; k++)
@@ -172,6 +173,7 @@ static void challenge_begin(void) {
     ch_state = CH_FLYING; ch_t = 0.0f; ch_td_t = 0.0f; ch_air_after = false;
     ch_xc_up = false; ch_fuel0 = pl.fuel;
     pl.n1 = pl.throttle;                                                // (a jet starts with its engine already at that power)
+    sw_run_all();                                                       // (challenges start with the engine running and the lights on)
     memset(&chr, 0, sizeof(chr));
     game_mode = MODE_LANDING;
 }
