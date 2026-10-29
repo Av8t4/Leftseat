@@ -65,6 +65,7 @@ static void setup_camera(void) {
 }
 
 // Transform a world polygon to the screen, near-clip it, and fill it.
+static float poly_fog_cap = 1e30f;                 // polygons count as no farther than this for the fog (the far sea uses it, so it ends in a steady haze)
 static void draw_poly_ex(const V3 *p, int n, unsigned int color, bool emit) {
     V3 c[8];
     for (int i = 0; i < n; i++) {
@@ -93,7 +94,9 @@ static void draw_poly_ex(const V3 *p, int n, unsigned int color, bool emit) {
     float cd = 0.0f;                                   // fog: blend toward the haze color with distance
     for (int i = 0; i < m; i++) cd += sqrtf(q[i].x * q[i].x + q[i].y * q[i].y + q[i].z * q[i].z);
     if (!emit) color = tod_apply(color);
-    color = wx_fog_apply(color, cd / m);
+    float fd = cd / m;
+    if (fd > poly_fog_cap) fd = poly_fog_cap;
+    color = wx_fog_apply(color, fd);
     fill_poly2d(s, m, color);
 }
 static void draw_world_poly(const V3 *p, int n, unsigned int color)      { draw_poly_ex(p, n, color, false); }
