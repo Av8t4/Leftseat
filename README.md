@@ -75,11 +75,11 @@ The same list is in the game under **Controls**.
 | D-pad up | Fast forward in free flight: tap for x2, again for x5, again for normal |
 | D-pad down (hold) | Wheel brakes on the ground. It is also the shift key: hold it and press ○, △ or □ for the three actions below |
 | D-pad down + △ | In the air, trim for level flight at your current speed (let go of the stick afterwards) |
-| D-pad down + ○ | Center the gyro controls (when flying by tilt; otherwise ○ still lowers the flaps) |
+| D-pad down + ○ | Center the gyro controls (when flying by tilt; otherwise it does nothing, and the flaps do not move) |
 | D-pad left / right | Pitch trim: a tap is a fine step, hold for more |
 | ○ / ✕ | Flaps down / up |
 | □ | Landing gear up / down (K-30 and Ashley Twin only) |
-| D-pad down + □ | Aircraft lights: all on, navigation and beacon only, or off |
+| D-pad down + □ | Aircraft lights: all on, navigation and beacon only, or off (you see them from the chase view) |
 | △ | Reset the aircraft, or restart the attempt in a challenge |
 | Select (tap) | Switch between cockpit and chase camera |
 | Select (hold) | Open the chart. The flight pauses while it is open |

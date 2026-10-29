@@ -281,11 +281,11 @@ static void build_fin(float rud) {
     }
     V3 cc = avgv(sec[1], 4);
     pf_poly(4, sec[2], &cc, C_NAVY, 0, 255);
-    bool strobe = ((frame_count / 6) % 10) == 0;                                          // blinking beacon / strobe
+    bool strobe = ac_lights > 0 && ((frame_count / 6) % 10) == 0;                         // blinking beacon / strobe (off with the lights)
     V3 tc = avgv(sec[2], 4);
     V3 lq[4] = { vadd(tc, vscale(pl.r, 0.05f)), vadd(tc, vscale(pl.f, -0.08f)),
                  vadd(tc, vscale(pl.r, -0.05f)), vadd(tc, vscale(pl.f, 0.04f)) };
-    pf_poly(4, lq, NULL, strobe ? 255 : 150, strobe ? 255 : 40, strobe ? 255 : 40, PF_DECAL | PF_EMIT, 255);
+    if (ac_lights > 0) pf_poly(4, lq, NULL, strobe ? 255 : 150, strobe ? 255 : 40, strobe ? 255 : 40, PF_DECAL | PF_EMIT, 255);
 }
 
 // Straight bar from a to b (model space) with a small rectangular section.

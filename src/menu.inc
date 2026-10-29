@@ -995,7 +995,7 @@ static void draw_menu(vita2d_pgf *pgf) {
             { "D-pad down + Circle",       "Gyro controls: center the tilt where the Vita is now" },
             { "D-pad up",                  "Fast forward x2 / x5 / normal (free flight only)" },
             { "Square",                    "Landing gear up / down (K-30 and A22)" },
-            { "D-pad down + Square",       "Aircraft lights: all on / navigation and beacon / off" },
+            { "D-pad down + Square",       "Aircraft lights: all on / navigation and beacon / off (seen in the chase view)" },
             { "Triangle",                  "Reset the aircraft (restart the attempt in a challenge)" },
             { "Select (tap)",              "Switch camera: cockpit / chase" },
                         { "Select (hold)",             "Chart (L / R scroll the list)" },

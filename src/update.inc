@@ -44,7 +44,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
     }
     // D-pad down is the "shift" key: hold it with the left thumb and press a face button with the right.
     //   Down + Square: aircraft lights (all on -> nav and beacon -> off)     Down + Triangle: trim for level flight
-    //   Down + Circle: center the gyro controls (only when flying by tilt; otherwise Circle still lowers the flaps)
+    //   Down + Circle: center the gyro controls (only acts when flying by tilt; otherwise it does nothing)
     // (Down on its own is still the wheel brake on the ground.)
     bool trim_req = false;
     if (pad->buttons & SCE_CTRL_DOWN) {
@@ -57,8 +57,8 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
             pressed &= ~SCE_CTRL_SQUARE;
         }
         if (pressed & SCE_CTRL_TRIANGLE) { trim_req = true; pressed &= ~SCE_CTRL_TRIANGLE; }
-        if (gy_mode && (pressed & SCE_CTRL_CIRCLE)) {
-            if (!ff_sub) { gyro_recenter(); gear_say("GYRO CENTERED"); }
+        if (pressed & SCE_CTRL_CIRCLE) {                // never raises the flaps while the shift key is held
+            if (gy_mode && !ff_sub) { gyro_recenter(); gear_say("GYRO CENTERED"); }
             pressed &= ~SCE_CTRL_CIRCLE;
         }
     }
