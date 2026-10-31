@@ -61,17 +61,18 @@ static void draw_pier(void) {
 
 static void draw_sea(void) {
     if (cam.pos.x < SEA_X - 60000.0f) return;                                    // too far away to see
-    static const float E8[9] = { 0.0f, 260.0f, 800.0f, 1800.0f, 3600.0f, 7000.0f, 14000.0f, 30000.0f, 80000.0f };
-    static const float E4[5] = { 0.0f, 1800.0f, 8000.0f, 30000.0f, 80000.0f };
+    static const float E8[9] = { 0.0f, 260.0f, 800.0f, 1800.0f, 3600.0f, 7000.0f, 14000.0f, 30000.0f, 3000000.0f };
+    static const float E4[5] = { 0.0f, 1800.0f, 8000.0f, 30000.0f, 3000000.0f };
     float zc = floorf(cam.pos.z / 1600.0f) * 1600.0f;
     float rows[40];
     int nr = 0;
-    rows[nr++] = zc - 64000.0f;
+    rows[nr++] = zc - 3000000.0f;                                              // (the sea runs right out to the horizon, both ways)
     for (float z = zc - 16000.0f; z < zc - 4800.0f - 1.0f; z += 3200.0f) rows[nr++] = z;
     for (float z = zc - 4800.0f; z <= zc + 6400.0f + 1.0f; z += 1600.0f) rows[nr++] = z;
     for (float z = zc + 6400.0f + 3200.0f; z <= zc + 16000.0f + 1.0f; z += 3200.0f) rows[nr++] = z;
-    rows[nr++] = zc + 64000.0f;
+    rows[nr++] = zc + 3000000.0f;
     float ph = (float)(frame_count % 6000) * 0.035f;
+    poly_fog_cap = 30000.0f;                                                       // (the far sea stays one steady haze all the way to the horizon)
     for (int r = 0; r + 1 < nr; r++) {
         float z0 = rows[r], z1 = rows[r + 1], dz = fabsf(0.5f * (z0 + z1) - cam.pos.z);
         if (vdot(vsub(v3(SEA_X, 0, 0.5f * (z0 + z1)), cam.pos), cam.f) < -(z1 - z0) - 9000.0f && dz > 30000.0f) continue;
@@ -92,6 +93,7 @@ static void draw_sea(void) {
             if (dz < 8000.0f) beach_strip(z0, z1, 0.92f, 1.35f, RGBA8(170, 168, 104, 255));     // dune grass behind it
         }
     }
+    poly_fog_cap = 1e30f;
     draw_pier();
 }
 
