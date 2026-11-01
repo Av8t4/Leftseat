@@ -165,13 +165,22 @@ typedef struct {
     float reverse_t;       // seconds the car has been held still while the stick asked for reverse
     bool  hand;            // the handbrake
     float odo;             // meters driven since the start
+    float gas;             // cold gas left in the tank, 0..100
+    bool  air;             // off the ground: the free-flight model below is running
+    float hiss;            // 0..1, how hard the thrusters are blowing (for the sound)
+    float rx, ry, rz;      // airborne spin: pitch (nose up +), roll (right wing down +), yaw (nose right +) in rad/s
+    float jet_hop, jet_roof;   // 0..1 jets in use this frame
+    float cp, cr, cy;      // attitude commands this frame, -1..1
+    float air_t;           // seconds since leaving the ground
 } KX;
 static KX kx;
 
+static int kx_npuff;                                  // (the thruster puffs: see below)
 static void kx_reset(float heading) {
     memset(&kx, 0, sizeof(kx));
-    kx.psi = heading; kx.batt = 1.0f;
+    kx.psi = heading; kx.batt = 1.0f; kx.gas = 100.0f;
     kx_steer_vis = 0.0f; kx_braking = false;
+    kx_npuff = 0;
 }
 
 // One frame of driving. Constants are SI; a mile per hour is 0.447 m/s.
@@ -243,9 +252,200 @@ static void kx_drive(const SceCtrlData *pad) {
     kx.odo += fabsf(kx.u) * dt;
 }
 
+/* ------------------------------------------------------------------ */
+/* Cold-gas thrusters and free flight                                  */
+/* ------------------------------------------------------------------ */
+
+#define KX_HOP_ACC   17.0f      // m/s^2 along the roof-to-floor axis from the four hop jets: about 1.7 g, so a level car climbs at 0.7 g
+#define KX_ROOF_ACC  10.0f      // m/s^2 pushing the car toward its floor
+#define KX_RCS_ACC   4.2f       // rad/s^2 from the attitude jets
+#define KX_HOP_USE   7.0f       // gas units a second (the tank holds 100: about 14 s of hop)
+#define KX_ROOF_USE  8.0f
+#define KX_RCS_USE   1.6f       // per axis at full stick
+
+typedef struct { V3 p; V3 v; float age, life, size; } KXPuff;
+static KXPuff kx_puffs[96];
+
+static unsigned int kx_rng = 12345u;
+static float kx_rnd(void) { kx_rng = kx_rng * 1664525u + 1013904223u; return ((kx_rng >> 9) & 0x7fff) / 16384.0f - 1.0f; }
+
+// A jet at a point on the car (model space) blowing along `dir` (model space).
+static void kx_emit(float x, float y, float z, float dx, float dy, float dz, float speed, float size) {
+    if (kx_npuff >= 96) return;
+    KXPuff *q = &kx_puffs[kx_npuff++];
+    q->p = MW(x, y, z);
+    V3 d = vadd(vadd(vscale(pl.r, dx), vscale(pl.u, dy)), vscale(pl.f, dz));
+    q->v = vadd(pl.vel, vadd(vscale(d, speed), v3(kx_rnd() * 0.8f, kx_rnd() * 0.8f, kx_rnd() * 0.8f)));
+    q->age = 0.0f; q->life = 0.35f + 0.15f * fabsf(kx_rnd()); q->size = size;
+}
+
+static void kx_puffs_step(void) {
+    int n = 0;
+    for (int i = 0; i < kx_npuff; i++) {
+        KXPuff q = kx_puffs[i];
+        q.age += DT;
+        if (q.age >= q.life) continue;
+        q.p = vadd(q.p, vscale(q.v, DT));
+        q.v = vscale(q.v, 1.0f - 2.2f * DT);
+        kx_puffs[n++] = q;
+    }
+    kx_npuff = n;
+}
+
+static void kx_draw_puffs(void) {
+    for (int i = 0; i < kx_npuff; i++) {
+        const KXPuff *q = &kx_puffs[i];
+        float t = q->age / q->life;
+        float rad = q->size * (0.5f + 1.6f * t);
+        int a = (int)(150.0f * (1.0f - t));
+        if (a < 4) continue;
+        V3 c = q->p, pts[6];
+        for (int k = 0; k < 6; k++) {
+            float ang = k * (PI_F / 3.0f);
+            pts[k] = vadd(c, vadd(vscale(cam.r, cosf(ang) * rad), vscale(cam.u, sinf(ang) * rad)));
+        }
+        draw_world_poly(pts, 6, RGBA8(235, 242, 255, a));
+    }
+}
+
+// The points on the car that can touch the ground (model space, y up from the wheel bottoms).
+typedef struct { float x, y, z; bool wheel; } KXPt;
+static const KXPt KXP[] = {
+    { -0.80f, 0.00f, -1.32f, true }, { 0.80f, 0.00f, -1.32f, true }, { -0.80f, 0.00f, 1.11f, true }, { 0.80f, 0.00f, 1.11f, true },
+    {  0.00f, 0.16f,  2.18f, false }, { 0.00f, 0.26f, -2.18f, false }, { -0.88f, 0.30f, 0.00f, false }, { 0.88f, 0.30f, 0.00f, false },
+    {  0.00f, 1.22f,  0.10f, false }, { 0.00f, 1.05f,  1.00f, false }, { 0.00f, 1.05f, -1.00f, false },
+    { -0.85f, 0.70f,  1.40f, false }, { 0.85f, 0.70f, 1.40f, false }, { -0.85f, 0.70f, -1.40f, false }, { 0.85f, 0.70f, -1.40f, false },
+};
+#define KX_NPT ((int)(sizeof(KXP) / sizeof(KXP[0])))
+
+// Leaves the ground: the speed and heading carry over as a free body.
+static void kx_lift_off(void) {
+    kx.air = true; kx.air_t = 0.0f;
+    kx.rx = kx.ry = kx.rz = 0.0f;
+    pl.pos.y = 0.03f;
+}
+
+// Touches down. Returns false (after setting the crash reason) when the landing is not survivable.
+static bool kx_touch_down(float lowest_wheel, float lowest_body) {
+    const float sink = -pl.vel.y;
+    const float sh = sinf(kx.psi), ch = cosf(kx.psi);
+    V3 hf = vnorm(v3(pl.f.x, 0.0f, pl.f.z));
+    kx.psi = atan2f(hf.x, hf.z); if (kx.psi < 0.0f) kx.psi += 2.0f * PI_F;
+    const float sh2 = sinf(kx.psi), ch2 = cosf(kx.psi); (void)sh; (void)ch;
+    const float u = pl.vel.x * sh2 + pl.vel.z * ch2, w = pl.vel.x * ch2 - pl.vel.z * sh2;
+    if (lowest_body < -0.04f && lowest_body < lowest_wheel - 0.0f) { crash_why(pl.u.y < 0.0f ? "landed upside down" : "hit the ground with the body"); return false; }
+    if (pl.u.y < 0.0f)   { crash_why("landed upside down"); return false; }
+    if (pl.u.y < 0.857f) { crash_why("landed on its side"); return false; }
+    if (sink > 7.0f)     { crash_why("landed too hard"); return false; }
+    if (fabsf(w) > 9.0f) { crash_why("landed sideways"); return false; }
+    pl.pos.y -= lowest_wheel; if (pl.pos.y < 0.0f) pl.pos.y = 0.0f;
+    kx.u = u; kx.w = w; kx.yawrate = kx.rz * 0.0f;
+    kx.pitch = asinf(clampf(pl.f.y, -1.0f, 1.0f));
+    kx.roll  = asinf(clampf(-pl.r.y / fmaxf(0.3f, cosf(kx.pitch)), -1.0f, 1.0f));
+    kx.steer = 0.0f; kx.thr = 0.0f;
+    kx.air = false; kx.rx = kx.ry = kx.rz = 0.0f;
+    kx.ax = kx.ay = 0.0f;
+    pl.pos.y = 0.0f; pl.vel.y = 0.0f;
+    return true;
+}
+
+static void kx_fly(const SceCtrlData *pad) {
+    const float dt = DT;
+    kx.air_t += dt;
+    const bool arm = sw.arm && sw.batt;
+    float hop = 0.0f, roof = 0.0f, cp = 0.0f, cr = 0.0f, cy = 0.0f;
+    if (arm && kx.gas > 0.0f) {
+        if (pad->buttons & SCE_CTRL_CROSS)  hop  = 1.0f;
+        if (pad->buttons & SCE_CTRL_SQUARE) roof = 1.0f;
+        cp = shape(stick(pad->ly)); cr = shape(stick(pad->lx)); cy = shape(stick(pad->rx));
+        if (gy_mode) cr = clampf(cr + gy_ail, -1.0f, 1.0f);
+    }
+    float use = hop * KX_HOP_USE + roof * KX_ROOF_USE + (fabsf(cp) + fabsf(cr) + fabsf(cy)) * KX_RCS_USE;
+    if (use * dt > kx.gas) { float k = kx.gas / (use * dt); hop *= k; roof *= k; cp *= k; cr *= k; cy *= k; use = kx.gas / dt; }
+    kx.gas = fmaxf(0.0f, kx.gas - use * dt);
+    kx.jet_hop = hop; kx.jet_roof = roof; kx.cp = cp; kx.cr = cr; kx.cy = cy;
+    kx.hiss += ((use > 0.01f ? clampf(0.35f + use / 18.0f, 0.0f, 1.0f) : 0.0f) - kx.hiss) * fminf(1.0f, 14.0f * dt);
+
+    // Spin: the jets change it, nothing else does. Leave it alone and it keeps turning.
+    kx.rx += cp * KX_RCS_ACC * dt; kx.ry += cr * KX_RCS_ACC * dt; kx.rz += cy * KX_RCS_ACC * dt;
+    kx.rx = clampf(kx.rx, -6.0f, 6.0f); kx.ry = clampf(kx.ry, -7.0f, 7.0f); kx.rz = clampf(kx.rz, -4.0f, 4.0f);
+    rot_pitch(kx.rx * dt); rot_roll(kx.ry * dt); rot_yaw(kx.rz * dt);
+    orthonormalize();
+
+    // Forces: gravity, drag, and the jets along the body's own up axis.
+    V3 a = v3(0.0f, -KX_G, 0.0f);
+    a = vadd(a, vscale(pl.u, hop * KX_HOP_ACC - roof * KX_ROOF_ACC));
+    float sp = sqrtf(vdot(pl.vel, pl.vel));
+    a = vsub(a, vscale(pl.vel, 0.0006f * sp));
+    pl.vel = vadd(pl.vel, vscale(a, dt));
+    pl.pos = vadd(pl.pos, vscale(pl.vel, dt));
+
+    // Jets: puffs for the eye.
+    if (hop > 0.0f) {
+        const float jx[4] = { -0.62f, 0.62f, -0.62f, 0.62f }, jz[4] = { -1.10f, -1.10f, 0.95f, 0.95f };
+        for (int i = 0; i < 4; i++) kx_emit(jx[i], 0.12f, jz[i], 0.0f, -1.0f, 0.0f, 14.0f, 0.20f);
+    }
+    if (roof > 0.0f) kx_emit(0.0f, 1.20f, 0.10f, 0.0f, 1.0f, 0.0f, 12.0f, 0.22f);
+    if (fabsf(cp) > 0.2f) {
+        float sg = cp > 0.0f ? 1.0f : -1.0f;
+        kx_emit(0.0f, 0.55f, 2.10f, 0.0f, -sg, 0.0f, 9.0f, 0.10f);
+        kx_emit(0.0f, 0.55f, -2.10f, 0.0f,  sg, 0.0f, 9.0f, 0.10f);
+    }
+    if (fabsf(cr) > 0.2f) {
+        float sg = cr > 0.0f ? 1.0f : -1.0f;
+        kx_emit(0.92f, 0.60f, 0.0f, 0.0f,  sg, 0.0f, 9.0f, 0.10f);
+        kx_emit(-0.92f, 0.60f, 0.0f, 0.0f, -sg, 0.0f, 9.0f, 0.10f);
+    }
+    if (fabsf(cy) > 0.2f) {
+        float sg = cy > 0.0f ? 1.0f : -1.0f;
+        kx_emit(0.0f, 0.55f, 2.10f, -sg, 0.0f, 0.0f, 9.0f, 0.10f);
+        kx_emit(0.0f, 0.55f, -2.10f, sg, 0.0f, 0.0f, 9.0f, 0.10f);
+    }
+
+    // Contact.
+    float lw = 1e9f, lb = 1e9f;
+    for (int i = 0; i < KX_NPT; i++) {
+        V3 P = body_pt(KXP[i].x, KXP[i].y, KXP[i].z);
+        if (KXP[i].wheel) { if (P.y < lw) lw = P.y; } else if (P.y < lb) lb = P.y;
+    }
+    if (lw < 0.0f || lb < 0.0f) {
+        if (!kx_touch_down(lw, lb)) { crash(); return; }
+    }
+}
+
 static void kx_update(const SceCtrlData *pad, unsigned int pressed) {
     (void)pressed;
-    eng_on = sw.batt; eng_n += ((sw.batt ? 1.0f : 0.0f) - eng_n) * 0.05f; sw.pump = sw.ign = true;       // (the motor: it runs when the battery is on)
+    eng_on = sw.batt; eng_n += ((sw.batt ? 1.0f : 0.0f) - eng_n) * 0.05f;       // (the motor: it runs when the battery is on)
+    kx.jet_hop = kx.jet_roof = 0.0f; kx.cp = kx.cr = kx.cy = 0.0f;
+    if (!kx.air) {
+        kx.hiss += (0.0f - kx.hiss) * fminf(1.0f, 10.0f * DT);
+        // A parked car takes on gas, slowly.
+        if (fabsf(kx.u) < 1.0f && fabsf(kx.w) < 1.0f && kx.gas < 100.0f) kx.gas = fminf(100.0f, kx.gas + 4.0f * DT);
+        if (sw.arm && sw.batt && kx.gas > 0.5f && (pad->buttons & SCE_CTRL_CROSS)) {
+            const float sh = sinf(kx.psi), ch = cosf(kx.psi);
+            pl.vel = v3(sh * kx.u + ch * kx.w, 0.0f, ch * kx.u - sh * kx.w);
+            set_axes(kx.psi, kx.pitch, kx.roll);
+            kx_lift_off();
+        }
+    }
+    if (kx.air) {
+        kx_fly(pad);
+        kx_puffs_step();
+        if (pl.crashed) return;
+        if (kx.air) {
+            pl.on_ground = false; pl.gs = 0.0f; pl.touched = true;
+            pl.hdg = atan2f(pl.f.x, pl.f.z); pl.pitch = asinf(clampf(pl.f.y, -1.0f, 1.0f)); pl.roll = asinf(clampf(-pl.r.y, -1.0f, 1.0f));
+            pl.speed = sqrtf(vdot(pl.vel, pl.vel)); pl.vs = pl.vel.y;
+            pl.alpha = 0.0f; pl.beta = 0.0f; pl.throttle = kx.jet_hop; pl.rpm = 100.0f * clampf(pl.speed / 72.0f, 0.0f, 1.0f);
+            pl.fuel = kx.gas / 100.0f;
+            kx_steer_vis += (0.0f - kx_steer_vis) * 0.1f; kx_braking = false;
+            if (pl.pos.y < 1.0f && sea_depth(pl.pos.x, pl.pos.z) > 0.0f) { crash_why("landed in the sea"); crash(); return; }
+            if (pl.pos.y < 1.0f && in_lake(pl.pos.x, pl.pos.z, 1.0f)) { crash_why("landed in the lake"); crash(); return; }
+            if (hit_scenery()) { crash_why("hit the scenery"); crash(); return; }
+            return;
+        }
+    }
+    kx_puffs_step();
     kx_drive(pad);
     const float sh = sinf(kx.psi), ch = cosf(kx.psi);
     pl.vel = v3(sh * kx.u + ch * kx.w, 0.0f, ch * kx.u - sh * kx.w);
@@ -257,7 +457,7 @@ static void kx_update(const SceCtrlData *pad, unsigned int pressed) {
     pl.alpha = 0.0f; pl.beta = clampf(atan2f(kx.w, fmaxf(fabsf(kx.u), 3.0f)), -0.5f, 0.5f);
     pl.throttle = fmaxf(0.0f, kx.thr);
     pl.rpm = 100.0f * clampf(pl.speed / 72.0f, 0.0f, 1.0f);
-    pl.fuel = 1.0f;
+    pl.fuel = kx.gas / 100.0f;
     pl.touched = true;
     if (sea_depth(pl.pos.x, pl.pos.z) > 0.0f) { crash_why("drove into the sea"); crash(); return; }
     if (in_lake(pl.pos.x, pl.pos.z, 1.0f)) { crash_why("drove into the lake"); crash(); return; }

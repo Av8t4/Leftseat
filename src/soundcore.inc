@@ -33,6 +33,7 @@ typedef struct {
     float rain;               // 0..1
     float turb;               // 0..1: gusts and bumps
     float misfire;            // 0..1: sputtering
+    float hiss;               // 0..1: cold gas escaping (the KX-1's thrusters)
     int   view;               // 0 cockpit, 1 chase, 2 tower
     float doppler;            // pitch change from the aircraft moving toward or away from the tower
     float distance;           // meters to the aircraft (tower view)
@@ -46,7 +47,7 @@ typedef struct { int type; float t, a, b; } SndVoice;
 typedef struct {
     unsigned rng;
     // smoothed copies of the inputs, so nothing clicks when a value jumps
-    float s_rpm, s_n1, s_load, s_air, s_prop, s_gs, s_brake, s_stall, s_rain, s_turb, s_flaps, s_vol, s_on, s_dist, s_dop, s_mis, s_gate;
+    float s_rpm, s_n1, s_load, s_air, s_prop, s_gs, s_brake, s_stall, s_rain, s_turb, s_flaps, s_vol, s_on, s_dist, s_dop, s_mis, s_gate, s_hiss, hs_lp;
     // oscillators
     float ph_fire, ph_bp, ph_w1, ph_w2, ph_horn, ph_squeal, ph_whistle, ph_lfo1, ph_lfo2, ph_motor, ph_flap;
     // filters
@@ -130,6 +131,7 @@ static void snd_render(SndSt *s, const SndIn *inp, int16_t *out, int n) {
         s->s_dist  += (in.distance - s->s_dist) * k;
         s->s_dop   += ((in.doppler > 0.0f ? in.doppler : 1.0f) - s->s_dop) * k;
         s->s_mis   += (in.misfire - s->s_mis) * k;
+        s->s_hiss  += (in.hiss - s->s_hiss) * kf;
         s->gate_t -= (float)SND_BLOCK / SND_RATE;
         if (s->gate_t <= 0.0f) { s->gate_t = 0.05f + 0.08f * (snd_rnd(s) * 0.5f + 0.5f); s->s_gate = (snd_rnd(s) * 0.5f + 0.5f) < s->s_mis ? 0.0f : 1.0f; }
         const int view = in.view;
@@ -248,6 +250,11 @@ static void snd_render(SndSt *s, const SndIn *inp, int16_t *out, int n) {
                 if ((snd_rnd(s) * 0.5f + 0.5f) < s->s_rain * 0.004f) drop = (snd_rnd(s) * 0.5f + 0.5f) * 1.6f;
                 s->k_lp += (drop - s->k_lp) * 0.5f;
                 y += rain_amp * ((s->rain_lp1 - s->rain_lp2) * 1.5f + s->k_lp * 1.4f);
+            }
+            // ---------------- cold gas: a hiss that is all high notes
+            if (s->s_hiss > 0.001f) {
+                s->hs_lp += (nz - s->hs_lp) * snd_lpa(2600.0f);
+                y += s->s_hiss * (nz - s->hs_lp) * 0.60f * s->s_on;
             }
             // ---------------- the ground
             if (roll_amp > 0.001f) {

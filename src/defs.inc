@@ -78,7 +78,7 @@ static void   chart_begin(void);
 static bool   engine_failed;     // the engine has stopped (engine-out challenge), whatever the fuel gauge says
 
 // The switch panel (double-tap the back of the Vita): the cockpit switches and the engine start-up.
-typedef struct { bool batt, pump, ign, beacon, nav, strobe, landing, taxi, pitot, avionics, cabin; } Switches;
+typedef struct { bool batt, pump, ign, beacon, nav, strobe, landing, taxi, pitot, avionics, cabin, arm; } Switches;       // (arm: the KX-1's thrusters)
 static Switches sw;
 static bool   eng_on;            // the engine is burning fuel (it has been started and not shut down)
 static float  eng_n;             // 0..1: how far the engine has spun up (it takes a moment after the start, and runs down after a shutdown)

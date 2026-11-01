@@ -225,8 +225,9 @@ static void draw_switch_panel(vita2d_pgf *pgf) {
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, SCREEN_H - VIEW_H, RGBA8(48, 48, 54, 255));
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, 3, RGBA8(120, 120, 128, 255));
     static const char *const LBL[SWI_N] = { "BATTERY", "", "", "START", "BEACON", "NAV", "STROBE", "LANDING", "TAXI", "PITOT", "AVIONICS", "CABIN", "" };
-    const char *pump = piston ? "PUMP" : "FUEL", *ign = piston ? "MAGS" : "IGNITION";
-    vita2d_pgf_draw_text(pgf, 22, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, "ENGINE");
+    const bool car = spec->model == 6;
+    const char *pump = car ? "THRUSTERS" : (piston ? "PUMP" : "FUEL"), *ign = piston ? "MAGS" : "IGNITION";
+    vita2d_pgf_draw_text(pgf, 22, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, car ? "DRIVE" : "ENGINE");
     vita2d_pgf_draw_text(pgf, 298, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, "LIGHTS");
     vita2d_pgf_draw_text(pgf, 640, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, "SYSTEMS");
     for (int i = 0; i < SWI_N; i++) {
@@ -234,13 +235,14 @@ static void draw_switch_panel(vita2d_pgf *pgf) {
         const float cx = x + w * 0.5f;
         vita2d_draw_rectangle(x - 1, y - 1, w + 2, h + 2, RGBA8(96, 98, 108, 255));
         vita2d_draw_rectangle(x, y, w, h, RGBA8(24, 25, 30, 255));
+        if (car && (i == SWI_IGN || i == SWI_START)) continue;                    // (the KX-1 has no ignition or starter)
         const char *lb = i == SWI_PUMP ? pump : (i == SWI_IGN ? ign : LBL[i]);
         if (i == SWI_QUICK) {
             vita2d_draw_rectangle(x + 6, y + 22, w - 12, 44, RGBA8(40, 110, 70, 255));
             vita2d_draw_rectangle(x + 6, y + 22, w - 12, 2, RGBA8(255, 255, 255, 70));
             int tw = vita2d_pgf_text_width(pgf, 0.6f, "QUICK"); vita2d_pgf_draw_text(pgf, cx - tw / 2, y + 41, txt, 0.6f, "QUICK");
             tw = vita2d_pgf_text_width(pgf, 0.6f, "START"); vita2d_pgf_draw_text(pgf, cx - tw / 2, y + 58, txt, 0.6f, "START");
-            const char *t = "ready to fly"; tw = vita2d_pgf_text_width(pgf, 0.55f, t); vita2d_pgf_draw_text(pgf, cx - tw / 2, y + h - 8, RGBA8(200, 204, 214, 255), 0.55f, t);
+            const char *t = car ? "ready to drive" : "ready to fly"; tw = vita2d_pgf_text_width(pgf, 0.55f, t); vita2d_pgf_draw_text(pgf, cx - tw / 2, y + h - 8, RGBA8(200, 204, 214, 255), 0.55f, t);
             continue;
         }
         if (i == SWI_START) {                                                   // a push button: hold it to turn the engine over
@@ -265,6 +267,14 @@ static void draw_switch_panel(vita2d_pgf *pgf) {
         if (sc > 0.62f) sc = 0.62f;
         const int tw = (int)(tw1 * sc);
         vita2d_pgf_draw_text(pgf, cx - tw / 2, y + h - 8, RGBA8(245, 246, 250, 255), sc, lb);
+    }
+    if (car) {
+        const char *cs = !sw.batt ? "BATTERY OFF" : (sw.arm ? "THRUSTERS ARMED" : "THRUSTERS SAFE");
+        vita2d_pgf_draw_text(pgf, 22, VIEW_H + 138, !sw.batt ? RGBA8(255, 190, 80, 255) : (sw.arm ? RGBA8(255, 150, 90, 255) : RGBA8(120, 230, 140, 255)), 0.55f, cs);
+        const char *ch = "Arm the thrusters before a jump. Double-tap the back of the Vita to see the gauges again";
+        int cw = vita2d_pgf_text_width(pgf, 0.55f, ch);
+        vita2d_pgf_draw_text(pgf, SCREEN_W - 22 - cw, VIEW_H + 138, RGBA8(190, 194, 206, 255), 0.55f, ch);
+        return;
     }
     const char *st = ENG_RUN ? "ENGINE RUNNING" : (eng_cranking ? "STARTING..." : (eng_n > 0.05f ? "ENGINE RUNNING DOWN" : "ENGINE OFF"));
     vita2d_pgf_draw_text(pgf, 22, VIEW_H + 138, ENG_RUN ? RGBA8(120, 230, 140, 255) : RGBA8(255, 190, 80, 255), 0.55f, st);
@@ -324,6 +334,22 @@ static void draw_kx_battery(vita2d_pgf *pgf, float cx, float cy, float r, float 
     pb_flush();
     gauge_hub(cx, cy);
 }
+static void draw_kx_gas(vita2d_pgf *pgf, float cx, float cy, float r, float gas) {
+    gauge_face(cx, cy, r);
+    const float S = 210.0f, W = 120.0f;
+    pb_arc(cx, cy, 0.84f * r, 0.94f * r, S, W, 0.0f, 0.20f, RGBA8(230, 50, 40, 255));        // low: enough to land on, no more
+    pb_arc(cx, cy, 0.84f * r, 0.94f * r, S, W, 0.20f, 1.0f, RGBA8(90, 190, 255, 255));
+    gauge_ticks(cx, cy, r, S, W, 8, 2, 0.68f, 0.74f, 0.82f);
+    pb_flush();
+    gauge_text(pgf, cx, cy, r, S, 0.58f, "E", 0.55f, RGBA8(255, 120, 100, 255));
+    gauge_text(pgf, cx, cy, r, S + W, 0.58f, "F", 0.55f, RGBA8(230, 230, 230, 255));
+    gauge_label(pgf, cx, cy + 0.20f * r, "GAS");
+    char b[16]; snprintf(b, sizeof(b), "%d%%", (int)(gas + 0.5f));
+    gauge_window(pgf, cx, cy + 0.36f * r, b);
+    pb_needle(cx, cy, S + W * clampf(gas / 100.0f, 0, 1), 0.76f * r, 0.10f * r, 1.8f, NEEDLE);
+    pb_flush();
+    gauge_hub(cx, cy);
+}
 static void draw_kx_panel(vita2d_pgf *pgf) {
     unsigned int txt = RGBA8(222, 224, 230, 255), dim = RGBA8(150, 154, 166, 255);
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, SCREEN_H - VIEW_H, RGBA8(48, 48, 54, 255));
@@ -333,6 +359,9 @@ static void draw_kx_panel(vita2d_pgf *pgf) {
     draw_kx_power(pgf, 214, dy, R, kx.power);
     draw_kx_battery(pgf, 324, dy, R, kx.batt);
     draw_heading(pgf, 434, dy, R, pl.hdg * 57.2958f);
+    draw_attitude(544, dy, R);
+    draw_vsi(pgf, 654, dy, R, pl.vs * 196.85f);
+    draw_kx_gas(pgf, 764, dy, R, kx.gas);
     // The pedal bar: power above the middle, brake and reverse below it.
     const float y0 = VIEW_H + 18.0f, y1 = VIEW_H + 98.0f, tx = 852.0f, ym = (y0 + y1) / 2;
     slider_track(tx, y0, y1);
@@ -349,7 +378,7 @@ static void draw_kx_panel(vita2d_pgf *pgf) {
     vita2d_draw_fill_circle(214.5f + clampf(pl.beta / 0.25f, -1.0f, 1.0f) * 30.0f, VIEW_H + 120, 5.0f, RGBA8(255, 200, 60, 255));
     int wd = ((int)(wx_dir * 57.2958f + 360.5f)) % 360;
     vita2d_pgf_draw_textf(pgf, 290, VIEW_H + 129, txt, 0.65f, "%s  WIND %03d/%d KT   TRIP %.1f MI   %s%s", wx_label(), wd, (int)(wx.wind * 1.944f + 0.5f),
-                          kx.odo / 1609.34f, sw.batt ? "READY" : "BATTERY OFF", gy_mode ? "  GYRO" : "");
+                          kx.odo / 1609.34f, !sw.batt ? "BATTERY OFF" : (kx.air ? "AIRBORNE" : (sw.arm ? "THRUSTERS ARMED" : "READY")), gy_mode ? "  GYRO" : "");
 }
 
 static void draw_panel(vita2d_pgf *pgf) {
