@@ -147,7 +147,7 @@ There are four airports, and one more place you have to find. Hold **Select** fo
 | **Pinecrest Airstrip (PNC)** | About 11 NM west-north-west of KAK | A 650 m mown-grass strip (runway 12/30, no markings) with a small hangar and cabin, in a forested valley between two ridges. After dark it has low runway lights. From far away you need the chart |
 | **Lana Lake Regional (LLK)** | About 8 NM south of KAK | Runway 16/34 with markings, PAPI lights, a parallel taxiway, apron, terminal, tower and three hangars, on the shore of a lake. Edge, threshold and taxiway lights and a beacon after dark |
 
-**Around Knowles Field.** Downtown Knowles is a real city: houses thin out into streets and blocks, then into a tower district with rooftop lights at night (the red beacons all flash on their own timing). East of the airport is Knowles Works, a giant factory with a village beside it.
+**Around Knowles Field.** Downtown Knowles is a real city: houses thin out into streets and blocks, then into a tower district with rooftop lights at night (the red beacons all flash on their own timing). East of the airport is Strake Corporation, a giant factory with a village beside it.
 
 **The countryside.** Patchwork fields, forests, lakes with sandy shores and red desert in the north. Mountains rise between the airports, with snow on the tallest. A river runs from the hills to a lake, with roads, a highway and bridges crossing it. Towns have streets, a plaza, water towers, churches and silos, and their windows light up at night. A windsock by each runway shows the wind.
 

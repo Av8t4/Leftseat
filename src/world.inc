@@ -629,13 +629,18 @@ static void settle_mountains(void) {
             emit_mountain(mounts[i], mt_col[i][0], mt_col[i][1], mt_col[i][2], mt_col[i][3], mt_col[i][4], mt_col[i][5]);
 }
 
-// ---- Knowles Works: the big factory and its village, east of the field -------------------------------------
+// ---- Strake Corporation: the big factory and its village, east of the field -------------------------------------
 #define KW_FX 1750.0f            // factory hall center
 #define KW_FZ (-1000.0f)
 #define KW_HW 320.0f             // half length of the hall (x)
 #define KW_HD 125.0f             // half depth (z)
 #define KW_VX 2950.0f            // village center
 #define KW_VZ (-1000.0f)
+// Strake Proving Ground: the test site for the KX-1, south of the east-west road (ROAD_Z), about 2 km by 1.2 km.
+#define SPG_X 2000.0f            // center of the site
+#define SPG_Z (-2350.0f)
+#define SPG_HX 1000.0f           // half length (x)
+#define SPG_HZ 600.0f            // half depth (z)
 static void build_knowles(void) {
     const float FX = KW_FX, FZ = KW_FZ;
     // The hall: a very large plain shed with a dark band round it.
@@ -657,12 +662,12 @@ static void build_knowles(void) {
         float xx = FX - 252.0f + k * 56.0f, zz = FZ - KW_HD - 48.3f;
         quad_face(v3(xx - 8.0f, 0.0f, zz), v3(xx + 8.0f, 0.0f, zz), v3(xx + 8.0f, 7.0f, zz), v3(xx - 8.0f, 7.0f, zz), 52, 58, 70);
     }
-    // The glass office block at the west end, with a red Knowles stripe.
+    // The glass office block at the west end, with a signal-yellow Strake stripe.
     add_building(FX - KW_HW - 38.0f, FZ - 20.0f, 76.0f, 130.0f, 19.0f, 96, 138, 178);
     add_box_faces(FX - KW_HW - 38.0f, FZ - 20.0f, 78.0f, 132.0f, 19.0f, 19.8f, 226, 228, 232);
     {
         float xx = FX - KW_HW - 76.3f;
-        quad_face(v3(xx, 11.0f, FZ - 85.0f), v3(xx, 11.0f, FZ + 45.0f), v3(xx, 13.5f, FZ + 45.0f), v3(xx, 13.5f, FZ - 85.0f), 196, 40, 40);
+        quad_face(v3(xx, 11.0f, FZ - 85.0f), v3(xx, 11.0f, FZ + 45.0f), v3(xx, 13.5f, FZ + 45.0f), v3(xx, 13.5f, FZ - 85.0f), 246, 200, 44);
     }
     // Cooling towers and battery containers at the east end.
     static const float CR[3] = { 8.0f, 8.0f, 0.0f }, CH[3] = { 0.0f, 13.0f, 13.3f };
