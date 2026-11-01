@@ -101,7 +101,7 @@ In **Options**, set **Controls** to **Gyro**. Tilt the Vita like a control colum
 
 ## Aircraft
 
-Six aircraft: four from Knowles Aircraft Co. and two from Ashley Aerospace. Each has its own 3D model, cockpit, handling, gauges and best scores. Pick one in the Hangar and it applies to Open World and every challenge.
+Seven vehicles: four aircraft from Knowles Aircraft Co., two from Ashley Aerospace and one car from Strake Corporation. Each has its own 3D model, cockpit, handling, gauges and best scores. Pick one in the Hangar and it applies to Open World and every challenge.
 
 | Aircraft | What it is | Numbers |
 |---|---|---|
@@ -111,6 +111,7 @@ Six aircraft: four from Knowles Aircraft Co. and two from Ashley Aerospace. Each
 | **K-30 Courier** | Twin jet with a T-tail, nose canards and retractable gear | Rotates at about 100 kt, cruises at about 320 kt, stalls at 82 kt. One throttle drives both engines |
 | **Ashley Twin A22** | Six-seat twin turboprop with pusher props, twin booms, a forward-swept wing, an inverted-V tail and retractable gear | Cruises at about 200 kt, stalls at about 62 kt with full flaps, carries 320 gallons. One throttle drives both engines |
 | **Ashley Single A11** | Four-seat single pusher with a swept wing, twin booms and an H-tail | Cruises at about 150 kt, stalls at about 52 kt with full flaps, carries 70 gallons. Fixed gear |
+| **Strake KX-1** | Two-seat electric coupe from Strake Corporation. It is driven, not flown | 0 to 60 mph in about 3 seconds, top speed about 160 mph. Left stick steers, the right stick is the pedal (up for power, down for the brake and then reverse), O is the handbrake |
 
 **Gear lights.** The K-30 and Ashley Twin have three gear lights on the panel, like a jet: three green when the gear is down and locked, red while it moves, dark when it is up. Raise the gear once you're climbing and lower it before you land.
 
@@ -260,6 +261,7 @@ src/models.inc     3D K-4 model, cockpit nose, shadow
 src/modelkit.inc   kit for smooth models: lofted fuselages, airfoil wings, tail surfaces, tires
 src/k10.inc, jet1.inc, k30.inc, a22.inc, a11.inc   the other aircraft models and cockpit parts
 src/fleet.inc      chooses the model for the aircraft being flown
+src/kx1.inc        the Strake KX-1: the car model, the driving and (later) its cold-gas thrusters
 src/soundcore.inc  the sound engine: makes every sound on the fly (knows nothing about the Vita)
 src/sound.inc      plays it on a background thread and tells it what the aircraft is doing
 src/sky.inc        clouds, windsock, rain

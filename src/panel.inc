@@ -274,8 +274,87 @@ static void draw_switch_panel(vita2d_pgf *pgf) {
     vita2d_pgf_draw_text(pgf, SCREEN_W - 22 - hw, VIEW_H + 138, RGBA8(190, 194, 206, 255), 0.55f, hint);
 }
 
+
+/* ------------------------------------------------------------------ */
+/* The KX-1's dash: speed, power, battery, heading                     */
+/* ------------------------------------------------------------------ */
+
+static void draw_kx_speedo(vita2d_pgf *pgf, float cx, float cy, float r, float mph) {
+    gauge_face(cx, cy, r);
+    const float top = 180.0f;
+    pb_arc(cx, cy, 0.90f * r, 0.97f * r, 135, 270, 150.0f / top, 1.0f, RGBA8(230, 50, 40, 255));
+    gauge_ticks(cx, cy, r, 135, 270, 18, 2, 0.70f, 0.76f, 0.82f);
+    pb_flush();
+    for (int i = 0; i <= 9; i++) { char t[8]; snprintf(t, sizeof(t), "%d", i * 20); gauge_text(pgf, cx, cy, r, 135 + 270.0f * (i * 20.0f) / top, 0.56f, t, 0.5f, RGBA8(230, 230, 230, 255)); }
+    gauge_label(pgf, cx, cy - 0.30f * r, "MPH");
+    char b[16]; snprintf(b, sizeof(b), "%d", (int)(mph + 0.5f));
+    gauge_window(pgf, cx, cy + 0.36f * r, b);
+    pb_needle(cx, cy, 135 + 270 * clampf(mph, 0, top) / top, 0.78f * r, 0.12f * r, 1.8f, NEEDLE);
+    pb_flush();
+    gauge_hub(cx, cy);
+}
+static void draw_kx_power(vita2d_pgf *pgf, float cx, float cy, float r, float p) {      // -1 (regen / brake) .. +1 (full power)
+    gauge_face(cx, cy, r);
+    const float S = 180.0f, W = 180.0f;
+    pb_arc(cx, cy, 0.84f * r, 0.94f * r, S, W, 0.0f, 0.5f, RGBA8(70, 150, 230, 255));
+    pb_arc(cx, cy, 0.84f * r, 0.94f * r, S, W, 0.5f, 1.0f, RGBA8(60, 200, 80, 255));
+    gauge_ticks(cx, cy, r, S, W, 8, 4, 0.68f, 0.74f, 0.82f);
+    pb_flush();
+    gauge_text(pgf, cx, cy, r, S, 0.56f, "R", 0.5f, RGBA8(140, 190, 255, 255));
+    gauge_text(pgf, cx, cy, r, S + W / 2, 0.58f, "0", 0.5f, RGBA8(230, 230, 230, 255));
+    gauge_text(pgf, cx, cy, r, S + W, 0.56f, "P", 0.5f, RGBA8(230, 230, 230, 255));
+    gauge_label(pgf, cx, cy + 0.20f * r, "POWER");
+    pb_needle(cx, cy, S + W * (0.5f + 0.5f * clampf(p, -1.0f, 1.0f)), 0.76f * r, 0.10f * r, 1.8f, NEEDLE);
+    pb_flush();
+    gauge_hub(cx, cy);
+}
+static void draw_kx_battery(vita2d_pgf *pgf, float cx, float cy, float r, float f) {
+    gauge_face(cx, cy, r);
+    const float S = 210.0f, W = 120.0f;
+    pb_arc(cx, cy, 0.84f * r, 0.94f * r, S, W, 0.0f, 0.12f, RGBA8(230, 50, 40, 255));
+    pb_arc(cx, cy, 0.84f * r, 0.94f * r, S, W, 0.12f, 1.0f, RGBA8(60, 200, 80, 255));
+    gauge_ticks(cx, cy, r, S, W, 8, 2, 0.68f, 0.74f, 0.82f);
+    pb_flush();
+    gauge_text(pgf, cx, cy, r, S, 0.58f, "E", 0.55f, RGBA8(255, 120, 100, 255));
+    gauge_text(pgf, cx, cy, r, S + W, 0.58f, "F", 0.55f, RGBA8(230, 230, 230, 255));
+    gauge_label(pgf, cx, cy + 0.20f * r, "BATTERY");
+    char b[16]; snprintf(b, sizeof(b), "%d%%", (int)(f * 100.0f + 0.5f));
+    gauge_window(pgf, cx, cy + 0.36f * r, b);
+    pb_needle(cx, cy, S + W * clampf(f, 0, 1), 0.76f * r, 0.10f * r, 1.8f, NEEDLE);
+    pb_flush();
+    gauge_hub(cx, cy);
+}
+static void draw_kx_panel(vita2d_pgf *pgf) {
+    unsigned int txt = RGBA8(222, 224, 230, 255), dim = RGBA8(150, 154, 166, 255);
+    vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, SCREEN_H - VIEW_H, RGBA8(48, 48, 54, 255));
+    vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, 3, RGBA8(120, 120, 128, 255));
+    const float R = 46.0f, dy = VIEW_H + 57.0f;
+    draw_kx_speedo(pgf, 92, dy, 52.0f, pl.speed * 2.237f * (kx.u < -0.5f ? -1.0f : 1.0f));
+    draw_kx_power(pgf, 214, dy, R, kx.power);
+    draw_kx_battery(pgf, 324, dy, R, kx.batt);
+    draw_heading(pgf, 434, dy, R, pl.hdg * 57.2958f);
+    // The pedal bar: power above the middle, brake and reverse below it.
+    const float y0 = VIEW_H + 18.0f, y1 = VIEW_H + 98.0f, tx = 852.0f, ym = (y0 + y1) / 2;
+    slider_track(tx, y0, y1);
+    if (kx.thr >= 0.0f) vita2d_draw_rectangle(tx - 2, ym - (ym - y0) * kx.thr, 4, (ym - y0) * kx.thr, RGBA8(70, 190, 90, 255));
+    else                vita2d_draw_rectangle(tx - 2, ym, 4, (y1 - ym) * -kx.thr, RGBA8(220, 70, 60, 255));
+    vita2d_draw_rectangle(tx - 7, ym, 14, 1, RGBA8(200, 200, 206, 255));
+    slider_knob(tx, ym - (ym - y0) * kx.thr, RGBA8(210, 50, 44, 255));
+    vita2d_pgf_draw_text(pgf, tx - 13, VIEW_H + 118, dim, 0.5f, "PEDAL");
+    // The slip indicator, as in the aircraft.
+    vita2d_draw_rectangle(172, VIEW_H + 113, 84, 14, RGBA8(100, 102, 110, 255));
+    vita2d_draw_rectangle(173, VIEW_H + 114, 82, 12, RGBA8(8, 8, 10, 255));
+    vita2d_draw_rectangle(205, VIEW_H + 114, 1, 12, RGBA8(160, 160, 168, 255));
+    vita2d_draw_rectangle(223, VIEW_H + 114, 1, 12, RGBA8(160, 160, 168, 255));
+    vita2d_draw_fill_circle(214.5f + clampf(pl.beta / 0.25f, -1.0f, 1.0f) * 30.0f, VIEW_H + 120, 5.0f, RGBA8(255, 200, 60, 255));
+    int wd = ((int)(wx_dir * 57.2958f + 360.5f)) % 360;
+    vita2d_pgf_draw_textf(pgf, 290, VIEW_H + 129, txt, 0.65f, "%s  WIND %03d/%d KT   TRIP %.1f MI   %s%s", wx_label(), wd, (int)(wx.wind * 1.944f + 0.5f),
+                          kx.odo / 1609.34f, sw.batt ? "READY" : "BATTERY OFF", gy_mode ? "  GYRO" : "");
+}
+
 static void draw_panel(vita2d_pgf *pgf) {
     if (sw_open) { draw_switch_panel(pgf); return; }
+    if (spec->model == 6) { draw_kx_panel(pgf); return; }
     unsigned int txt = RGBA8(222, 224, 230, 255), dim = RGBA8(150, 154, 166, 255);
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, SCREEN_H - VIEW_H, RGBA8(48, 48, 54, 255));
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, 3, RGBA8(120, 120, 128, 255));

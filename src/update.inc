@@ -64,6 +64,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
         look_ang += (lt - look_ang) * 0.22f;
     }
     if (pl.crashed) return;
+    if (spec->model == 6) { kx_update(pad, pressed); return; }        // the KX-1 is a car: it has its own driving
 
     if (spec->retract) {                                // Square: landing gear up / down
         if (pressed & SCE_CTRL_SQUARE) {

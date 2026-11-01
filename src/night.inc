@@ -147,6 +147,7 @@ static const AcLights AC_LIGHTS[AC_COUNT] = {
     /* K-30     */ { 7.20f, 1.72f, -1.66f, { 0.00f, 0.00f }, { 3.00f, 0.00f }, { -7.40f, 0.00f }, 1, 0.00f, 6.12f, -5.80f },
     /* Ashley A22 */ { 6.60f, 2.22f, 2.53f, { -4.05f, 4.05f }, { 2.29f, 2.29f }, { -7.05f, -7.05f }, 2, 0.00f, 4.08f, -5.43f },
     /* Ashley A11 */ { 4.90f, 1.17f, -0.41f, { 0.00f, 0.00f }, { 3.05f, 0.00f }, { -5.70f, 0.00f }, 1, 0.00f, 3.34f, -1.62f },
+    /* KX-1     */ { 0.88f, 0.60f,  0.95f, { 0.00f, 0.00f }, { 0.62f, 0.00f }, { -2.22f, 0.00f }, 1, 0.00f, 1.02f, -0.55f },
 };
 
 // A round glow: an octagon that always faces the camera, at least `px` pixels across from its middle to its edge.
