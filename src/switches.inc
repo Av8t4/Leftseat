@@ -45,6 +45,12 @@ static void sw_cell(int i, float *x, float *y, float *w, float *h) {
     if (spec->model == 6) { static const float KXX[SWI_N] = { 22, 86, 0, 0, 0, 0, 0, 150, 0, 0, 0, 0, 852 }; *x = KXX[i]; } else *x = X[i];
     *y = VIEW_H + 24.0f; *w = (i == SWI_QUICK) ? 86.0f : 60.0f; *h = 96.0f;
 }
+// The KX-1 keeps its three switches on the gauge panel (battery, thrusters, headlights), so there is nothing to open.
+static const int KX_SW[3] = { SWI_BATT, SWI_PUMP, SWI_LAND };
+static void kx_sw_cell(int i, float *x, float *y, float *w, float *h) {
+    const int k = i == SWI_BATT ? 0 : (i == SWI_PUMP ? 1 : 2);
+    *x = 668.0f + 58.0f * k; *y = VIEW_H + 14.0f; *w = 52.0f; *h = 88.0f;
+}
 static bool *sw_flag(int i) {
     switch (i) {
         case SWI_BATT: return &sw.batt;   case SWI_PUMP: return spec->model == 6 ? &sw.arm : &sw.pump;   case SWI_IGN: return spec->model == 6 ? NULL : &sw.ign;
@@ -94,6 +100,14 @@ static void sw_input(int nf, const float *fx, const float *fy, const int *fid, i
         const float x = fx[k], y = fy[k];
         if (y < VIEW_H) continue;
         bool hit = false;
+        if (spec->model == 6 && !sw_open) {
+            for (int k = 0; k < 3; k++) {
+                float cx, cy, cw, ch; kx_sw_cell(KX_SW[k], &cx, &cy, &cw, &ch);
+                if (x < cx - 4.0f || x > cx + cw + 4.0f || y < cy - 4.0f || y > cy + ch + 4.0f) continue;
+                hit = true;
+                if (fresh) { bool *f = sw_flag(KX_SW[k]); if (f) { *f = !*f; snd_event(EV_CLICK, 1.0f); } }
+            }
+        }
         if (sw_open) {
             for (int i = 0; i < SWI_N; i++) {
                 float cx, cy, cw, ch; sw_cell(i, &cx, &cy, &cw, &ch);

@@ -186,6 +186,7 @@ static void kx_reset(float heading) {
 }
 
 // One frame of driving. Constants are SI; a mile per hour is 0.447 m/s.
+#define KX_BOOST_USE 1.5f       // gas units a second at full power with the thrusters armed
 #define KX_WHEELBASE 2.43f
 #define KX_G         9.81f
 static void kx_drive(const SceCtrlData *pad) {
@@ -212,7 +213,9 @@ static void kx_drive(const SceCtrlData *pad) {
     float ax = 0.0f;
     kx.power = 0.0f;
     if (throttle > 0.0f && u > -0.5f) {
-        float amax = fminf(9.3f, 240.0f / fmaxf(u, 1.0f));
+        const bool boost = sw.arm && sw.batt && kx.gas > 0.0f;                  // thrusters armed: the cold-gas jets push the car along as well
+        float amax = boost ? fminf(39.0f, 700.0f / fmaxf(u, 1.0f)) : fminf(9.3f, 240.0f / fmaxf(u, 1.0f));
+        if (boost) kx.gas = fmaxf(0.0f, kx.gas - KX_BOOST_USE * throttle * dt);
         ax += throttle * amax; kx.power = throttle;
     }
     if (rev > 0.0f) { ax -= rev * 4.5f * clampf(1.0f - (-u) / 11.0f, 0.0f, 1.0f); kx.power = -rev * 0.3f; }
