@@ -57,8 +57,8 @@ static void kx_wheel(float cx, float cy, float cz, float rad, float hw, int hub_
     }
     V3 cc = MW(cx, cy, cz);
     for (int i = 0; i < 8; i++) { int j = (i + 1) & 7; V3 q[4] = { r0[i], r0[j], r1[j], r1[i] }; pf_poly(4, q, &cc, 26, 26, 30, 0, 255); }
-    pf_poly(8, r0, &cc, 34, 34, 38, 0, 255);
-    pf_poly(8, r1, &cc, 34, 34, 38, 0, 255);
+    if (hub_side > 0) { pf_poly(8, r0, &cc, 34, 34, 38, 0, 255); pf_poly(8, r1, &cc, 34, 34, 38, 0, 255); }      // (the hub is a decal: it goes right after
+    else              { pf_poly(8, r1, &cc, 34, 34, 38, 0, 255); pf_poly(8, r0, &cc, 34, 34, 38, 0, 255); }      //  the cap it sits on, which is the last one)
     V3 h[8];
     for (int i = 0; i < 8; i++) {
         float a = i * PI_F / 4.0f + PI_F / 8.0f, y = rad * 0.5f * cosf(a), z = rad * 0.5f * sinf(a), xo = hub_side * (hw + 0.004f);
@@ -74,7 +74,7 @@ static void build_kx1(void) {
     npf = 0; pf_last = -1;
     V3 ring[KXN][8], cen[KXN];
     for (int i = 0; i < KXN; i++) { kx_ring(ring[i], &KXA[i]); cen[i] = avgv(ring[i], 8); }
-    static const float W[3] = { 238, 241, 246 }, G[3] = { 46, 52, 62 }, GL[3] = { 30, 56, 96 };
+    static const float W[3] = { 238, 241, 246 }, G[3] = { 46, 52, 62 }, GL[3] = { 30, 56, 96 }, DOOR[3] = { 168, 174, 186 }, INTAKE[3] = { 16, 18, 22 };
     for (int i = 0; i + 1 < KXN; i++) {
         const float zm = 0.5f * (KXA[i].z + KXA[i + 1].z);
         const V3 cc = vscale(vadd(cen[i], cen[i + 1]), 0.5f);
@@ -86,19 +86,14 @@ static void build_kx1(void) {
             if (e == 0) c = (wind || rearw) ? GL : W;                    // windshield and rear window
             else if (e == 1 || e == 7) c = cab ? GL : W;                 // side windows
             else if (e == 3 || e == 4 || e == 5) c = G;                   // the dark lower body (the same on both sides)
+            if ((e == 2 || e == 6) && zm > -0.70f && zm < 0.95f) c = DOOR;       // the doors, as part of the body (a decal would sort wrongly)
+            if ((e == 2 || e == 3 || e == 5 || e == 6) && zm < -0.86f && zm > -1.28f) c = INTAKE;    // the side intakes
             pf_poly(4, q, &cc, c[0], c[1], c[2], 0, 255);
         }
     }
     pf_poly(8, ring[0], &cen[0], KC_GRAPH, 0, 255);                     // nose and tail
     pf_poly(8, ring[KXN - 1], &cen[KXN - 1], KC_GRAPH, 0, 255);
     for (int s = -1; s <= 1; s += 2) {
-        const float xo = s * 0.935f;
-        V3 d[4] = { MW(xo, 0.12f, 0.95f), MW(xo, 0.46f, 0.95f), MW(xo, 0.46f, -0.70f), MW(xo, 0.12f, -0.70f) };       // the door
-        if (s < 0) { V3 t = d[0]; d[0] = d[3]; d[3] = t; t = d[1]; d[1] = d[2]; d[2] = t; }
-        pf_poly(4, d, NULL, 150, 156, 166, PF_DECAL, 255);
-        V3 in[4] = { MW(s * 0.955f, 0.14f, -0.86f), MW(s * 0.955f, 0.46f, -0.86f), MW(s * 0.955f, 0.46f, -1.28f), MW(s * 0.955f, 0.14f, -1.28f) };   // side intake
-        if (s < 0) { V3 t = in[0]; in[0] = in[3]; in[3] = t; t = in[1]; in[1] = in[2]; in[2] = t; }
-        pf_poly(4, in, NULL, 16, 18, 22, PF_DECAL, 255);
         kx_box(s * 0.12f - 0.012f, s * 0.12f + 0.012f, 0.66f, 0.96f, -1.55f, -0.85f, KC_YEL);                    // rear deck strakes
         kx_box(s * 0.12f - 0.012f, s * 0.12f + 0.012f, 0.62f, 0.76f, -2.05f, -1.55f, KC_YEL);
         kx_box(s * 0.30f - 0.02f, s * 0.30f + 0.02f, 0.455f, 0.485f, 1.20f, 1.42f, KC_YEL);                       // nose strakes along the hood

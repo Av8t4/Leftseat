@@ -481,6 +481,7 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
             menu_popen = menu_sel; menu_psel = pk_cur(menu_popen); menu_psnd = snd_level & 3; menu_pparent = 0;
             return 0;
         }
+        if (menu_sel == 0 && SPECS[menu_ac].model == 6) { menu_popup = 0; menu_popup_t = 300; return 0; }     // the KX-1 is only for the proving ground challenges
         if (menu_sel == 0) return 1;
         if (menu_sel == 1) {                                  // X also steps through the airports
             menu_ap = ap_next(menu_ap, 1);
@@ -1062,10 +1063,10 @@ static void draw_menu(vita2d_pgf *pgf) {
     if (menu_popup >= 0) {
         vita2d_draw_rectangle(220, 180, 520, 170, gold);
         vita2d_draw_rectangle(224, 184, 512, 162, RGBA8(10, 22, 56, 255));
-        const bool kxp = (menu_popup == 2 && SPECS[menu_ac].model == 6);
-        vita2d_pgf_draw_text(pgf, 256, 232, white, 1.3f, kxp ? "KX-1 CHALLENGES" : MENU_ITEMS[menu_popup]);
-        vita2d_pgf_draw_text(pgf, 256, 276, gold, 1.1f, "FUTURE UPDATE");
-        vita2d_pgf_draw_text(pgf, 256, 308, RGBA8(200, 214, 240, 255), 0.8f, kxp ? "They are at Strake Proving Ground - coming soon." : "Not implemented yet - coming in a later version.");
+        const bool kxp = (menu_popup == 2 && SPECS[menu_ac].model == 6), kxo = (menu_popup == 0 && SPECS[menu_ac].model == 6);
+        vita2d_pgf_draw_text(pgf, 256, 232, white, 1.3f, kxo ? "KX-1: CHALLENGES ONLY" : (kxp ? "KX-1 CHALLENGES" : MENU_ITEMS[menu_popup]));
+        vita2d_pgf_draw_text(pgf, 256, 276, gold, 1.1f, kxo ? "STRAKE PROVING GROUND" : "FUTURE UPDATE");
+        vita2d_pgf_draw_text(pgf, 256, 308, RGBA8(200, 214, 240, 255), 0.8f, kxo ? "The KX-1 stays at the track. Pick an aircraft to fly free." : (kxp ? "They are at Strake Proving Ground - coming soon." : "Not implemented yet - coming in a later version."));
         vita2d_pgf_draw_text(pgf, 256, 334, RGBA8(150, 172, 215, 255), 0.75f, "Press X to close");
     }
     draw_shot_msg(pgf);
