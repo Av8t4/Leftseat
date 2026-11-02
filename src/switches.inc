@@ -49,7 +49,7 @@ static void sw_cell(int i, float *x, float *y, float *w, float *h) {
 static const int KX_SW[3] = { SWI_BATT, SWI_PUMP, SWI_LAND };
 static void kx_sw_cell(int i, float *x, float *y, float *w, float *h) {
     const int k = i == SWI_BATT ? 0 : (i == SWI_PUMP ? 1 : 2);
-    *x = 668.0f + 58.0f * k; *y = VIEW_H + 14.0f; *w = 52.0f; *h = 88.0f;
+    *x = 650.0f + 68.0f * k; *y = VIEW_H + 14.0f; *w = 64.0f; *h = 88.0f;
 }
 static bool *sw_flag(int i) {
     switch (i) {
@@ -128,5 +128,6 @@ static void sw_input(int nf, const float *fx, const float *fy, const int *fid, i
     for (int k = 0; k < prev_n; k++) prev_id[k] = fid[k];
     starter_held = sw_open && start_down;
     (void)had_hold;
+    if (spec->model == 6) { toggle_panel = false; sw_open = false; }                 // (the KX-1 has no switch panel: its switches are on the gauges)
     if (toggle_panel) { sw_open = !sw_open; snd_event(EV_CLICK, 1.0f); starter_held = false; }
 }

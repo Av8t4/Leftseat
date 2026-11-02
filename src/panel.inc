@@ -366,9 +366,12 @@ static void draw_kx_switch(vita2d_pgf *pgf, int i) {
     pb_line(cx - 1.0f, py, cx - 1.0f, ty, 2.0f, RGBA8(210, 212, 220, 255));
     pb_flush();
     vita2d_draw_fill_circle(cx, ty, 5.0f, on ? RGBA8(255, 255, 255, 255) : RGBA8(210, 212, 220, 255));
-    const char *lb = i == SWI_BATT ? "BATTERY" : (i == SWI_PUMP ? "THRUSTERS" : "HEADLIGHTS");
-    const int tw = vita2d_pgf_text_width(pgf, 0.42f, lb);
-    vita2d_pgf_draw_text(pgf, cx - tw / 2, y + h - 5, RGBA8(200, 204, 214, 255), 0.42f, lb);
+    const char *lb = i == SWI_BATT ? "BATTERY" : (i == SWI_PUMP ? "THRUST" : "LIGHTS");
+    const int tw1 = vita2d_pgf_text_width(pgf, 1.0f, lb);                           // as big as fits under the switch (as on the other panels)
+    float sc = tw1 > 0 ? (w - 6.0f) / (float)tw1 : 0.6f;
+    if (sc > 0.62f) sc = 0.62f;
+    const int tw = (int)(tw1 * sc);
+    vita2d_pgf_draw_text(pgf, cx - tw / 2, y + h - 8, RGBA8(245, 246, 250, 255), sc, lb);
 }
 static void draw_kx_panel(vita2d_pgf *pgf) {
     unsigned int txt = RGBA8(222, 224, 230, 255), dim = RGBA8(150, 154, 166, 255);
@@ -376,26 +379,26 @@ static void draw_kx_panel(vita2d_pgf *pgf) {
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, 3, RGBA8(120, 120, 128, 255));
     const float R = 46.0f, dy = VIEW_H + 57.0f;
     draw_kx_speedo(pgf, 92, dy, 52.0f, pl.speed * 2.237f * (kx.u < -0.5f ? -1.0f : 1.0f));
-    draw_kx_power(pgf, 204, dy, R, kx.power);
-    draw_kx_battery(pgf, 304, dy, R, kx.batt);
-    draw_attitude(404, dy, R);
-    draw_vsi(pgf, 504, dy, R, pl.vs * 196.85f);
-    draw_kx_gas(pgf, 604, dy, R, kx.gas);
+    draw_kx_power(pgf, 200, dy, R, kx.power);
+    draw_kx_battery(pgf, 296, dy, R, kx.batt);
+    draw_attitude(392, dy, R);
+    draw_vsi(pgf, 488, dy, R, pl.vs * 196.85f);
+    draw_kx_gas(pgf, 584, dy, R, kx.gas);
     for (int i = 0; i < 3; i++) draw_kx_switch(pgf, KX_SW[i]);
     // The pedal bar: power above the middle, brake and reverse below it.
-    const float y0 = VIEW_H + 18.0f, y1 = VIEW_H + 98.0f, tx = 852.0f, ym = (y0 + y1) / 2;
+    const float y0 = VIEW_H + 18.0f, y1 = VIEW_H + 98.0f, tx = 910.0f, ym = (y0 + y1) / 2;
     slider_track(tx, y0, y1);
     if (kx.thr >= 0.0f) vita2d_draw_rectangle(tx - 2, ym - (ym - y0) * kx.thr, 4, (ym - y0) * kx.thr, RGBA8(70, 190, 90, 255));
     else                vita2d_draw_rectangle(tx - 2, ym, 4, (y1 - ym) * -kx.thr, RGBA8(220, 70, 60, 255));
     vita2d_draw_rectangle(tx - 7, ym, 14, 1, RGBA8(200, 200, 206, 255));
     slider_knob(tx, ym - (ym - y0) * kx.thr, RGBA8(210, 50, 44, 255));
-    vita2d_pgf_draw_text(pgf, tx - 13, VIEW_H + 118, dim, 0.5f, "PEDAL");
+    vita2d_pgf_draw_text(pgf, tx - 13, VIEW_H + 118, dim, 0.5f, "POWER");
     // The slip indicator, as in the aircraft.
-    vita2d_draw_rectangle(162, VIEW_H + 113, 84, 14, RGBA8(100, 102, 110, 255));
-    vita2d_draw_rectangle(163, VIEW_H + 114, 82, 12, RGBA8(8, 8, 10, 255));
-    vita2d_draw_rectangle(195, VIEW_H + 114, 1, 12, RGBA8(160, 160, 168, 255));
-    vita2d_draw_rectangle(213, VIEW_H + 114, 1, 12, RGBA8(160, 160, 168, 255));
-    vita2d_draw_fill_circle(204.5f + clampf(pl.beta / 0.25f, -1.0f, 1.0f) * 30.0f, VIEW_H + 120, 5.0f, RGBA8(255, 200, 60, 255));
+    vita2d_draw_rectangle(158, VIEW_H + 113, 84, 14, RGBA8(100, 102, 110, 255));
+    vita2d_draw_rectangle(159, VIEW_H + 114, 82, 12, RGBA8(8, 8, 10, 255));
+    vita2d_draw_rectangle(191, VIEW_H + 114, 1, 12, RGBA8(160, 160, 168, 255));
+    vita2d_draw_rectangle(209, VIEW_H + 114, 1, 12, RGBA8(160, 160, 168, 255));
+    vita2d_draw_fill_circle(200.5f + clampf(pl.beta / 0.25f, -1.0f, 1.0f) * 30.0f, VIEW_H + 120, 5.0f, RGBA8(255, 200, 60, 255));
     int wd = ((int)(wx_dir * 57.2958f + 360.5f)) % 360;
     vita2d_pgf_draw_textf(pgf, 280, VIEW_H + 129, txt, 0.65f, "%s  WIND %03d/%d KT   TRIP %.1f MI   %s%s", wx_label(), wd, (int)(wx.wind * 1.944f + 0.5f),
                           kx.odo / 1609.34f, !sw.batt ? "BATTERY OFF" : (kx.air ? "AIRBORNE" : (sw.arm ? "THRUSTERS ARMED" : "READY")), gy_mode ? "  GYRO" : "");
