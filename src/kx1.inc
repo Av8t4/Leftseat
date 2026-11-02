@@ -99,7 +99,6 @@ static void build_kx1(void) {
         V3 in[4] = { MW(s * 0.955f, 0.14f, -0.86f), MW(s * 0.955f, 0.46f, -0.86f), MW(s * 0.955f, 0.46f, -1.28f), MW(s * 0.955f, 0.14f, -1.28f) };   // side intake
         if (s < 0) { V3 t = in[0]; in[0] = in[3]; in[3] = t; t = in[1]; in[1] = in[2]; in[2] = t; }
         pf_poly(4, in, NULL, 16, 18, 22, PF_DECAL, 255);
-        kx_box(s * 0.935f - 0.015f, s * 0.935f + 0.015f, 0.09f, 0.15f, -1.00f, 1.55f, KC_YEL);                  // sill strake
         kx_box(s * 0.12f - 0.012f, s * 0.12f + 0.012f, 0.66f, 0.96f, -1.55f, -0.85f, KC_YEL);                    // rear deck strakes
         kx_box(s * 0.12f - 0.012f, s * 0.12f + 0.012f, 0.62f, 0.76f, -2.05f, -1.55f, KC_YEL);
         kx_box(s * 0.30f - 0.02f, s * 0.30f + 0.02f, 0.455f, 0.485f, 1.20f, 1.42f, KC_YEL);                       // nose strakes along the hood
@@ -111,15 +110,18 @@ static void build_kx1(void) {
         kx_box(s * 0.90f - 0.02f, s * 0.90f + 0.02f, 0.58f, 0.92f, -2.26f, -1.86f, KC_GRAPH);                     // end plates
     }
     kx_box(-0.92f, 0.92f, 0.90f, 0.94f, -2.26f, -1.84f, KC_GRAPH);                                                // rear wing
-    if (lt_landing()) { kx_lamp(-0.55f, -0.18f, 0.20f, 0.28f, 2.17f, 2.22f, 255, 246, 200); kx_lamp(0.18f, 0.55f, 0.20f, 0.28f, 2.17f, 2.22f, 255, 246, 200); }
-    else              { kx_box(-0.55f, -0.18f, 0.20f, 0.28f, 2.17f, 2.22f, 190, 192, 184);   kx_box(0.18f, 0.55f, 0.20f, 0.28f, 2.17f, 2.22f, 190, 192, 184); }
-    const bool tl = lt_nav() || kx_braking;                                                                       // tail lights: dim, bright on the brake
+    for (int s = -1; s <= 1; s += 2) {                                                                            // headlights: set into the nose
+        const float xa = s * 0.20f, xb = s * 0.42f;
+        if (lt_head()) kx_lamp(fminf(xa, xb), fmaxf(xa, xb), 0.20f, 0.30f, 1.58f, 1.70f, 255, 246, 200);
+        else           kx_box (fminf(xa, xb), fmaxf(xa, xb), 0.20f, 0.30f, 1.58f, 1.70f, 190, 192, 184);
+    }
+    const bool tl = lt_head() || kx_braking;                                                                       // tail lights: dim, bright on the brake
     for (int s = -1; s <= 1; s += 2) {
-        if (tl) kx_lamp(s * 0.30f, s * 0.72f > 0 ? s * 0.72f : s * 0.30f, 0.30f, 0.38f, -2.215f, -2.185f, kx_braking ? 255 : 190, 20, 20);
-        else    kx_box(s * 0.30f, s * 0.72f > 0 ? s * 0.72f : s * 0.30f, 0.30f, 0.38f, -2.215f, -2.185f, 90, 20, 20);
+        const float xa = s * 0.20f, xb = s * 0.44f, x0 = fminf(xa, xb), x1 = fmaxf(xa, xb);
+        if (tl) kx_lamp(x0, x1, 0.32f, 0.40f, -2.225f, -2.19f, kx_braking ? 255 : 190, 20, 20);
+        else    kx_box (x0, x1, 0.32f, 0.40f, -2.225f, -2.19f, 90, 20, 20);
     }
     kx_box(-0.55f, 0.55f, 0.05f, 0.09f, 2.12f, 2.28f, KC_GRAPH);                                                  // splitter
-    kx_box(-0.55f, 0.55f, 0.09f, 0.10f, 2.26f, 2.28f, KC_YEL);
     for (int s = -1; s <= 1; s += 2) {
         wheel(s * KX_WX, 0.30f, KX_WZ_REAR, 0.32f, 0.15f, s);
         kx_wheel(s * KX_WX, 0.30f, KX_WZ_FRONT, 0.30f, 0.12f, s, kx_steer_vis);
@@ -184,6 +186,7 @@ static void kx_reset(float heading) {
 }
 
 // One frame of driving. Constants are SI; a mile per hour is 0.447 m/s.
+#define KX_BOOST_USE 1.5f       // gas units a second at full power with the thrusters armed
 #define KX_WHEELBASE 2.43f
 #define KX_G         9.81f
 static void kx_drive(const SceCtrlData *pad) {
@@ -210,7 +213,9 @@ static void kx_drive(const SceCtrlData *pad) {
     float ax = 0.0f;
     kx.power = 0.0f;
     if (throttle > 0.0f && u > -0.5f) {
-        float amax = fminf(9.3f, 240.0f / fmaxf(u, 1.0f));
+        const bool boost = sw.arm && sw.batt && kx.gas > 0.0f;                  // thrusters armed: the cold-gas jets push the car along as well
+        float amax = boost ? fminf(39.0f, 700.0f / fmaxf(u, 1.0f)) : fminf(9.3f, 240.0f / fmaxf(u, 1.0f));
+        if (boost) kx.gas = fmaxf(0.0f, kx.gas - KX_BOOST_USE * throttle * dt);
         ax += throttle * amax; kx.power = throttle;
     }
     if (rev > 0.0f) { ax -= rev * 4.5f * clampf(1.0f - (-u) / 11.0f, 0.0f, 1.0f); kx.power = -rev * 0.3f; }
@@ -244,8 +249,8 @@ static void kx_drive(const SceCtrlData *pad) {
 
     kx.ax += (ax - kx.ax) * fminf(1.0f, 6.0f * dt);
     kx.ay += ((ay + kx.u * kx.yawrate) - kx.ay) * fminf(1.0f, 6.0f * dt);
-    kx.roll  += (clampf(-0.015f * kx.u * kx.yawrate, -0.16f, 0.16f) - kx.roll) * fminf(1.0f, 8.0f * dt);
-    kx.pitch += (clampf(0.0055f * kx.ax, -0.07f, 0.06f) - kx.pitch) * fminf(1.0f, 8.0f * dt);
+    kx.roll  += (clampf(-0.004f * kx.u * kx.yawrate, -0.04f, 0.04f) - kx.roll) * fminf(1.0f, 8.0f * dt);
+    kx.pitch += (clampf(0.0035f * kx.ax, -0.04f, 0.035f) - kx.pitch) * fminf(1.0f, 8.0f * dt);
     kx_braking = brake > 0.1f || kx.hand;
     kx_steer_vis = kx.steer;
     kx.batt = clampf(kx.batt - fmaxf(0.0f, kx.power) * 0.00004f * dt * 60.0f + fmaxf(0.0f, -kx.power) * 0.000005f * dt * 60.0f, 0.0f, 1.0f);

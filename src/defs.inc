@@ -92,6 +92,7 @@ static inline bool lt_nav(void)     { return sw.batt && sw.nav; }
 static inline bool lt_strobe(void)  { return sw.batt && sw.strobe; }
 static inline bool lt_beacon(void)  { return sw.batt && sw.beacon; }
 static inline bool lt_landing(void) { return sw.batt && sw.landing; }
+static inline bool lt_head(void)    { return sw.batt && sw.landing; }       // (the KX-1: the headlights, with the tail lights)
 // Cold and dark: everything off and the engine stopped (a new flight, or Triangle).
 static void sw_cold(void) {
     memset(&sw, 0, sizeof(sw));
