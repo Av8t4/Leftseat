@@ -46,7 +46,7 @@ static void sw_cell(int i, float *x, float *y, float *w, float *h) {
 }
 static bool *sw_flag(int i) {
     switch (i) {
-        case SWI_BATT: return &sw.batt;   case SWI_PUMP: return &sw.pump;   case SWI_IGN: return &sw.ign;
+        case SWI_BATT: return &sw.batt;   case SWI_PUMP: return spec->model == 6 ? &sw.arm : &sw.pump;   case SWI_IGN: return spec->model == 6 ? NULL : &sw.ign;
         case SWI_BEACON: return &sw.beacon; case SWI_NAV: return &sw.nav;  case SWI_STROBE: return &sw.strobe;
         case SWI_LAND: return &sw.landing; case SWI_TAXI: return &sw.taxi; case SWI_PITOT: return &sw.pitot;
         case SWI_AVI: return &sw.avionics; case SWI_CABIN: return &sw.cabin;

@@ -46,6 +46,7 @@
 #include "night.inc"
 #include "airports.inc"
 #include "spaceport.inc"
+#include "kx1.inc"
 #include "scene.inc"
 #include "panel.inc"
 #include "screenshot.inc"

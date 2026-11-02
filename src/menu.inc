@@ -486,6 +486,7 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
             menu_ap = ap_next(menu_ap, 1);
             return 0;
         }
+        if (menu_sel == 2 && SPECS[menu_ac].model == 6) { menu_popup = 2; menu_popup_t = 240; return 0; }     // the KX-1 has its own challenges, at the proving ground
         if (menu_sel == 2) {                                  // challenges: open the list
             menu_chopen = 1;
             menu_chsel = ch_running() ? 0 : ch_kind;
@@ -623,7 +624,7 @@ static void draw_hangar_preview(int ac, float ang) {
     pl.pos = v3(0.0f, 0.0f, 0.0f); pl.gear = 1.0f; pl.gear_cmd = true; pl.on_ground = true; pl.rpm = 700.0f;
     set_axes(ang, 0.0f, 0.0f);
     g_focal = 520.0f; g_near = 0.5f;
-    float rm = fmaxf(spec->tip_x, fmaxf(-spec->tail_z, 4.5f)), D = 3.3f * rm;
+    float rm = fmaxf(spec->tip_x, fmaxf(-spec->tail_z, spec->model == 6 ? 2.3f : 4.5f)), D = 3.3f * rm;
     V3 pivot = v3(0.0f, spec->piv_y * 0.8f, 0.0f);
     look_at(vadd(pivot, v3(0.0f, D * 0.30f, -D * 0.95f)), pivot);
     float cxp = HG_PX + HG_PW * 0.5f, cyp = HG_PY + HG_PH * 0.52f;       // where the aircraft should appear on the screen
@@ -762,7 +763,7 @@ static void draw_menu(vita2d_pgf *pgf) {
             vita2d_draw_rectangle(HG_LX + HG_LW + 6, HG_LY + (HG_LH - th) * (menu_hscroll / hm), 3, th, gold);
         }
         {                                                                    // the facts about the aircraft in the picture
-            const char *maker = (menu_hsel == AC_A22 || menu_hsel == AC_A11) ? "ASHLEY AEROSPACE" : "KNOWLES AIRCRAFT CO.";
+            const char *maker = menu_hsel == AC_KX1 ? "STRAKE CORPORATION" : (menu_hsel == AC_A22 || menu_hsel == AC_A11) ? "ASHLEY AEROSPACE" : "KNOWLES AIRCRAFT CO.";
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 32, white, 1.25f, SPECS[menu_hsel].name);
             vita2d_pgf_draw_text(pgf, HG_PX + HG_PW - vita2d_pgf_text_width(pgf, 0.65f, maker), HG_PY + HG_PH + 32, RGBA8(176, 150, 96, 255), 0.65f, maker);
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 58, pale, 0.78f, SPECS[menu_hsel].line1);
@@ -1061,9 +1062,10 @@ static void draw_menu(vita2d_pgf *pgf) {
     if (menu_popup >= 0) {
         vita2d_draw_rectangle(220, 180, 520, 170, gold);
         vita2d_draw_rectangle(224, 184, 512, 162, RGBA8(10, 22, 56, 255));
-        vita2d_pgf_draw_text(pgf, 256, 232, white, 1.3f, MENU_ITEMS[menu_popup]);
+        const bool kxp = (menu_popup == 2 && SPECS[menu_ac].model == 6);
+        vita2d_pgf_draw_text(pgf, 256, 232, white, 1.3f, kxp ? "KX-1 CHALLENGES" : MENU_ITEMS[menu_popup]);
         vita2d_pgf_draw_text(pgf, 256, 276, gold, 1.1f, "FUTURE UPDATE");
-        vita2d_pgf_draw_text(pgf, 256, 308, RGBA8(200, 214, 240, 255), 0.8f, "Not implemented yet - coming in a later version.");
+        vita2d_pgf_draw_text(pgf, 256, 308, RGBA8(200, 214, 240, 255), 0.8f, kxp ? "They are at Strake Proving Ground - coming soon." : "Not implemented yet - coming in a later version.");
         vita2d_pgf_draw_text(pgf, 256, 334, RGBA8(150, 172, 215, 255), 0.75f, "Press X to close");
     }
     draw_shot_msg(pgf);

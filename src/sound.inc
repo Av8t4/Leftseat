@@ -117,6 +117,9 @@ static void snd_game_update(const SceCtrlData *pad) {
         case 2: case 3:                                             // jet (Jet 1, K-30): the dial reads per cent N1
             in.engine_kind = SND_JET; in.n1 = clampf(pl.rpm / 100.0f, 0.0f, 1.05f); in.load = clampf(in.n1, 0.0f, 1.0f);
             break;
+        case 6:                                                     // the KX-1: an electric motor, a soft whine that rises with speed
+            in.engine_kind = SND_JET; in.n1 = clampf(0.20f + 0.70f * pl.rpm / 100.0f, 0.0f, 1.0f); in.load = clampf(pl.throttle, 0.0f, 1.0f) * 0.5f;
+            break;
         default:
             in.engine_kind = SND_PISTON; in.blades = 2; in.rpm = pl.rpm;
             in.load = clampf((pl.rpm - 600.0f) / 1800.0f, 0.0f, 1.0f);
@@ -134,6 +137,7 @@ static void snd_game_update(const SceCtrlData *pad) {
     in.rough = pl.on_ground ? snd_ground_rough() : 0.0f;
     if (!pl.on_ground && !pl.crashed) in.stall = clampf((pl.alpha - (ALPHA_S - 0.09f)) / 0.05f, 0.0f, 1.0f);   // the horn starts a few knots before the stall
     in.rain = clampf(wx.rain, 0.0f, 1.0f);
+    if (spec->model == 6) { in.hiss = kx.hiss; if (pl.on_ground && fabsf(kx.w) > 1.5f) in.brake = clampf(fabsf(kx.w) / 4.0f, 0.0f, 1.0f); }     // the KX-1: the thrusters, and the tires when it slides
     in.turb = clampf(wx.turb * 2.0f, 0.0f, 1.0f);
     in.view = view_mode;
     if (view_mode == 2) {                                           // from the tower: quieter with distance, and the pitch shifts as it passes

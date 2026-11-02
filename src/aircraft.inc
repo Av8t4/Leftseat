@@ -49,7 +49,7 @@ typedef struct {
     float kd_gear, gear_vmax, gear_time;                // extra drag with the gear out, fastest speed (m/s) at which it may move, seconds to move
 } Spec;
 
-enum { AC_K4 = 0, AC_K10, AC_JET1, AC_K30, AC_A22, AC_A11, AC_COUNT };
+enum { AC_K4 = 0, AC_K10, AC_JET1, AC_K30, AC_A22, AC_A11, AC_KX1, AC_COUNT };
 
 static const Spec SPECS[AC_COUNT] = {
     {   // ---- K-4 Trainer ------------------------------------------------------------
@@ -221,8 +221,40 @@ static const Spec SPECS[AC_COUNT] = {
         200.0f, 40.0f, 2.0f,
         100.0f, 500.0f, 10.0f, 10.0f, "RPM",
         0
+    },
+    {   // ---- Strake KX-1: an electric coupe with cold-gas thrusters (the car has its own update path, see kx1.inc) --
+        "STRAKE KX-1", "kx1", "KX-1",
+        "Electric coupe with cold-gas thrusters, 160 mph", "Drive it, hop it, flip it. Run out of gas in the air and it crashes.",
+        0.00858f, 4.6f, -0.065f, 0.261f, 1.5f,
+        0.00036f, 0.00049f, 0.00006f, 0.0027f,
+        2.0f, 450.0f,
+        55.0f, 0.065f, 83.8f,
+        { 0.0f, 0.15f, 0.27f, 0.375f }, { 0.0f, 0.00008f, 0.00020f, 0.00034f },
+        0.02f, 2.7f, 9.0f, 4.2f,
+        1.3f, 2.8f, 0.9f, 2.5f, 5.0f,
+        53.0f, 2550.0f, 6.0f, 2.0f, 9.5f,
+        700.0f, 1600.0f, 7.0f, 2800.0f, 14.0f, 1200.0f, 1100.0f,
+        15.0f, 0.24f, 3.5f,
+        0.40f,
+        0.82f, 1.16f, 1.70f,
+        { { -1.25f, -0.118f, -0.30f, 34.7f, 9.0f }, { 1.25f, -0.118f, -0.30f, 34.7f, 9.0f }, { 0.0f, -0.162f, 1.62f, 10.0f, 5.0f } },
+        2.2f, 0.5f, -2.2f, 0.4f, 2.2f, 0.4f,
+        -0.36f, 0.80f, 0.05f, 7.5f, 2.2f,
+        40.0f, 85.0f, 48.0f, 129.0f, 163.0f,
+        3000.0f, 2100.0f, 2600.0f, 2700.0f,
+        75.0f, 1, 36.0f, -0.098f, 440.0f, 520.0f,
+        1.09f, 3.10f, 0.95f, 0.20f, 3.46f, 3.0f, 2,
+        6,
+        0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+        200.0f, 40.0f, 2.0f,
+        100.0f, 500.0f, 10.0f, 10.0f, "RPM",
+        0
     }
 };
+
+// The KX-1 (kx1.inc) drives instead of flying: update() hands it the frame.
+static void kx_reset(float heading);
+static void kx_update(const SceCtrlData *pad, unsigned int pressed);
 
 static const Spec *spec = &SPECS[AC_K4];           // the aircraft being flown
 static int ac_flying = AC_K4;                      // ... as an index

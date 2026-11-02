@@ -441,7 +441,7 @@ static void draw_country_roads(void) {
         }
 }
 
-// Knowles Works' ground: the apron, the road in from the main road, car parks, a solar field and the road to the village.
+// Strake Corporation's ground: the apron, the road in from the main road, car parks, a solar field and the road to the village.
 static void draw_knowles_ground(void) {
     float dx = KW_FX - cam.pos.x, dz = KW_FZ - cam.pos.z, d2 = dx * dx + dz * dz;
     if (d2 > 3500.0f * 3500.0f) return;

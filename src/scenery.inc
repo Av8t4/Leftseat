@@ -217,6 +217,7 @@ static bool tree_ok(float x, float z) {
     if (city_d(x, z) > 0.07f) return false;                                  // downtown and its suburbs
     if (fabsf(x - KW_FX) < 520.0f && fabsf(z - KW_FZ) < 330.0f) return false;      // the factory
     if (fabsf(x - KW_VX) < 480.0f && fabsf(z - KW_VZ) < 360.0f) return false;      // and its village
+    if (fabsf(x - SPG_X) < SPG_HX + 60.0f && fabsf(z - SPG_Z) < SPG_HZ + 60.0f) return false;   // Strake Proving Ground
     if (fabsf(x) < 320.0f && fabsf(z) < 1400.0f) return false;              // airport
     if (fabsf(x - 150.0f) < 120.0f && fabsf(z) < 500.0f) return false;      // terminal area
     if (fabsf(x - ROAD_X) < 26.0f || fabsf(z - ROAD_Z) < 26.0f) return false;
