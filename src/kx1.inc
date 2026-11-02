@@ -85,7 +85,7 @@ static void build_kx1(void) {
             const float *c = W;
             if (e == 0) c = (wind || rearw) ? GL : W;                    // windshield and rear window
             else if (e == 1 || e == 7) c = cab ? GL : W;                 // side windows
-            else if (e == 3 || e == 6 || e == 4 || e == 5) c = G;         // the dark lower body
+            else if (e == 3 || e == 4 || e == 5) c = G;                   // the dark lower body (the same on both sides)
             pf_poly(4, q, &cc, c[0], c[1], c[2], 0, 255);
         }
     }
@@ -171,7 +171,7 @@ typedef struct {
     bool  air;             // off the ground: the free-flight model below is running
     float hiss;            // 0..1, how hard the thrusters are blowing (for the sound)
     float rx, ry, rz;      // airborne spin: pitch (nose up +), roll (right wing down +), yaw (nose right +) in rad/s
-    float jet_hop, jet_roof;   // 0..1 jets in use this frame
+    float jet_hop, jet_roof, jet_fwd;   // 0..1 jets in use this frame
     float cp, cr, cy;      // attitude commands this frame, -1..1
     float air_t;           // seconds since leaving the ground
 } KX;
@@ -186,15 +186,15 @@ static void kx_reset(float heading) {
 }
 
 // One frame of driving. Constants are SI; a mile per hour is 0.447 m/s.
-#define KX_BOOST_USE 1.5f       // gas units a second at full power with the thrusters armed
+#define KX_BOOST_USE 2.5f       // gas units a second from the forward jets on the ground
 #define KX_WHEELBASE 2.43f
 #define KX_G         9.81f
 static void kx_drive(const SceCtrlData *pad) {
     const float dt = DT;
-    float steer_in = shape(stick(pad->lx));
+    float steer_in = shape(stick(pad->rx));                              // right stick: steering
     if (gy_mode) steer_in = clampf(steer_in + gy_ail, -1.0f, 1.0f);
-    float drive_in = -stick(pad->ry);                              // right stick up: power, down: brake and then reverse
-    kx.hand = (pad->buttons & SCE_CTRL_CIRCLE) != 0;
+    float drive_in = -stick(pad->ly);                              // left stick up: power, down: brake and then reverse (the other way: brake first, then power)
+    kx.hand = (pad->buttons & SCE_CTRL_RTRIGGER) != 0;                  // R: the handbrake
     if (!sw.batt) drive_in = fminf(drive_in, 0.0f);                // no battery, no power (the brakes still work)
     kx.thr += (drive_in - kx.thr) * fminf(1.0f, 10.0f * dt);
 
@@ -213,10 +213,15 @@ static void kx_drive(const SceCtrlData *pad) {
     float ax = 0.0f;
     kx.power = 0.0f;
     if (throttle > 0.0f && u > -0.5f) {
-        const bool boost = sw.arm && sw.batt && kx.gas > 0.0f;                  // thrusters armed: the cold-gas jets push the car along as well
-        float amax = boost ? fminf(39.0f, 700.0f / fmaxf(u, 1.0f)) : fminf(9.3f, 240.0f / fmaxf(u, 1.0f));
-        if (boost) kx.gas = fmaxf(0.0f, kx.gas - KX_BOOST_USE * throttle * dt);
+        float amax = fminf(9.3f, 240.0f / fmaxf(u, 1.0f));
         ax += throttle * amax; kx.power = throttle;
+    }
+    // The forward jets (Square, thrusters armed): a big push on top of the motor, for as long as the gas lasts.
+    kx.jet_fwd = 0.0f;
+    if (sw.arm && sw.batt && kx.gas > 0.0f && (pad->buttons & SCE_CTRL_SQUARE) && u > -0.5f) {
+        ax = fmaxf(ax, fminf(37.0f, 700.0f / fmaxf(u, 1.0f)));
+        kx.power = 1.0f; kx.jet_fwd = 1.0f;
+        kx.gas = fmaxf(0.0f, kx.gas - KX_BOOST_USE * dt);
     }
     if (rev > 0.0f) { ax -= rev * 4.5f * clampf(1.0f - (-u) / 11.0f, 0.0f, 1.0f); kx.power = -rev * 0.3f; }
     if (brake > 0.0f) { ax -= (u > 0.0f ? 1.0f : -1.0f) * brake * 11.0f; kx.power = -brake; }
@@ -262,6 +267,8 @@ static void kx_drive(const SceCtrlData *pad) {
 /* ------------------------------------------------------------------ */
 
 #define KX_HOP_ACC   17.0f      // m/s^2 along the roof-to-floor axis from the four hop jets: about 1.7 g, so a level car climbs at 0.7 g
+#define KX_FWD_ACC   24.0f      // m/s^2 along the nose from the forward jets in the air
+#define KX_FWD_USE   4.0f
 #define KX_ROOF_ACC  10.0f      // m/s^2 pushing the car toward its floor
 #define KX_RCS_ACC   4.2f       // rad/s^2 from the attitude jets
 #define KX_HOP_USE   7.0f       // gas units a second (the tank holds 100: about 14 s of hop)
@@ -358,17 +365,18 @@ static void kx_fly(const SceCtrlData *pad) {
     const float dt = DT;
     kx.air_t += dt;
     const bool arm = sw.arm && sw.batt;
-    float hop = 0.0f, roof = 0.0f, cp = 0.0f, cr = 0.0f, cy = 0.0f;
+    float hop = 0.0f, roof = 0.0f, fwd = 0.0f, cp = 0.0f, cr = 0.0f, cy = 0.0f;
     if (arm && kx.gas > 0.0f) {
         if (pad->buttons & SCE_CTRL_CROSS)  hop  = 1.0f;
-        if (pad->buttons & SCE_CTRL_SQUARE) roof = 1.0f;
+        if (pad->buttons & SCE_CTRL_CIRCLE) roof = 1.0f;                 // O: the roof jets
+        if (pad->buttons & SCE_CTRL_SQUARE) fwd  = 1.0f;                 // Square: the forward jets
         cp = shape(stick(pad->ly)); cr = shape(stick(pad->lx)); cy = shape(stick(pad->rx));
         if (gy_mode) cr = clampf(cr + gy_ail, -1.0f, 1.0f);
     }
-    float use = hop * KX_HOP_USE + roof * KX_ROOF_USE + (fabsf(cp) + fabsf(cr) + fabsf(cy)) * KX_RCS_USE;
-    if (use * dt > kx.gas) { float k = kx.gas / (use * dt); hop *= k; roof *= k; cp *= k; cr *= k; cy *= k; use = kx.gas / dt; }
+    float use = hop * KX_HOP_USE + roof * KX_ROOF_USE + fwd * KX_FWD_USE + (fabsf(cp) + fabsf(cr) + fabsf(cy)) * KX_RCS_USE;
+    if (use * dt > kx.gas) { float k = kx.gas / (use * dt); hop *= k; roof *= k; fwd *= k; cp *= k; cr *= k; cy *= k; use = kx.gas / dt; }
     kx.gas = fmaxf(0.0f, kx.gas - use * dt);
-    kx.jet_hop = hop; kx.jet_roof = roof; kx.cp = cp; kx.cr = cr; kx.cy = cy;
+    kx.jet_hop = hop; kx.jet_roof = roof; kx.jet_fwd = fwd; kx.cp = cp; kx.cr = cr; kx.cy = cy;
     kx.hiss += ((use > 0.01f ? clampf(0.35f + use / 18.0f, 0.0f, 1.0f) : 0.0f) - kx.hiss) * fminf(1.0f, 14.0f * dt);
 
     // Spin: the jets change it, nothing else does. Leave it alone and it keeps turning.
@@ -380,6 +388,7 @@ static void kx_fly(const SceCtrlData *pad) {
     // Forces: gravity, drag, and the jets along the body's own up axis.
     V3 a = v3(0.0f, -KX_G, 0.0f);
     a = vadd(a, vscale(pl.u, hop * KX_HOP_ACC - roof * KX_ROOF_ACC));
+    a = vadd(a, vscale(pl.f, fwd * KX_FWD_ACC));
     float sp = sqrtf(vdot(pl.vel, pl.vel));
     a = vsub(a, vscale(pl.vel, 0.0006f * sp));
     pl.vel = vadd(pl.vel, vscale(a, dt));
@@ -390,6 +399,7 @@ static void kx_fly(const SceCtrlData *pad) {
         const float jx[4] = { -0.62f, 0.62f, -0.62f, 0.62f }, jz[4] = { -1.10f, -1.10f, 0.95f, 0.95f };
         for (int i = 0; i < 4; i++) kx_emit(jx[i], 0.12f, jz[i], 0.0f, -1.0f, 0.0f, 14.0f, 0.20f);
     }
+    if (fwd > 0.0f) { kx_emit(-0.30f, 0.45f, -2.15f, 0.0f, 0.0f, -1.0f, 16.0f, 0.20f); kx_emit(0.30f, 0.45f, -2.15f, 0.0f, 0.0f, -1.0f, 16.0f, 0.20f); }
     if (roof > 0.0f) kx_emit(0.0f, 1.20f, 0.10f, 0.0f, 1.0f, 0.0f, 12.0f, 0.22f);
     if (fabsf(cp) > 0.2f) {
         float sg = cp > 0.0f ? 1.0f : -1.0f;
@@ -423,7 +433,7 @@ static void kx_update(const SceCtrlData *pad, unsigned int pressed) {
     eng_on = sw.batt; eng_n += ((sw.batt ? 1.0f : 0.0f) - eng_n) * 0.05f;       // (the motor: it runs when the battery is on)
     kx.jet_hop = kx.jet_roof = 0.0f; kx.cp = kx.cr = kx.cy = 0.0f;
     if (!kx.air) {
-        kx.hiss += (0.0f - kx.hiss) * fminf(1.0f, 10.0f * DT);
+        kx.hiss += ((kx.jet_fwd > 0.0f ? 0.75f : 0.0f) - kx.hiss) * fminf(1.0f, 10.0f * DT);
         // A parked car takes on gas, slowly.
         if (fabsf(kx.u) < 1.0f && fabsf(kx.w) < 1.0f && kx.gas < 100.0f) kx.gas = fminf(100.0f, kx.gas + 4.0f * DT);
         if (sw.arm && sw.batt && kx.gas > 0.5f && (pad->buttons & SCE_CTRL_CROSS)) {
@@ -452,6 +462,7 @@ static void kx_update(const SceCtrlData *pad, unsigned int pressed) {
     }
     kx_puffs_step();
     kx_drive(pad);
+    if (kx.jet_fwd > 0.0f) { kx_emit(-0.30f, 0.45f, -2.15f, 0.0f, 0.0f, -1.0f, 16.0f, 0.20f); kx_emit(0.30f, 0.45f, -2.15f, 0.0f, 0.0f, -1.0f, 16.0f, 0.20f); }
     const float sh = sinf(kx.psi), ch = cosf(kx.psi);
     pl.vel = v3(sh * kx.u + ch * kx.w, 0.0f, ch * kx.u - sh * kx.w);
     pl.pos.x += pl.vel.x * DT; pl.pos.z += pl.vel.z * DT; pl.pos.y = 0.0f;
