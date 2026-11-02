@@ -164,8 +164,23 @@ static void plane_glow(V3 c, float px, unsigned int col) {
     draw_world_poly_emit(q, 8, col);
 }
 
+static bool kx_braking;                                       // (the KX-1 brake lights: set in kx1.inc)
 static void draw_plane_lights(void) {
     if (pl.crashed || !sw.batt) return;
+    if (spec->model == 6) {                                                           // the KX-1: headlights and tail lights, nothing else
+        const bool hl = lt_head(), br = kx_braking;
+        for (int s = -1; s <= 1; s += 2) {
+            if (hl) {
+                V3 p = body_pt(s * 0.31f, 0.25f, 1.72f), d = vsub(cam.pos, p);
+                if (vdot(d, pl.f) > -0.1f * sqrtf(vdot(d, d))) { plane_glow(p, tod == TOD_DAY ? 4.0f : 9.0f, RGBA8(255, 246, 200, tod == TOD_DAY ? 50 : 90)); plane_glow(p, 1.8f, RGBA8(255, 250, 225, 255)); }
+            }
+            if (hl || br) {
+                V3 p = body_pt(s * 0.32f, 0.36f, -2.24f), d = vsub(cam.pos, p);
+                if (vdot(d, pl.f) < 0.1f * sqrtf(vdot(d, d))) { plane_glow(p, br ? 9.0f : 5.0f, RGBA8(255, 40, 30, br ? 110 : 60)); plane_glow(p, br ? 2.4f : 1.6f, RGBA8(255, 70, 50, 255)); }
+            }
+        }
+        return;
+    }
     const AcLights *L = &AC_LIGHTS[ac_flying];
     const bool night = (tod != TOD_DAY);
     const unsigned int redc = RGBA8(255, 50, 40, 255), grnc = RGBA8(60, 255, 110, 255), whtc = RGBA8(255, 252, 235, 255);

@@ -228,15 +228,16 @@ static void draw_switch_panel(vita2d_pgf *pgf) {
     const bool car = spec->model == 6;
     const char *pump = car ? "THRUSTERS" : (piston ? "PUMP" : "FUEL"), *ign = piston ? "MAGS" : "IGNITION";
     vita2d_pgf_draw_text(pgf, 22, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, car ? "DRIVE" : "ENGINE");
-    vita2d_pgf_draw_text(pgf, 298, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, "LIGHTS");
-    vita2d_pgf_draw_text(pgf, 640, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, "SYSTEMS");
+    vita2d_pgf_draw_text(pgf, car ? 150 : 298, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, "LIGHTS");
+    if (!car) vita2d_pgf_draw_text(pgf, 640, VIEW_H + 20, RGBA8(190, 194, 206, 255), 0.58f, "SYSTEMS");
     for (int i = 0; i < SWI_N; i++) {
         float x, y, w, h; sw_cell(i, &x, &y, &w, &h);
+        if (car && i != SWI_BATT && i != SWI_PUMP && i != SWI_LAND && i != SWI_QUICK) continue;     // (the KX-1 has three switches)
         const float cx = x + w * 0.5f;
         vita2d_draw_rectangle(x - 1, y - 1, w + 2, h + 2, RGBA8(96, 98, 108, 255));
         vita2d_draw_rectangle(x, y, w, h, RGBA8(24, 25, 30, 255));
         if (car && (i == SWI_IGN || i == SWI_START)) continue;                    // (the KX-1 has no ignition or starter)
-        const char *lb = i == SWI_PUMP ? pump : (i == SWI_IGN ? ign : LBL[i]);
+        const char *lb = i == SWI_PUMP ? pump : (i == SWI_IGN ? ign : (car && i == SWI_LAND ? "HEADLIGHTS" : LBL[i]));
         if (i == SWI_QUICK) {
             vita2d_draw_rectangle(x + 6, y + 22, w - 12, 44, RGBA8(40, 110, 70, 255));
             vita2d_draw_rectangle(x + 6, y + 22, w - 12, 2, RGBA8(255, 255, 255, 70));
