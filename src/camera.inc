@@ -94,7 +94,7 @@ static void draw_poly_ex(const V3 *p, int n, unsigned int color, bool emit) {
     {   // entirely off the screen: skip the fog and the fill (the circuit's long rows of strips and dashes are mostly beside or behind the view)
         float x0 = s[0].x, x1 = s[0].x, y0 = s[0].y, y1 = s[0].y;
         for (int i = 1; i < m; i++) { x0 = fminf(x0, s[i].x); x1 = fmaxf(x1, s[i].x); y0 = fminf(y0, s[i].y); y1 = fmaxf(y1, s[i].y); }
-        if (x1 < 0.0f || x0 > (float)FBW || y1 < 0.0f || y0 > (float)FBH) return;
+        if (x1 < 0.0f || x0 > (float)SCREEN_W || y1 < 0.0f || y0 > (float)SCREEN_H) return;
     }
     float cd = 0.0f;                                   // fog: blend toward the haze color with distance
     for (int i = 0; i < m; i++) cd += sqrtf(q[i].x * q[i].x + q[i].y * q[i].y + q[i].z * q[i].z);
