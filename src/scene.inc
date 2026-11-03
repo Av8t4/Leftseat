@@ -110,6 +110,15 @@ static void draw_scene(void) {
             for (int di = -tr; di <= tr; di++) {
                 int i = i0 + di, j = j0 + dj;
                 bool dark = ((i + j) & 1) != 0;
+                {   // Strake Proving Ground: one plain concrete floor, no checkerboard
+                    const float tcx = (i + 0.5f) * TILE, tcz = (j + 0.5f) * TILE;
+                    if (fabsf(tcx - SPG_X) < SPG_HX && fabsf(tcz - SPG_Z) < SPG_HZ) {
+                        V3 sc = v3(tcx - cam.pos.x, -cam.pos.y, tcz - cam.pos.z);
+                        if (vdot(sc, cam.f) < -TILE * 1.5f) continue;
+                        draw_ground_quad(i * TILE, j * TILE, (i + 1) * TILE, (j + 1) * TILE, RGBA8(122, 123, 126, 255));
+                        continue;
+                    }
+                }
                 if (!dark && !alltiles) continue;
                 V3 cc = v3((i + 0.5f) * TILE - cam.pos.x, -cam.pos.y, (j + 0.5f) * TILE - cam.pos.z);
                 if (vdot(cc, cam.f) < -TILE * 1.5f) continue;     // well behind us
