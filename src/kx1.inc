@@ -186,7 +186,7 @@ static void kx_reset(float heading) {
 #define KX_G         9.81f
 static void kx_drive(const SceCtrlData *pad) {
     const float dt = DT;
-    float steer_in = shape(stick(pad->rx));                              // right stick: steering
+    float steer_in = shape(stick(pad->lx));                              // left stick left/right: steering (the right hand is free for the jets)
     if (gy_mode) steer_in = clampf(steer_in + gy_ail, -1.0f, 1.0f);
     float drive_in = -stick(pad->ly);                              // left stick up: power, down: brake and then reverse (the other way: brake first, then power)
     kx.hand = (pad->buttons & SCE_CTRL_RTRIGGER) != 0;                  // R: the handbrake
@@ -225,17 +225,20 @@ static void kx_drive(const SceCtrlData *pad) {
     ax -= (u > 0.0f ? 1.0f : -1.0f) * (0.12f * fminf(1.0f, fabsf(u) / 1.5f) + 0.0006f * u * u);        // rolling resistance and drag
     if (throttle < 0.02f && brake < 0.01f && u > 1.0f) ax -= 0.5f * clampf(u / 20.0f, 0.0f, 1.0f);     // lifting off: a little regeneration
 
-    // Steering: a lot of lock when slow, a little when fast; the front tires can only give so much sideways grip.
-    const float dmax = 0.52f / (1.0f + (u / 16.0f) * (u / 16.0f)) + 0.035f;
+    // Grip: the wing and the underbody press the car down, so it holds more in fast corners (about 1.2 g slow, 2 g at 100 mph).
+    const float down = 1.0f + 0.00022f * u * u / 1.2f;
+    // Steering: a lot of lock when slow; at speed full stick is just a little over what the tires can hold.
+    const float grip = 1.2f * down * KX_G;
+    float r_lim = grip / fmaxf(fabsf(u), 1.5f);
+    float dmax = 0.52f / (1.0f + (u / 16.0f) * (u / 16.0f)) + 0.035f;
+    dmax = fminf(dmax, 1.25f * atanf(r_lim * KX_WHEELBASE / fmaxf(fabsf(u), 1.5f)));
     kx.steer += (steer_in * dmax - kx.steer) * fminf(1.0f, 6.0f * dt);
     float r_want = u / KX_WHEELBASE * tanf(kx.steer);
-    const float grip = 1.12f * KX_G;
-    float r_lim = grip / fmaxf(fabsf(u), 1.5f);
     r_want = clampf(r_want, -r_lim, r_lim);
     kx.yawrate += (r_want - kx.yawrate) * fminf(1.0f, 7.0f * dt);
 
     // Rear grip: it gives way under the handbrake, and when a lot of power meets a low speed.
-    float mu_r = 1.10f;
+    float mu_r = 1.4f * down;
     if (kx.hand) mu_r = 0.38f;
     mu_r -= 0.35f * throttle * clampf(1.0f - fabsf(u) / 25.0f, 0.0f, 1.0f);
     float ay = -clampf(9.0f * kx.w, -mu_r * KX_G, mu_r * KX_G);
