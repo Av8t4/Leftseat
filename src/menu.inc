@@ -1082,11 +1082,11 @@ static void draw_menu(vita2d_pgf *pgf) {
                 if (!KC_BUILT[k]) snprintf(bb, sizeof(bb), "SOON");
                 else if (k == KC_FREE) snprintf(bb, sizeof(bb), "PRACTICE");
                 else if (kc_best[k] > 0) { int m = kc_medal_for(k, kc_best[k]); snprintf(bb, sizeof(bb), "%s", KC_MEDAL_NAME[m]); bc = kc_medal_color(m); }
-                else snprintf(bb, sizeof(bb), "NO TIME");
+                else snprintf(bb, sizeof(bb), "NOT RUN");
             } else if (k < 0) {
                 title = "RESUME"; snprintf(sb, sizeof(sb), "Continue the %s challenge (%s)", CK_NAMES[ch_kind], SPECS[ac_flying].key); sub = sb;
             } else if (k == CK_COUNT) {
-                title = "STRAKE KX-1"; sub = "The rocket-assisted coupe: Proving Ground"; snprintf(bb, sizeof(bb), ">"); bc = gold;
+                title = "STRAKE KX-1"; sub = "The rocket-assisted coupe: Proving Ground"; snprintf(bb, sizeof(bb), "%s", kc_all_gold() ? "TROPHY" : ">"); bc = gold;
             } else {
                 title = CK_NAMES[k]; sub = DESC[k];
                 if (ch_best_a[menu_ac][k] > 0) { snprintf(bb, sizeof(bb), "BEST %d", ch_best_a[menu_ac][k]); bc = gold; } else snprintf(bb, sizeof(bb), "NOT FLOWN");
@@ -1102,9 +1102,11 @@ static void draw_menu(vita2d_pgf *pgf) {
                 if (kk == KC_SPEED) {
                     char g[16], sv[16], br[16]; kc_time_text(g, sizeof(g), KC_SPEED_MEDAL[0]); kc_time_text(sv, sizeof(sv), KC_SPEED_MEDAL[1]); kc_time_text(br, sizeof(br), KC_SPEED_MEDAL[2]);
                     snprintf(l3, sizeof(l3), "GOLD %s    SILVER %s    BRONZE %s", g, sv, br);
+                } else if (kk >= KC_HOOP) {
+                    snprintf(l3, sizeof(l3), "GOLD %d    SILVER %d    BRONZE %d POINTS", (int)KC_PTS_MEDAL[kk][0], (int)KC_PTS_MEDAL[kk][1], (int)KC_PTS_MEDAL[kk][2]);
                 }
             } else if (kk < 0) { t1 = "RESUME"; t2 = "Continue the challenge in progress."; }
-            else if (kk == CK_COUNT) { t1 = "STRAKE KX-1"; t2 = "Drive, hop and flip it at Strake Proving Ground."; t3 = "The KX-1 is only used here, never in the open world."; }
+            else if (kk == CK_COUNT) { t1 = "STRAKE KX-1"; t2 = "Drive, hop and flip it at Strake Proving Ground."; t3 = kc_all_gold() ? "Gold on all five: you have the Strake trophy." : "Gold on all five wins the Strake trophy."; }
             else { t1 = CK_NAMES[kk]; t2 = DESC[kk]; if (SPECS[menu_ac].model == 6) t3 = "Choose an aircraft in the hangar first."; }
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 32, white, 1.25f, t1);
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 58, pale, 0.74f, t2);

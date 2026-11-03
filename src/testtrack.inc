@@ -37,7 +37,42 @@ static void spc_build(void) {
 
 // The five gates of the speed run, where the plan has its yellow marks: {map x, map y, 1 if the gap runs across x (a road running north-south), 0 if across z (a road running east-west)}.
 static const float SPG_GATES[5][3] = { { 522.0f, 150.0f, 0.0f }, { 402.0f, 450.0f, 0.0f }, { 660.0f, 450.0f, 0.0f }, { 780.0f, 318.0f, 1.0f }, { 260.0f, 318.0f, 1.0f } };
+static int kc_kind;                      // (the KX-1 challenge being run: kxchal.inc)
 #define SPG_GATE_HW 13.0f                // half the gap between the posts
+
+// The ramps. Each is a wedge: it rises from the ground at its base to H meters at its top, then drops away.
+// {base x, base z, direction x, direction z, length, half width, height}. The car's height comes from spg_h(); nothing else on the site is above ground.
+#define SPG_NRAMP 3
+static const float SPG_RAMPS[SPG_NRAMP][7] = {
+    { SPG_SX(750.0f), SPG_SZ(72.0f),  1.0f, 0.0f, 40.0f, 7.5f, 9.0f },     // 0: the launch strip's ramp (hoop jump)
+    { SPG_SX(740.0f), SPG_SZ(500.0f), 1.0f, 0.0f, 36.0f, 7.5f, 8.5f },     // 1: the pond ramp (precision landing)
+    { SPG_SX(680.0f), SPG_SZ(285.0f), 0.0f, 1.0f, 28.0f, 7.5f, 9.0f },     // 2: the flip ramp, inside the circuit, heading north
+};
+static float spg_h(float x, float z) {
+    if (fabsf(x - SPG_X) > SPG_HX || fabsf(z - SPG_Z) > SPG_HZ) return 0.0f;
+    for (int i = 0; i < SPG_NRAMP; i++) {
+        const float *r = SPG_RAMPS[i];
+        const float dx = x - r[0], dz = z - r[1];
+        const float t = dx * r[2] + dz * r[3], s = -dx * r[3] + dz * r[2];
+        if (t >= 0.0f && t <= r[4] && fabsf(s) <= r[5]) return r[6] * t / r[4];
+    }
+    return 0.0f;
+}
+// The car's heading as a slope: how steeply the ground rises ahead of (x, z) along (hx, hz).
+static float spg_slope(float x, float z, float hx, float hz) {
+    return (spg_h(x + hx * 1.5f, z + hz * 1.5f) - spg_h(x - hx * 1.5f, z - hz * 1.5f)) / 3.0f;
+}
+
+// The hoop (hoop jump) and the gantry (upside-down flip).
+#define SPG_HOOP_X  SPG_SX(808.0f)
+#define SPG_HOOP_Z  SPG_SZ(72.0f)
+#define SPG_HOOP_Y  16.5f
+#define SPG_HOOP_R  9.0f
+#define SPG_GANT_X  SPG_SX(680.0f)
+#define SPG_GANT_Z  SPG_SZ(216.0f)
+#define SPG_GANT_HW 14.0f                // half the width between the pylons
+#define SPG_GANT_Y0 4.0f                 // the opening, from the ground
+#define SPG_GANT_Y1 34.0f
 
 static void build_proving_ground(void) {
     // Gates: two posts and a beam over the road.
@@ -69,6 +104,32 @@ static void build_proving_ground(void) {
             town_box(tx, tz, 16.0f, 16.0f, 13.4f);
         }
         if (ntown_lights < 630) { town_lights[ntown_lights++] = v3(gx - 42.0f, 8.0f, gz - 15.0f); town_lights[ntown_lights++] = v3(gx + 42.0f, 8.0f, gz - 15.0f); }
+    }
+    // The ramps: a gray slope with yellow edges, a plain back wall.
+    for (int i = 0; i < SPG_NRAMP; i++) {
+        const float *r = SPG_RAMPS[i];
+        const float bx = r[0], bz = r[1], dx = r[2], dz = r[3], L = r[4], W = r[5], H = r[6];
+        const float sx = -dz, sz = dx;                                              // sideways
+        V3 b0 = v3(bx - sx * W, 0, bz - sz * W), b1 = v3(bx + sx * W, 0, bz + sz * W);
+        V3 t0 = v3(b0.x + dx * L, H, b0.z + dz * L), t1 = v3(b1.x + dx * L, H, b1.z + dz * L);
+        quad_face(b0, b1, t1, t0, 52, 66, 112);
+        for (int e = -1; e <= 1; e += 2) {                                            // yellow edge strips on the slope
+            const float o0 = e * (W - 1.3f), o1 = e * W;
+            V3 q0 = v3(bx + sx * o0, 0.04f, bz + sz * o0), q1 = v3(bx + sx * o1, 0.04f, bz + sz * o1);
+            quad_face(q0, q1, v3(q1.x + dx * L, H + 0.04f, q1.z + dz * L), v3(q0.x + dx * L, H + 0.04f, q0.z + dz * L), 246, 200, 44);
+            tri_face(e < 0 ? b0 : b1, e < 0 ? t0 : t1, v3((e < 0 ? b0.x : b1.x) + dx * L, 0, (e < 0 ? b0.z : b1.z) + dz * L), 200, 202, 210);
+        }
+        quad_face(t0, t1, v3(t1.x, 0, t1.z), v3(t0.x, 0, t0.z), 150, 152, 160);
+    }
+    // The gantry for the upside-down flip: two tall pylons and a yellow beam, with a fan on each.
+    {
+        for (int s = -1; s <= 1; s += 2) {
+            const float px = SPG_GANT_X + s * (SPG_GANT_HW + 1.5f);
+            add_box_faces(px, SPG_GANT_Z, 3.0f, 3.0f, 0.0f, SPG_GANT_Y1 + 3.0f, 226, 228, 234);
+            town_box(px, SPG_GANT_Z, 3.0f, 3.0f, SPG_GANT_Y1 + 3.0f);
+            if (ntown_lights < 630) town_lights[ntown_lights++] = v3(px, SPG_GANT_Y1 + 4.0f, SPG_GANT_Z);
+        }
+        add_box_faces(SPG_GANT_X, SPG_GANT_Z, 2.0f * SPG_GANT_HW + 6.0f, 2.4f, SPG_GANT_Y1, SPG_GANT_Y1 + 3.0f, 246, 200, 44);
     }
     // The beacon tower: a pale shaft with a yellow cab, so the site shows from far away.
     {
@@ -148,10 +209,15 @@ static void draw_proving_ground(void) {
             ground_strip(x0, z, x1, z, 8.0f, asph);
             strip_off(x0, z, x1, z,  7.2f, 0.2f, wht); strip_off(x0, z, x1, z, -7.2f, 0.2f, wht);
             ground_dashes(x0, z, x1, z, 0.2f, 10.0f, 28.0f, 800.0f, wht);
-            const float lx0 = SPG_SX(880.0f), lx1 = SPG_SX(960.0f), lz0 = SPG_SZ(88.0f), lz1 = SPG_SZ(56.0f);
+            const float lx0 = SPG_SX(845.0f), lx1 = SPG_SX(965.0f), lz0 = SPG_SZ(88.0f), lz1 = SPG_SZ(56.0f);
             spg_rect(lx0, lz0, lx1, lz1, pad); spg_frame(lx0, lz0, lx1, lz1, 1.2f, yel);
             ground_strip(SPG_SX(770.0f), z, lx0, z, 8.0f, RGBA8(110, 112, 120, 255));
         }
+        // The run-ups: to the pond ramp, and to the flip ramp inside the circuit.
+        ground_strip(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f), 8.0f, asph);
+        strip_off(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f),  7.2f, 0.2f, wht); strip_off(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f), -7.2f, 0.2f, wht);
+        ground_strip(SPG_SX(680.0f), SPG_SZ(445.0f), SPG_SX(680.0f), SPG_SZ(285.0f), 8.0f, asph);
+        strip_off(SPG_SX(680.0f), SPG_SZ(445.0f), SPG_SX(680.0f), SPG_SZ(285.0f),  7.2f, 0.2f, wht); strip_off(SPG_SX(680.0f), SPG_SZ(445.0f), SPG_SX(680.0f), SPG_SZ(285.0f), -7.2f, 0.2f, wht);
         // The trick pad: a big pad with three Strake bars, a sign from the air.
         {
             const float x0 = SPG_SX(420.0f), x1 = SPG_SX(570.0f), z0 = SPG_SZ(350.0f), z1 = SPG_SZ(240.0f);
@@ -164,10 +230,37 @@ static void draw_proving_ground(void) {
         }
         // The landing platform by the pond: a pad with a target.
         {
-            const float x0 = SPG_SX(790.0f), x1 = SPG_SX(870.0f), z0 = SPG_SZ(520.0f), z1 = SPG_SZ(460.0f);
+            const float x0 = SPG_SX(830.0f), x1 = SPG_SX(880.0f), z0 = SPG_SZ(530.0f), z1 = SPG_SZ(470.0f);
             spg_rect(x0, z0, x1, z1, pad); spg_frame(x0, z0, x1, z1, 1.2f, yel);
-            const float cx = SPG_SX(830.0f), cz = SPG_SZ(490.0f);
-            ground_disc(cx, cz, 44.0f * 0.5f, wht); ground_disc(cx, cz, 17.0f, RGBA8(226, 60, 44, 255)); ground_disc(cx, cz, 10.0f, wht); ground_disc(cx, cz, 4.0f, RGBA8(226, 60, 44, 255));
+            const float cx = SPG_SX(855.0f), cz = SPG_SZ(500.0f);
+            ground_disc(cx, cz, 22.0f, wht); ground_disc(cx, cz, 17.0f, RGBA8(226, 60, 44, 255)); ground_disc(cx, cz, 10.0f, wht); ground_disc(cx, cz, 4.0f, RGBA8(226, 60, 44, 255));
+        }
+    }
+
+    // The hoop and the gantry's fans (drawn fresh each frame: the hoop is a ring, the fans turn).
+    if (near_site) {
+        const float hx = SPG_HOOP_X - cam.pos.x, hz = SPG_HOOP_Z - cam.pos.z;
+        if (hx * hx + hz * hz < 3500.0f * 3500.0f) {
+            const unsigned int hc = (game_mode == MODE_KX && kc_kind == 2 /* KC_HOOP */) ? RGBA8(255, 214, 70, 255) : RGBA8(226, 60, 44, 255);
+            for (int i = 0; i < 24; i++) {
+                const float a0 = i * (2.0f * PI_F / 24), a1 = (i + 1) * (2.0f * PI_F / 24);
+                const float ro = SPG_HOOP_R + 0.7f, ri = SPG_HOOP_R - 0.7f;
+                V3 q[4] = { v3(SPG_HOOP_X, SPG_HOOP_Y + ri * sinf(a0), SPG_HOOP_Z + ri * cosf(a0)), v3(SPG_HOOP_X, SPG_HOOP_Y + ro * sinf(a0), SPG_HOOP_Z + ro * cosf(a0)),
+                            v3(SPG_HOOP_X, SPG_HOOP_Y + ro * sinf(a1), SPG_HOOP_Z + ro * cosf(a1)), v3(SPG_HOOP_X, SPG_HOOP_Y + ri * sinf(a1), SPG_HOOP_Z + ri * cosf(a1)) };
+                draw_world_poly(q, 4, (i & 1) ? hc : RGBA8(250, 250, 250, 255));
+            }
+        }
+        const float gx = SPG_GANT_X - cam.pos.x, gz = SPG_GANT_Z - cam.pos.z;
+        if (gx * gx + gz * gz < 3500.0f * 3500.0f) {
+            for (int s = -1; s <= 1; s += 2) {
+                const float fx = SPG_GANT_X + s * (SPG_GANT_HW + 1.5f), fy = SPG_GANT_Y1 + 9.0f;
+                for (int k = 0; k < 4; k++) {
+                    const float a = frame_count * 0.35f * s + k * (PI_F * 0.5f), c = cosf(a), n = sinf(a);
+                    const float a2 = a + 0.5f;
+                    V3 q[3] = { v3(fx, fy, SPG_GANT_Z - 2.5f), v3(fx + 6.0f * c, fy + 6.0f * n, SPG_GANT_Z - 2.5f), v3(fx + 6.0f * cosf(a2), fy + 6.0f * sinf(a2), SPG_GANT_Z - 2.5f) };
+                    draw_world_poly(q, 3, RGBA8(70, 76, 90, 255));
+                }
+            }
         }
     }
 
@@ -180,6 +273,18 @@ static void draw_proving_ground(void) {
         draw_light(bx, 88.0f, bz, flash ? 3.4f : 2.4f, flash ? white : RGBA8(255, 170, 60, 255));              // the beacon: a short white flash, otherwise amber
         light_far = 9000.0f;
         for (int k = 1; k <= 3; k++) draw_light(bx + 5.0f, 22.0f * k, bz, 1.8f, ((frame_count / 30) & 1) ? red : RGBA8(120, 24, 20, 255));
+        for (int i = 0; i < SPG_NRAMP; i++) {                                    // the ramps: amber lamps up both edges
+            const float *r = SPG_RAMPS[i];
+            for (int k = 0; k <= 4; k++) for (int e = -1; e <= 1; e += 2) {
+                const float t = r[4] * k / 4.0f;
+                draw_light(r[0] + r[2] * t - r[3] * e * r[5], r[6] * k / 4.0f + 0.6f, r[1] + r[3] * t + r[2] * e * r[5], 1.6f, RGBA8(255, 170, 60, 255));
+            }
+        }
+        for (int i = 0; i < 12; i++) {                                           // the hoop and the gantry
+            const float a = i * (2.0f * PI_F / 12);
+            draw_light(SPG_HOOP_X, SPG_HOOP_Y + SPG_HOOP_R * sinf(a), SPG_HOOP_Z + SPG_HOOP_R * cosf(a), 1.8f, (i & 1) ? RGBA8(255, 214, 70, 255) : white);
+        }
+        for (int s = -1; s <= 1; s += 2) for (int k = 0; k < 4; k++) draw_light(SPG_GANT_X + s * (SPG_GANT_HW + 1.5f), 4.0f + k * 10.0f, SPG_GANT_Z - 1.6f, 1.6f, red);
         static const float FP[4][2] = { { 120.0f, 500.0f }, { 240.0f, 500.0f }, { 420.0f, 236.0f }, { 570.0f, 236.0f } };
         for (int k = 0; k < 4; k++) draw_light(SPG_SX(FP[k][0]), 22.5f, SPG_SZ(FP[k][1]), 3.0f, white);
         for (int i = 0; i < SPC_N; i += 2) {

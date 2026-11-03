@@ -184,6 +184,12 @@ The last line of the Challenges list is **Strake KX-1**. It opens its own list, 
 |---|---|
 | **Free roam** | Drive and fly around the proving ground with no clock. Leave the site and you are put back at the start |
 | **Speed run** | A three-second countdown, then one lap of the circuit through five gates in order. A light column marks the next gate. Your lap time is saved, with gold, silver and bronze medals. △ restarts |
+| **Hoop jump** | Race down the launch strip, up the ramp and through the hoop, then land on the far pad. Score out of 100: 40 for the pass (the closer to the center the better), 30 for landing on the pad and 30 for the gas you have left. A landing from a jump is hard: a burst of the hop jets (X) just before touchdown cushions it |
+| **Trick run** | 90 seconds on the trick pad. Hop off with X, flip and roll with the left stick (pitch and roll) and land on the wheels on the pad. Each flip or roll scores 50, with a bonus for stringing several into one jump, and a soft landing counts in full. A crash keeps the points you already have |
+| **Precision landing** | Run up the pond ramp, cross the pond and land on the target ring on the platform. Score out of 100: up to 70 for distance from the center and 30 for the gas you have left. Missing the platform scores nothing |
+| **Upside-down flip** | Climb the ramp inside the circuit, fly through the gantry upside down, then roll back and land on the wheels. Score out of 100: 40 for the pass, up to 30 for time upside down (2 seconds is the most), up to 30 for a soft landing |
+
+The thrusters are armed from the start in every KX-1 challenge except the speed run. All five challenges have bronze, silver and gold, and gold on all five wins the Strake trophy, shown on the Challenges screen. The ramps are the only raised ground on the site: the car climbs them, leaves the end of them as a jump, and has to be flown from there.
 
 ## Weather, time and sound
 
@@ -271,8 +277,8 @@ src/modelkit.inc   kit for smooth models: lofted fuselages, airfoil wings, tail 
 src/k10.inc, jet1.inc, k30.inc, a22.inc, a11.inc   the other aircraft models and cockpit parts
 src/fleet.inc      chooses the model for the aircraft being flown
 src/kx1.inc        the Strake KX-1: the car model, the driving, the cold-gas thrusters and the landing grading
-src/kxchal.inc     the KX-1 challenges: speed run, free roam, countdown, gates, timing and results
-src/testtrack.inc  Strake Proving Ground, the KX-1's test site: circuit, gates, pit, pads, beacon tower and night lights
+src/kxchal.inc     the KX-1 challenges: the five challenges and free roam, countdown, scoring, medals and results
+src/testtrack.inc  Strake Proving Ground, the KX-1's test site: circuit, gates, pit, pads, ramps and height map, hoop, gantry, beacon tower and night lights
 src/soundcore.inc  the sound engine: makes every sound on the fly (knows nothing about the Vita)
 src/sound.inc      plays it on a background thread and tells it what the aircraft is doing
 src/sky.inc        clouds, windsock, rain

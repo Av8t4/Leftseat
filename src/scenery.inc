@@ -81,7 +81,7 @@ static const Lake LAKES[NLAKES] = { { -1800.0f, 2300.0f, 520.0f, 380.0f }, { 260
                                     { -2600.0f, -2600.0f, 600.0f, 500.0f },
                                     { 18450.0f, -1400.0f, 850.0f, 620.0f },       // the river ends in this one
                                     { 5234.0f, -14424.0f, 600.0f, 420.0f },       // Lana Lake, 1100 m to the left of Lana Lake Regional's runway
-                                    { 2660.0f, -2730.0f, 190.0f, 95.0f } };        // the pond at Strake Proving Ground (the precision landing crosses it)
+                                    { 2590.0f, -2730.0f, 60.0f, 90.0f } };         // the pond at Strake Proving Ground (the precision landing crosses it): map (795, 500)
 
 static void lake_outline(int n, float k, V3 *out) {
     const Lake *L = &LAKES[n];
