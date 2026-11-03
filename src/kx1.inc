@@ -169,6 +169,8 @@ typedef struct {
     float jet_hop, jet_roof, jet_fwd;   // 0..1 jets in use this frame
     float cp, cr, cy;      // attitude commands this frame, -1..1
     float air_t;           // seconds since leaving the ground
+    bool  loop;            // on the loop ramp (the curl and the overhead track), held by the suction fans
+    float ls;              // how far along the loop ramp the wheels are (m)
 } KX;
 static KX kx;
 // What the challenges (kxchal.inc) read from the last flight.
@@ -182,7 +184,7 @@ static int kx_npuff;                                  // (the thruster puffs: se
 static void kx_reset(float heading) {
     memset(&kx, 0, sizeof(kx));
     kx.psi = heading; kx.batt = 1.0f; kx.gas = 100.0f;
-    kx_steer_vis = 0.0f; kx_braking = false;
+    kx_steer_vis = 0.0f; kx_braking = false; kx_fans_on = false;
     kx_npuff = 0;
 }
 
@@ -462,6 +464,58 @@ static void kx_fly(const SceCtrlData *pad) {
     }
 }
 
+// The loop ramp: the wheels follow the curl and the overhead track. The suction fans (the thrusters' switch, and gas) hold the car on;
+// without them it only stays while it is fast enough, and falls off the overhead track at once.
+#define KX_FAN_USE 2.5f
+static void kx_loop_pose(void) {
+    float t, y, th; spg_loop_pt(kx.ls, &t, &y, &th);
+    pl.pos = v3(SPG_LOOP_X, y, SPG_LOOP_Z + t);
+    const float st = sinf(th), ct = cosf(th);
+    pl.f = v3(0.0f, st, ct); pl.u = v3(0.0f, ct, -st); pl.r = vcross(pl.u, pl.f);
+    pl.vel = vscale(pl.f, kx.u);
+}
+static void kx_loop_step(const SceCtrlData *pad) {
+    const float dt = DT;
+    float drive_in = -stick(pad->ly);
+    if (!sw.batt) drive_in = fminf(drive_in, 0.0f);
+    kx.thr += (drive_in - kx.thr) * fminf(1.0f, 10.0f * dt);
+    kx.hand = (pad->buttons & SCE_CTRL_RTRIGGER) != 0;
+    const bool fans = sw.arm && sw.batt && kx.gas > 0.0f;
+    kx_fans_on = fans;
+    if (fans) kx.gas = fmaxf(0.0f, kx.gas - KX_FAN_USE * dt);
+    float t, y, th; spg_loop_pt(kx.ls, &t, &y, &th);
+    const float u = kx.u;
+    float acc = 0.0f;
+    if (kx.thr > 0.05f) acc = kx.thr * 9.0f;
+    else if (kx.thr < -0.05f) acc = (u > 0.5f) ? kx.thr * 11.0f : kx.thr * 4.5f * clampf(1.0f - (-u) / 11.0f, 0.0f, 1.0f);
+    if (kx.hand) acc -= (u > 0.0f ? 1.0f : -1.0f) * 6.0f * fminf(1.0f, fabsf(u) / 2.0f);
+    acc -= KX_G * sinf(th);                                                   // gravity along the track: pulls back down the curl
+    acc -= (u > 0.0f ? 1.0f : -1.0f) * (0.12f * fminf(1.0f, fabsf(u) / 1.5f) + 0.0006f * u * u);
+    kx.power = kx.thr > 0.0f ? kx.thr : 0.0f;
+    // Without the fans the car needs the speed to stay on the curl (the overhead track is a fall).
+    const bool arc = kx.ls < PI_F * SPG_LOOP_R;
+    const float normal = (arc ? u * u / SPG_LOOP_R : 0.0f) + KX_G * cosf(th);
+    kx.u += acc * dt;
+    kx.ls += kx.u * dt;
+    kx_loop_pose();
+    pl.on_ground = false; pl.gs = 0.0f; pl.touched = true;
+    pl.hdg = atan2f(pl.f.x, pl.f.z); pl.pitch = asinf(clampf(pl.f.y, -1.0f, 1.0f)); pl.roll = asinf(clampf(-pl.r.y, -1.0f, 1.0f));
+    pl.speed = fabsf(kx.u); pl.vs = pl.vel.y; pl.hdg_g = pl.hdg;
+    pl.throttle = fmaxf(0.0f, kx.thr); pl.rpm = 100.0f * clampf(pl.speed / 72.0f, 0.0f, 1.0f); pl.fuel = kx.gas / 100.0f;
+    kx.ax += (acc - kx.ax) * fminf(1.0f, 6.0f * dt); kx.ay = 0.0f; kx_braking = kx.thr < -0.1f || kx.hand;
+    kx.odo += fabsf(kx.u) * dt;
+    kx.hiss += ((fans ? 0.55f : 0.0f) - kx.hiss) * fminf(1.0f, 10.0f * dt);
+    kx_cam_below = pl.u.y < 0.2f;
+    if (kx.ls < 0.0f) {                                                        // rolled back off the bottom of the curl
+        kx.loop = false; kx_fans_on = false;
+        kx.psi = 0.0f; kx.w = 0.0f; kx.pitch = kx.roll = 0.0f; kx.steer = 0.0f;
+        pl.pos = v3(SPG_LOOP_X, 0.0f, SPG_LOOP_Z + kx.ls);
+        return;
+    }
+    if (!fans && normal < 0.0f) { kx.loop = false; kx_fans_on = false; kx_lift_off(); return; }      // came off the curl, or the overhead track
+    if (kx.ls >= PI_F * SPG_LOOP_R + SPG_LOOP_LB) { kx.loop = false; kx_fans_on = false; kx_lift_off(); return; }   // drove off the end of the overhead track, upside down
+}
+
 static bool kc_hold;                                       // the countdown: the car is held where it is (kxchal.inc)
 static void kx_update(const SceCtrlData *pad_in, unsigned int pressed) {
     (void)pressed;
@@ -470,6 +524,8 @@ static void kx_update(const SceCtrlData *pad_in, unsigned int pressed) {
     if (kc_hold) { held.buttons = 0; held.lx = held.ly = held.rx = held.ry = 128; pad = &held; }
     eng_on = sw.batt; eng_n += ((sw.batt ? 1.0f : 0.0f) - eng_n) * 0.05f;       // (the motor: it runs when the battery is on)
     kx.jet_hop = kx.jet_roof = 0.0f; kx.cp = kx.cr = kx.cy = 0.0f;
+    kx_cam_below = false;
+    if (kx.loop) { kx_loop_step(pad); kx_puffs_step(); return; }
     if (!kx.air) {
         kx.hiss += ((kx.jet_fwd > 0.0f ? 0.75f : 0.0f) - kx.hiss) * fminf(1.0f, 10.0f * DT);
         // A parked car takes on gas, slowly.
@@ -505,6 +561,12 @@ static void kx_update(const SceCtrlData *pad_in, unsigned int pressed) {
     pl.vel = v3(sh * kx.u + ch * kx.w, 0.0f, ch * kx.u - sh * kx.w);
     {   // Follow the ground: up a ramp, and off the end of it into the air.
         const float nx = pl.pos.x + pl.vel.x * DT, nz = pl.pos.z + pl.vel.z * DT, hn = spg_h(nx, nz), dh = hn - pl.pos.y;
+        if (kx.u > 3.0f && pl.pos.z < SPG_LOOP_Z && nz >= SPG_LOOP_Z && fabsf(nx - SPG_LOOP_X) < SPG_LOOP_HW + 1.5f) {      // the foot of the loop ramp
+            if (fabsf(nx - SPG_LOOP_X) > SPG_LOOP_HW - 0.4f || fabsf(sinf(kx.psi)) > 0.5f || cosf(kx.psi) < 0.0f) { pl.pos.x = nx; pl.pos.z = nz; crash_why("missed the loop ramp"); crash(); return; }
+            kx.loop = true; kx.ls = nz - SPG_LOOP_Z; kx.w = 0.0f; kx_climb = 0.0f;
+            kx_loop_pose();
+            return;
+        }
         if (dh > 0.6f) { pl.pos.x = nx; pl.pos.z = nz; crash_why("hit a ramp"); crash(); return; }
         if (dh < -0.12f && pl.pos.y > 0.3f) {                                     // the ground fell away: the climb carries on as a jump
             pl.pos.x = nx; pl.pos.z = nz;

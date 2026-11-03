@@ -106,5 +106,6 @@ static void sw_run_all(void) {
 static int    view_banner;      // frames left to show the view name
 static float  look_ang;         // head / camera turn from straight ahead (radians, right is positive)
 static V3     chase_dir = { 0.0f, 0.0f, 1.0f };
+static bool   kx_cam_below;                 // (kx1.inc: the KX-1 is upside down on the loop ramp, so the chase camera sits under it)
 static FILE  *logfile;
 

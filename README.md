@@ -187,7 +187,7 @@ The last line of the Challenges list is **Strake KX-1**. It opens its own list, 
 | **Hoop jump** | Race down the launch strip, up the ramp and through the hoop, then land on the far pad. Score out of 100: 40 for the pass (the closer to the center the better), 30 for landing on the pad and 30 for the gas you have left. A landing from a jump is hard: a burst of the hop jets (X) just before touchdown cushions it |
 | **Trick run** | 90 seconds on the trick pad. Hop off with X, flip and roll with the left stick (pitch and roll) and land on the wheels on the pad. Each flip or roll scores 50, with a bonus for stringing several into one jump, and a soft landing counts in full. A crash keeps the points you already have |
 | **Precision landing** | Run up the pond ramp, cross the pond and land on the target ring on the platform. Score out of 100: up to 70 for distance from the center and 30 for the gas you have left. Missing the platform scores nothing |
-| **Upside-down flip** | Climb the ramp inside the circuit, fly through the gantry upside down, then roll back and land on the wheels. Score out of 100: 40 for the pass, up to 30 for time upside down (2 seconds is the most), up to 30 for a soft landing |
+| **Upside-down flip** | Drive up the loop ramp inside the circuit: the ground curls up and over, 180 degrees, onto an overhead track. The suction fans (the THRUST switch, they use gas) hold the car to it. Stay upside down as long as you like (the points stop at 4 seconds), then drive off the end, roll back over (the roof jets, O, slow the fall while you are upside down) and land on the wheels. Score out of 100: 30 for reaching the track, up to 30 for time held and up to 40 for a soft landing. Without the fans the car falls off the overhead track |
 
 **Computer assist.** The fourth switch on the KX-1's gauge panel (ASSIST), or Square on the KX-1 challenge list, turns on the car's driving computer. In the air, when you are low and falling, it levels the car if you are not on the sticks and burns the hop jets to cushion the touchdown (it uses your gas, so the gas-left points still suffer). On the ground it eases off in hard corners and keeps the car from sliding. With the assist on, silver is the most you can earn, and the result card says so. Assisted runs have their own best, so they never replace an unassisted one, and only unassisted golds count toward the trophy. Switching it during a challenge starts the challenge over.
 
@@ -280,7 +280,7 @@ src/k10.inc, jet1.inc, k30.inc, a22.inc, a11.inc   the other aircraft models and
 src/fleet.inc      chooses the model for the aircraft being flown
 src/kx1.inc        the Strake KX-1: the car model, the driving, the cold-gas thrusters and the landing grading
 src/kxchal.inc     the KX-1 challenges: the five challenges and free roam, countdown, scoring, medals and results
-src/testtrack.inc  Strake Proving Ground, the KX-1's test site: circuit, gates, pit, pads, ramps and height map, hoop, gantry, beacon tower and night lights
+src/testtrack.inc  Strake Proving Ground, the KX-1's test site: circuit, gates, pit, pads, ramps and height map, hoop, loop ramp, beacon tower and night lights
 src/soundcore.inc  the sound engine: makes every sound on the fly (knows nothing about the Vita)
 src/sound.inc      plays it on a background thread and tells it what the aircraft is doing
 src/sky.inc        clouds, windsock, rain

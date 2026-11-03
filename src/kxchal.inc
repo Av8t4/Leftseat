@@ -9,20 +9,20 @@ static const char *const KC_DESC[KC_COUNT] = {
     "Launch off the strip ramp, fly through the lit hoop, land on the far pad.",
     "String flips and rolls over the trick pad and land on the wheels.",
     "Hop from the ramp across the pond and land inside the target.",
-    "Hold the car upside down at the fan gantry, flip it and land upright." };
+    "Up the loop ramp, hold on upside down, drive off, flip and land." };
 static const char *const KC_HOW[KC_COUNT] = {
     "Nothing to beat here. Practice with the thrusters.",
     "Standing start. Thrusters use gas: spend it where it counts.",
     "Fast down the strip, up the ramp, through the hoop. Cushion the landing with the hop jets. Centered pass, pad landing and gas left score.",
     "90 seconds. Hop off the pad, flip and roll, land on the wheels on the pad. Each landed trick scores.",
     "Run up to the ramp and cross the pond. The closer to the center and the more gas left, the better.",
-    "Up the ramp, fly through the gantry upside down, land the right way up. Time inverted and a soft landing score." };
+    "Up the curl, onto the overhead track. The suction fans (THRUST switch) hold you there: they use gas. Time held and a soft landing score." };
 static const bool KC_BUILT[KC_COUNT] = { true, true, true, true, true, true };
 
 // Medal times for the speed run, in seconds: gold, silver, bronze.
 static const float KC_SPEED_MEDAL[3] = { 55.0f, 63.0f, 76.0f };
 // Medal points for the others: gold, silver, bronze (these are first guesses, to be tuned on the Vita).
-static const float KC_PTS_MEDAL[KC_COUNT][3] = { { 0, 0, 0 }, { 0, 0, 0 }, { 88.0f, 75.0f, 55.0f }, { 400.0f, 250.0f, 100.0f }, { 90.0f, 75.0f, 55.0f }, { 90.0f, 75.0f, 55.0f } };
+static const float KC_PTS_MEDAL[KC_COUNT][3] = { { 0, 0, 0 }, { 0, 0, 0 }, { 88.0f, 75.0f, 55.0f }, { 400.0f, 250.0f, 100.0f }, { 90.0f, 75.0f, 55.0f }, { 85.0f, 70.0f, 50.0f } };
 
 enum { KS_IDLE = 0, KS_READY, KS_RUN, KS_DONE };
 static int   kc_kind, kc_st;
@@ -34,9 +34,10 @@ static char  kc_why[48], kc_msg[40];
 static int   kc_msg_t;
 static float kc_result;                      // the finished result: seconds for the speed run, points for the others
 static int   kc_lift0, kc_land0;             // the lift-off and landing counters when the run began
-static bool  kc_pass;                        // hoop or gantry passed
+static bool  kc_pass;                        // hoop passed, or the overhead track reached
 static float kc_pass_d, kc_pts;              // how far off center the pass was; points banked so far (trick run)
-static int   kc_tricks;                      // trick run: tricks landed
+static int   kc_tricks;
+static float kc_hold_t;                      // loop ramp: seconds held upside down on the overhead track                      // trick run: tricks landed
 static bool  kc_assisted;                    // this run has the computer assist on: silver is the most it can earn, and it has its own best
 static bool  kc_unlocked_now;                // set on the run that completed the set of five golds: the result card shows the message
 static const float KC_TRICK_TIME = 90.0f;
@@ -94,12 +95,12 @@ static void kc_start(int kind) {
     } else if (kind == KC_TRICK) {                                         // on the trick pad
         kc_place(SPG_SX(495.0f), SPG_SZ(295.0f), PI_F * 0.5f);
     } else if (kind == KC_FLIP) {                                          // at the south end of the flip ramp's run-up, facing north
-        kc_place(SPG_SX(680.0f), SPG_SZ(438.0f), 0.0f);
+        kc_place(SPG_LOOP_X, SPG_SZ(438.0f), 0.0f);
     } else {                                                               // at the pit, facing the road, past the garage and the tanks
         kc_place(SPG_SX(177.0f), SPG_SZ(550.0f), 0.0f);
     }
     if (kind >= KC_HOOP) sw.arm = true;                                    // the jets are the point of these: armed from the start
-    kc_assisted = kx_assist; kc_unlocked_now = false; kc_lift0 = kx_ev_lift; kc_land0 = kx_ev_land; kc_pass = false; kc_pass_d = 0.0f; kc_pts = 0.0f; kc_tricks = 0;
+    kc_assisted = kx_assist; kc_unlocked_now = false; kc_lift0 = kx_ev_lift; kc_land0 = kx_ev_land; kc_pass = false; kc_pass_d = 0.0f; kc_pts = 0.0f; kc_tricks = 0; kc_hold_t = 0.0f;
     kc_gi = 0; kc_t = 0.0f; kc_go_t = 0.0f; kc_fail = false; kc_newbest = false; kc_why[0] = 0; kc_msg_t = 0;
     kc_prev = pl.pos;
     if (kind == KC_FREE) { kc_st = KS_RUN; kc_hold = false; }
@@ -204,16 +205,14 @@ static void kc_update(void) {
         }
         if (kc_t > 150.0f) { kc_finish(true, "Out of time"); return; }
     } else if (kc_kind == KC_FLIP) {
-        if (!kc_pass && (kc_prev.z - SPG_GANT_Z) * (pl.pos.z - SPG_GANT_Z) < 0.0f) {
-            const float t = (kc_prev.z - SPG_GANT_Z) / (kc_prev.z - pl.pos.z);
-            const float x = kc_prev.x + (pl.pos.x - kc_prev.x) * t, y = kc_prev.y + (pl.pos.y - kc_prev.y) * t;
-            if (fabsf(x - SPG_GANT_X) > SPG_GANT_HW || y < SPG_GANT_Y0 || y > SPG_GANT_Y1) { kc_finish(true, "Missed the gantry"); return; }
-            if (pl.u.y > -0.2f) { kc_finish(true, "Not upside down at the gantry"); return; }
-            kc_pass = true; snd_event(EV_CONFIRM, 1.0f); kc_say("UPSIDE DOWN AT THE GANTRY");
+        if (kx.loop && kx.ls >= PI_F * SPG_LOOP_R + 1.0f) {                       // on the overhead track
+            if (!kc_pass) { kc_pass = true; snd_event(EV_CONFIRM, 1.0f); kc_say("UPSIDE DOWN ON THE TRACK"); }
+            kc_hold_t += DT;
         }
         if (landed) {
-            if (!kc_pass) { kc_finish(true, "Landed before the gantry"); return; }
-            kc_finish_pts(false, "", 40.0f + 30.0f * fminf(1.0f, kx_last_inv / 2.0f) + 30.0f * clampf(1.0f - kx_last_sink / 7.0f, 0.3f, 1.0f)); return;
+            if (!kc_pass) { kc_finish(true, "Did not reach the overhead track"); return; }
+            const float q = kx_last_sink <= 3.0f ? 1.0f : 1.0f - (kx_last_sink - 3.0f) / 4.0f * 0.6f;
+            kc_finish_pts(false, "", 30.0f + 30.0f * fminf(1.0f, kc_hold_t / 4.0f) + 40.0f * q); return;
         }
         if (kc_t > 150.0f) { kc_finish(true, "Out of time"); return; }
     } else if (kc_kind == KC_TRICK) {
@@ -268,7 +267,7 @@ static void kc_draw_hud(vita2d_pgf *pgf) {
             case KC_HOOP:    snprintf(info, sizeof(info), "%s", kc_pass ? "HOOP: THROUGH" : "HOOP: AHEAD"); break;
             case KC_PRECISE: snprintf(info, sizeof(info), "LAND ON THE TARGET"); break;
             case KC_TRICK:   snprintf(info, sizeof(info), "POINTS %d", (int)kc_pts); break;
-            default:         snprintf(info, sizeof(info), "%s  INVERTED %.1f S", kc_pass ? "GANTRY: PASSED" : "GANTRY: AHEAD", kx_inv_t); break;
+            default:         snprintf(info, sizeof(info), "FANS %s   HELD %.1f S", (kx_fans_on ? "ON" : "OFF"), kc_hold_t); break;
         }
         vita2d_pgf_draw_textf(pgf, 540, 28, gold, 0.8f, "%s    %s", KC_NAMES[kc_kind], info);
         if (kc_assisted) vita2d_pgf_draw_text(pgf, 540, 70, RGBA8(120, 210, 255, 255), 0.62f, "ASSIST: SILVER IS THE MOST");

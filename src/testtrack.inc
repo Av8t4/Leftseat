@@ -38,15 +38,15 @@ static void spc_build(void) {
 // The five gates of the speed run, where the plan has its yellow marks: {map x, map y, 1 if the gap runs across x (a road running north-south), 0 if across z (a road running east-west)}.
 static const float SPG_GATES[5][3] = { { 522.0f, 150.0f, 0.0f }, { 402.0f, 450.0f, 0.0f }, { 660.0f, 450.0f, 0.0f }, { 780.0f, 318.0f, 1.0f }, { 260.0f, 318.0f, 1.0f } };
 static int kc_kind;                      // (the KX-1 challenge being run: kxchal.inc)
+static bool kx_fans_on;                  // (the suction fans are holding the car on the loop ramp: kx1.inc)
 #define SPG_GATE_HW 13.0f                // half the gap between the posts
 
 // The ramps. Each is a wedge: it rises from the ground at its base to H meters at its top, then drops away.
 // {base x, base z, direction x, direction z, length, half width, height}. The car's height comes from spg_h(); nothing else on the site is above ground.
-#define SPG_NRAMP 3
+#define SPG_NRAMP 2
 static const float SPG_RAMPS[SPG_NRAMP][7] = {
     { SPG_SX(750.0f), SPG_SZ(72.0f),  1.0f, 0.0f, 40.0f, 7.5f, 9.0f },     // 0: the launch strip's ramp (hoop jump)
     { SPG_SX(740.0f), SPG_SZ(500.0f), 1.0f, 0.0f, 36.0f, 7.5f, 8.5f },     // 1: the pond ramp (precision landing)
-    { SPG_SX(680.0f), SPG_SZ(285.0f), 0.0f, 1.0f, 28.0f, 7.5f, 9.0f },     // 2: the flip ramp, inside the circuit, heading north
 };
 static float spg_h(float x, float z) {
     if (fabsf(x - SPG_X) > SPG_HX || fabsf(z - SPG_Z) > SPG_HZ) return 0.0f;
@@ -63,16 +63,26 @@ static float spg_slope(float x, float z, float hx, float hz) {
     return (spg_h(x + hx * 1.5f, z + hz * 1.5f) - spg_h(x - hx * 1.5f, z - hz * 1.5f)) / 3.0f;
 }
 
-// The hoop (hoop jump) and the gantry (upside-down flip).
+// The hoop (hoop jump).
 #define SPG_HOOP_X  SPG_SX(808.0f)
 #define SPG_HOOP_Z  SPG_SZ(72.0f)
 #define SPG_HOOP_Y  16.5f
 #define SPG_HOOP_R  9.0f
-#define SPG_GANT_X  SPG_SX(680.0f)
-#define SPG_GANT_Z  SPG_SZ(216.0f)
-#define SPG_GANT_HW 14.0f                // half the width between the pylons
-#define SPG_GANT_Y0 4.0f                 // the opening, from the ground
-#define SPG_GANT_Y1 34.0f
+// The loop ramp (upside-down flip), inside the circuit: the ground curls up and over, 180 degrees, onto an overhead track
+// that runs back the way the car came. The car's wheels run on the inside of the curl and on the underside of the deck;
+// the suction fans hold it there. Heading north (+z) from the entry line.
+#define SPG_LOOP_X  SPG_SX(680.0f)
+#define SPG_LOOP_Z  SPG_SZ(285.0f)       // the entry line
+#define SPG_LOOP_R  10.0f                // radius of the curl (the deck is twice that high)
+#define SPG_LOOP_LB 40.0f                // length of the overhead track
+#define SPG_LOOP_HW 5.0f                 // half the width of the track
+// Where the wheels are at a distance s along the loop (t is meters north of the entry line, y the height), and the angle of the track there.
+static void spg_loop_pt(float s, float *t, float *y, float *th) {
+    const float arc = PI_F * SPG_LOOP_R;
+    if (s < 0.0f) { *t = s; *y = 0.0f; *th = 0.0f; }
+    else if (s < arc) { const float a = s / SPG_LOOP_R; *t = SPG_LOOP_R * sinf(a); *y = SPG_LOOP_R * (1.0f - cosf(a)); *th = a; }
+    else { *t = -(s - arc); *y = 2.0f * SPG_LOOP_R; *th = PI_F; }
+}
 
 static void build_proving_ground(void) {
     // Gates: two posts and a beam over the road.
@@ -105,31 +115,15 @@ static void build_proving_ground(void) {
         }
         if (ntown_lights < 630) { town_lights[ntown_lights++] = v3(gx - 42.0f, 8.0f, gz - 15.0f); town_lights[ntown_lights++] = v3(gx + 42.0f, 8.0f, gz - 15.0f); }
     }
-    // The ramps: a gray slope with yellow edges, a plain back wall.
-    for (int i = 0; i < SPG_NRAMP; i++) {
-        const float *r = SPG_RAMPS[i];
-        const float bx = r[0], bz = r[1], dx = r[2], dz = r[3], L = r[4], W = r[5], H = r[6];
-        const float sx = -dz, sz = dx;                                              // sideways
-        V3 b0 = v3(bx - sx * W, 0, bz - sz * W), b1 = v3(bx + sx * W, 0, bz + sz * W);
-        V3 t0 = v3(b0.x + dx * L, H, b0.z + dz * L), t1 = v3(b1.x + dx * L, H, b1.z + dz * L);
-        quad_face(b0, b1, t1, t0, 52, 66, 112);
-        for (int e = -1; e <= 1; e += 2) {                                            // yellow edge strips on the slope
-            const float o0 = e * (W - 1.3f), o1 = e * W;
-            V3 q0 = v3(bx + sx * o0, 0.04f, bz + sz * o0), q1 = v3(bx + sx * o1, 0.04f, bz + sz * o1);
-            quad_face(q0, q1, v3(q1.x + dx * L, H + 0.04f, q1.z + dz * L), v3(q0.x + dx * L, H + 0.04f, q0.z + dz * L), 246, 200, 44);
-            tri_face(e < 0 ? b0 : b1, e < 0 ? t0 : t1, v3((e < 0 ? b0.x : b1.x) + dx * L, 0, (e < 0 ? b0.z : b1.z) + dz * L), 200, 202, 210);
-        }
-        quad_face(t0, t1, v3(t1.x, 0, t1.z), v3(t0.x, 0, t0.z), 150, 152, 160);
-    }
-    // The gantry for the upside-down flip: two tall pylons and a yellow beam, with a fan on each.
+    // The loop ramp's pylons (the curl and the deck are painted each frame, with the other things the car is close to).
     {
-        for (int s = -1; s <= 1; s += 2) {
-            const float px = SPG_GANT_X + s * (SPG_GANT_HW + 1.5f);
-            add_box_faces(px, SPG_GANT_Z, 3.0f, 3.0f, 0.0f, SPG_GANT_Y1 + 3.0f, 226, 228, 234);
-            town_box(px, SPG_GANT_Z, 3.0f, 3.0f, SPG_GANT_Y1 + 3.0f);
-            if (ntown_lights < 630) town_lights[ntown_lights++] = v3(px, SPG_GANT_Y1 + 4.0f, SPG_GANT_Z);
+        const float W = SPG_LOOP_HW, R = SPG_LOOP_R;
+        for (int s = -1; s <= 1; s += 2) for (int k = 0; k < 2; k++) {                  // pylons under the deck, outside the track
+            const float pz = SPG_LOOP_Z - SPG_LOOP_LB * (k == 0 ? 0.45f : 1.0f);
+            add_box_faces(SPG_LOOP_X + s * (W + 1.2f), pz, 1.6f, 1.6f, 0.0f, 2.0f * R + 1.4f, 226, 228, 234);
+            town_box(SPG_LOOP_X + s * (W + 1.2f), pz, 1.6f, 1.6f, 2.0f * R + 1.4f);
         }
-        add_box_faces(SPG_GANT_X, SPG_GANT_Z, 2.0f * SPG_GANT_HW + 6.0f, 2.4f, SPG_GANT_Y1, SPG_GANT_Y1 + 3.0f, 246, 200, 44);
+        if (ntown_lights < 630) town_lights[ntown_lights++] = v3(SPG_LOOP_X, 2.0f * R + 2.4f, SPG_LOOP_Z - SPG_LOOP_LB);
     }
     // The beacon tower: a pale shaft with a yellow cab, so the site shows from far away.
     {
@@ -213,7 +207,7 @@ static void draw_proving_ground(void) {
             spg_rect(lx0, lz0, lx1, lz1, pad); spg_frame(lx0, lz0, lx1, lz1, 1.2f, yel);
             ground_strip(SPG_SX(770.0f), z, lx0, z, 8.0f, RGBA8(110, 112, 120, 255));
         }
-        // The run-ups: to the pond ramp, and to the flip ramp inside the circuit.
+        // The run-ups: to the pond ramp, and to the loop ramp inside the circuit.
         ground_strip(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f), 8.0f, asph);
         strip_off(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f),  7.2f, 0.2f, wht); strip_off(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f), -7.2f, 0.2f, wht);
         ground_strip(SPG_SX(680.0f), SPG_SZ(445.0f), SPG_SX(680.0f), SPG_SZ(285.0f), 8.0f, asph);
@@ -237,7 +231,117 @@ static void draw_proving_ground(void) {
         }
     }
 
-    // The hoop and the gantry's fans (drawn fresh each frame: the hoop is a ring, the fans turn).
+    // The ramps and the loop ramp's track are painted each frame, before the car and the other solids are drawn. As solid faces the
+    // long slopes under the car were drawn after parts of it, and hid them.
+    if (near_site) {
+        const unsigned int blue = RGBA8(60, 74, 126, 255), edge = RGBA8(246, 200, 44, 255), sideA = RGBA8(150, 154, 164, 255), sideB = RGBA8(192, 196, 206, 255), wall = RGBA8(128, 132, 144, 255);
+        for (int i = 0; i < SPG_NRAMP; i++) {
+            const float *r = SPG_RAMPS[i];
+            const float mx = r[0] + r[2] * r[4] * 0.5f - cam.pos.x, mz = r[1] + r[3] * r[4] * 0.5f - cam.pos.z;
+            if (mx * mx + mz * mz > 2500.0f * 2500.0f) continue;
+            const float bx = r[0], bz = r[1], dx = r[2], dz = r[3], L = r[4], W = r[5], H = r[6], sx = -dz, sz = dx;
+            const float tc = (cam.pos.x - bx) * dx + (cam.pos.z - bz) * dz, sc = (cam.pos.x - bx) * sx + (cam.pos.z - bz) * sz;
+            const int N = 4;
+            for (int pass = 0; pass < 3; pass++) {                                       // 0: far side and back wall as needed, 1: the slope, 2: near side
+                for (int e = -1; e <= 1; e += 2) {
+                    const bool near_side = fabsf(sc) > W && (sc >= 0.0f) == (e > 0);                // (from over the slope, the walls are all behind it)
+                    if ((pass == 0 && near_side) || (pass == 2 && !near_side) || pass == 1) continue;
+                    for (int k = 0; k < N; k++) {
+                        const float ta = L * k / N, tb = L * (k + 1) / N, ha = H * ta / L, hb = H * tb / L;
+                        V3 q[4] = { v3(bx + dx * ta + sx * W * e, 0.0f, bz + dz * ta + sz * W * e), v3(bx + dx * tb + sx * W * e, 0.0f, bz + dz * tb + sz * W * e),
+                                    v3(bx + dx * tb + sx * W * e, hb, bz + dz * tb + sz * W * e), v3(bx + dx * ta + sx * W * e, ha, bz + dz * ta + sz * W * e) };
+                        draw_world_poly(q, 4, e > 0 ? sideA : sideB);
+                    }
+                }
+                if (pass == 0 && tc < L) {                                              // seen from the front: the back wall is the farthest thing
+                    V3 q[4] = { v3(bx + dx * L - sx * W, 0, bz + dz * L - sz * W), v3(bx + dx * L + sx * W, 0, bz + dz * L + sz * W), v3(bx + dx * L + sx * W, H, bz + dz * L + sz * W), v3(bx + dx * L - sx * W, H, bz + dz * L - sz * W) };
+                    draw_world_poly(q, 4, wall);
+                }
+                if (pass == 1) {
+                    V3 q[4] = { v3(bx - sx * (W - 1.3f), 0.03f, bz - sz * (W - 1.3f)), v3(bx + sx * (W - 1.3f), 0.03f, bz + sz * (W - 1.3f)),
+                                v3(bx + dx * L + sx * (W - 1.3f), H, bz + dz * L + sz * (W - 1.3f)), v3(bx + dx * L - sx * (W - 1.3f), H, bz + dz * L - sz * (W - 1.3f)) };
+                    draw_world_poly(q, 4, blue);
+                    for (int e = -1; e <= 1; e += 2) {
+                        V3 y4[4] = { v3(bx + sx * (W - 1.3f) * e, 0.04f, bz + sz * (W - 1.3f) * e), v3(bx + sx * W * e, 0.04f, bz + sz * W * e),
+                                     v3(bx + dx * L + sx * W * e, H + 0.04f, bz + dz * L + sz * W * e), v3(bx + dx * L + sx * (W - 1.3f) * e, H + 0.04f, bz + dz * L + sz * (W - 1.3f) * e) };
+                        draw_world_poly(y4, 4, edge);
+                    }
+                }
+                if (pass == 2 && tc >= L) {                                             // seen from beyond the top: the back wall is the nearest thing
+                    V3 q[4] = { v3(bx + dx * L - sx * W, 0, bz + dz * L - sz * W), v3(bx + dx * L + sx * W, 0, bz + dz * L + sz * W), v3(bx + dx * L + sx * W, H, bz + dz * L + sz * W), v3(bx + dx * L - sx * W, H, bz + dz * L - sz * W) };
+                    draw_world_poly(q, 4, wall);
+                }
+            }
+        }
+        {   // The loop ramp: the inside of the curl (the car runs on it), its outside, and the deck over the overhead track (underside, top, sides), far to near.
+            const float lx = SPG_LOOP_X - cam.pos.x, lz = SPG_LOOP_Z - 15.0f - cam.pos.z;
+            if (lx * lx + lz * lz < 2500.0f * 2500.0f) {
+                enum { NC = 16, ND = 10, NSEG = NC * 2 + ND * 4 };       // curl inside, curl outside, deck underside, deck top, deck side x2
+                float sd[NSEG]; int so[NSEG], nso = 0;
+                for (int k = 0; k < NSEG; k++) {                         // only the pieces facing the camera, far to near
+                    V3 c, n;
+                    if (k < 2 * NC) {
+                        float t, y, th; spg_loop_pt(PI_F * SPG_LOOP_R * ((k % NC) + 0.5f) / NC, &t, &y, &th);
+                        c = v3(SPG_LOOP_X, y, SPG_LOOP_Z + t);
+                        n = k < NC ? v3(0.0f, cosf(th), -sinf(th)) : v3(0.0f, -cosf(th), sinf(th));
+                    } else {
+                        const int kk = k - 2 * NC, j = kk % ND, part = kk / ND;
+                        const float zc = SPG_LOOP_Z - SPG_LOOP_LB * (j + 0.5f) / ND, Y2c = 2.0f * SPG_LOOP_R;
+                        if (part == 0)      { c = v3(SPG_LOOP_X, Y2c, zc);                         n = v3(0.0f, -1.0f, 0.0f); }
+                        else if (part == 1) { c = v3(SPG_LOOP_X, Y2c + 1.4f, zc);                  n = v3(0.0f, 1.0f, 0.0f); }
+                        else                { c = v3(SPG_LOOP_X + (part == 2 ? -1.0f : 1.0f) * SPG_LOOP_HW, Y2c + 0.7f, zc); n = v3(part == 2 ? -1.0f : 1.0f, 0.0f, 0.0f); }
+                    }
+                    const V3 d = vsub(cam.pos, c);
+                    if (vdot(d, n) <= 0.0f) continue;
+                    sd[k] = vdot(d, d); so[nso++] = k;
+                }
+                for (int a2 = 0; a2 < nso; a2++) for (int b2 = a2 + 1; b2 < nso; b2++) if (sd[so[b2]] > sd[so[a2]]) { int t = so[a2]; so[a2] = so[b2]; so[b2] = t; }
+                const float W = SPG_LOOP_HW, Wi = SPG_LOOP_HW - 1.2f, R = SPG_LOOP_R, x0 = SPG_LOOP_X, z0 = SPG_LOOP_Z, Y2 = 2.0f * SPG_LOOP_R;
+                const unsigned int outer = RGBA8(190, 194, 204, 255), top = RGBA8(214, 218, 226, 255);
+                for (int n = 0; n < nso; n++) {
+                    const int k = so[n];
+                    if (k < NC) {                                                              // inside of the curl
+                        float ta, ya, th, tb, yb;
+                        spg_loop_pt(PI_F * R * k / NC, &ta, &ya, &th); spg_loop_pt(PI_F * R * (k + 1) / NC, &tb, &yb, &th);
+                        V3 q[4] = { v3(x0 - Wi, ya, z0 + ta), v3(x0 + Wi, ya, z0 + ta), v3(x0 + Wi, yb, z0 + tb), v3(x0 - Wi, yb, z0 + tb) };
+                        draw_world_poly(q, 4, blue);
+                        for (int e = -1; e <= 1; e += 2) {
+                            V3 y4[4] = { v3(x0 + e * Wi, ya, z0 + ta), v3(x0 + e * W, ya, z0 + ta), v3(x0 + e * W, yb, z0 + tb), v3(x0 + e * Wi, yb, z0 + tb) };
+                            draw_world_poly(y4, 4, edge);
+                        }
+                    } else if (k < 2 * NC) {                                                   // outside of the curl
+                        const int j = k - NC;
+                        float ta, ya, tha, tb, yb, thb;
+                        spg_loop_pt(PI_F * R * j / NC, &ta, &ya, &tha); spg_loop_pt(PI_F * R * (j + 1) / NC, &tb, &yb, &thb);
+                        const float rr = R + 0.8f;
+                        V3 q[4] = { v3(x0 - W, R - rr * cosf(tha), z0 + rr * sinf(tha)), v3(x0 + W, R - rr * cosf(tha), z0 + rr * sinf(tha)),
+                                    v3(x0 + W, R - rr * cosf(thb), z0 + rr * sinf(thb)), v3(x0 - W, R - rr * cosf(thb), z0 + rr * sinf(thb)) };
+                        draw_world_poly(q, 4, outer);
+                    } else {
+                        const int kk = k - 2 * NC, j = kk % ND, part = kk / ND;                // 0 underside, 1 top, 2/3 sides
+                        const float za = z0 - SPG_LOOP_LB * j / ND, zb = z0 - SPG_LOOP_LB * (j + 1) / ND;
+                        if (part == 0) {
+                            V3 q[4] = { v3(x0 - Wi, Y2, za), v3(x0 + Wi, Y2, za), v3(x0 + Wi, Y2, zb), v3(x0 - Wi, Y2, zb) };
+                            draw_world_poly(q, 4, blue);
+                            for (int e = -1; e <= 1; e += 2) {
+                                V3 y4[4] = { v3(x0 + e * Wi, Y2, za), v3(x0 + e * W, Y2, za), v3(x0 + e * W, Y2, zb), v3(x0 + e * Wi, Y2, zb) };
+                                draw_world_poly(y4, 4, edge);
+                            }
+                        } else if (part == 1) {
+                            V3 q[4] = { v3(x0 - W, Y2 + 1.4f, za), v3(x0 + W, Y2 + 1.4f, za), v3(x0 + W, Y2 + 1.4f, zb), v3(x0 - W, Y2 + 1.4f, zb) };
+                            draw_world_poly(q, 4, top);
+                        } else {
+                            const float e = part == 2 ? -W : W;
+                            V3 q[4] = { v3(x0 + e, Y2, za), v3(x0 + e, Y2, zb), v3(x0 + e, Y2 + 1.4f, zb), v3(x0 + e, Y2 + 1.4f, za) };
+                            draw_world_poly(q, 4, sideA);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // The hoop and the loop ramp's suction fans (drawn fresh each frame: the hoop is a ring, the fans turn).
     if (near_site) {
         const float hx = SPG_HOOP_X - cam.pos.x, hz = SPG_HOOP_Z - cam.pos.z;
         if (hx * hx + hz * hz < 3500.0f * 3500.0f) {
@@ -250,15 +354,16 @@ static void draw_proving_ground(void) {
                 draw_world_poly(q, 4, (i & 1) ? hc : RGBA8(250, 250, 250, 255));
             }
         }
-        const float gx = SPG_GANT_X - cam.pos.x, gz = SPG_GANT_Z - cam.pos.z;
-        if (gx * gx + gz * gz < 3500.0f * 3500.0f) {
-            for (int s = -1; s <= 1; s += 2) {
-                const float fx = SPG_GANT_X + s * (SPG_GANT_HW + 1.5f), fy = SPG_GANT_Y1 + 9.0f;
+        const float gx = SPG_LOOP_X - cam.pos.x, gz = SPG_LOOP_Z - 20.0f - cam.pos.z;
+        if (gx * gx + gz * gz < 3500.0f * 3500.0f) {                                   // the suction fans, under the deck, on both sides of the track
+            const bool on = kx_fans_on;
+            const float spin = frame_count * (on ? 0.9f : 0.12f);
+            for (int s = -1; s <= 1; s += 2) for (int f = 0; f < 2; f++) {
+                const float fx = SPG_LOOP_X + s * 2.9f, fz = SPG_LOOP_Z - SPG_LOOP_LB * (f == 0 ? 0.3f : 0.72f), fy = 2.0f * SPG_LOOP_R - 0.05f;
                 for (int k = 0; k < 4; k++) {
-                    const float a = frame_count * 0.35f * s + k * (PI_F * 0.5f), c = cosf(a), n = sinf(a);
-                    const float a2 = a + 0.5f;
-                    V3 q[3] = { v3(fx, fy, SPG_GANT_Z - 2.5f), v3(fx + 6.0f * c, fy + 6.0f * n, SPG_GANT_Z - 2.5f), v3(fx + 6.0f * cosf(a2), fy + 6.0f * sinf(a2), SPG_GANT_Z - 2.5f) };
-                    draw_world_poly(q, 3, RGBA8(70, 76, 90, 255));
+                    const float a = spin * s + k * (PI_F * 0.5f), a2 = a + 0.6f;
+                    V3 q[3] = { v3(fx, fy, fz), v3(fx + 1.7f * cosf(a), fy, fz + 1.7f * sinf(a)), v3(fx + 1.7f * cosf(a2), fy, fz + 1.7f * sinf(a2)) };
+                    draw_world_poly(q, 3, on ? RGBA8(120, 210, 255, 255) : RGBA8(70, 76, 90, 255));
                 }
             }
         }
@@ -280,11 +385,15 @@ static void draw_proving_ground(void) {
                 draw_light(r[0] + r[2] * t - r[3] * e * r[5], r[6] * k / 4.0f + 0.6f, r[1] + r[3] * t + r[2] * e * r[5], 1.6f, RGBA8(255, 170, 60, 255));
             }
         }
-        for (int i = 0; i < 12; i++) {                                           // the hoop and the gantry
+        for (int i = 0; i < 12; i++) {                                           // the hoop
             const float a = i * (2.0f * PI_F / 12);
             draw_light(SPG_HOOP_X, SPG_HOOP_Y + SPG_HOOP_R * sinf(a), SPG_HOOP_Z + SPG_HOOP_R * cosf(a), 1.8f, (i & 1) ? RGBA8(255, 214, 70, 255) : white);
         }
-        for (int s = -1; s <= 1; s += 2) for (int k = 0; k < 4; k++) draw_light(SPG_GANT_X + s * (SPG_GANT_HW + 1.5f), 4.0f + k * 10.0f, SPG_GANT_Z - 1.6f, 1.6f, red);
+        for (int k = 0; k <= 8; k++) for (int e = -1; e <= 1; e += 2) {                // the loop ramp: lamps up the curl and along the deck
+            float t, y, th; spg_loop_pt(PI_F * SPG_LOOP_R * k / 8.0f, &t, &y, &th);
+            draw_light(SPG_LOOP_X + e * SPG_LOOP_HW, y + 0.4f, SPG_LOOP_Z + t, 1.6f, RGBA8(255, 170, 60, 255));
+        }
+        for (int k = 1; k <= 4; k++) for (int e = -1; e <= 1; e += 2) draw_light(SPG_LOOP_X + e * SPG_LOOP_HW, 2.0f * SPG_LOOP_R - 0.4f, SPG_LOOP_Z - SPG_LOOP_LB * k / 4.0f, 1.6f, k == 4 ? red : RGBA8(255, 170, 60, 255));
         static const float FP[4][2] = { { 120.0f, 500.0f }, { 240.0f, 500.0f }, { 420.0f, 236.0f }, { 570.0f, 236.0f } };
         for (int k = 0; k < 4; k++) draw_light(SPG_SX(FP[k][0]), 22.5f, SPG_SZ(FP[k][1]), 3.0f, white);
         for (int i = 0; i < SPC_N; i += 2) {
