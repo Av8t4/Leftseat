@@ -5,17 +5,18 @@ typedef struct { float dist; int idx; } DrawItem;
 #define TREE_IDX0 (MAX_FACES + MAX_PFACES)      // items from here on are trees (index = TREE_IDX0 + position in trees[])
 #define LIGHT_IDX0 (TREE_IDX0 + 256)           // and from here on, lights (index = LIGHT_IDX0 + position in flights[])
 #define MAX_FLIGHTS 520
+#define SPG_IDX (LIGHT_IDX0 + MAX_FLIGHTS)      // the proving ground's ramps, loop and hoop: one item in the queue
 typedef struct { float x, y, z, px, far; unsigned int col; } FLight;
 static FLight flights[MAX_FLIGHTS];
 static int nflights;
-static DrawItem items[MAX_FACES + MAX_PFACES + 256 + MAX_FLIGHTS];
+static DrawItem items[MAX_FACES + MAX_PFACES + 256 + MAX_FLIGHTS + 1];
 static int cmp_item(const void *a, const void *b) {
     float da = ((const DrawItem *)a)->dist, db = ((const DrawItem *)b)->dist;
     return (da < db) - (da > db);          // far to near
 }
 // Far-to-near order for the painter's algorithm. A radix sort on the float bits (distances are never negative, so their bit
 // patterns sort the same way the numbers do): linear time and stable, where qsort was about a third of the CPU time of a busy frame.
-static DrawItem items_tmp[MAX_FACES + MAX_PFACES + 256 + MAX_FLIGHTS];
+static DrawItem items_tmp[MAX_FACES + MAX_PFACES + 256 + MAX_FLIGHTS + 1];
 static void sort_items(int n) {
     DrawItem *src = items, *dst = items_tmp;
     for (int pass = 0; pass < 4; pass++) {
@@ -186,6 +187,7 @@ static void draw_scene(void) {
         items[ni].dist = vdot(d, d); items[ni].idx = TREE_IDX0 + k; ni++;
     }
     collect_flights(&ni);
+    { float k; if (spg_solids_key(&k)) { items[ni].dist = k; items[ni].idx = SPG_IDX; ni++; } }
     npf = 0; pf_last = -1;
     if (view_mode != 0) build_plane();
     else {
@@ -214,7 +216,9 @@ static void draw_scene(void) {
     sort_items(ni);
     for (int i = 0; i < ni; i++) {
         int idx = items[i].idx;
-        if (idx >= LIGHT_IDX0) {
+        if (idx == SPG_IDX) {
+            draw_spg_solids();
+        } else if (idx >= LIGHT_IDX0) {
             const FLight *fl = &flights[idx - LIGHT_IDX0];
             light_far = fl->far;
             draw_light(fl->x, fl->y, fl->z, fl->px, fl->col);

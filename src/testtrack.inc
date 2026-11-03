@@ -165,74 +165,30 @@ static void spg_curve(float ax, float az, float bx, float bz, float cx, float cz
     }
 }
 
-static void draw_proving_ground(void) {
+// The ramps, the loop ramp, the hoop and the fans are painted each frame as ONE item of the painter's queue (see draw_scene), so the
+// mountains and other far things are drawn first and the car after. As faces, the long slopes were sorted by their centers and hid
+// parts of the car; painted before the queue, the mountains covered them.
+static bool spg_solids_key(float *key) {
+    const float dx = SPG_X - cam.pos.x, dz = SPG_Z - cam.pos.z;
+    if (dx * dx + dz * dz > 6500.0f * 6500.0f) return false;
+    float best = 1e30f;
+    #define SPG_PT(px, py, pz) do { const float ex = (px) - cam.pos.x, ey = (py) - cam.pos.y, ez = (pz) - cam.pos.z; const float e2 = ex * ex + ey * ey + ez * ez; if (e2 < best) best = e2; } while (0)
+    for (int i = 0; i < SPG_NRAMP; i++) {
+        const float *r = SPG_RAMPS[i];
+        for (int k = 0; k <= 4; k++) SPG_PT(r[0] + r[2] * r[4] * k / 4, r[6] * k / 4, r[1] + r[3] * r[4] * k / 4);
+    }
+    for (int k = 0; k <= 4; k++) { SPG_PT(SPG_LOOP_X, 2.0f * SPG_LOOP_R, SPG_LOOP_Z - SPG_LOOP_LB * k / 4); SPG_PT(SPG_LOOP_X, SPG_LOOP_R * (1.0f + sinf(k * 0.4f)), SPG_LOOP_Z + SPG_LOOP_R * k * 0.25f); }
+    SPG_PT(SPG_HOOP_X, SPG_HOOP_Y, SPG_HOOP_Z);
+    #undef SPG_PT
+    if (best > 2500.0f * 2500.0f) return false;
+    const float d = sqrtf(best) + 40.0f;                                   // nearer than the mountains, farther than the car and what is close to it
+    *key = d * d;
+    return true;
+}
+
+static void draw_spg_solids(void) {
     const float dx = SPG_X - cam.pos.x, dz = SPG_Z - cam.pos.z;
     const bool near_site = dx * dx + dz * dz < 6500.0f * 6500.0f;
-    spc_build();
-    const unsigned int asph = RGBA8(64, 66, 74, 255), pad = RGBA8(86, 88, 96, 255), yel = RGBA8(246, 200, 44, 255), wht = PAINT_W;
-    if (near_site) {
-        // The circuit: tarmac, white edge lines, and the start line at the first gate.
-        for (int i = 0; i < SPC_N; i++) {
-            const int j = (i + 1) % SPC_N;
-            const float mx = 0.5f * (spc_x[i] + spc_x[j]) - cam.pos.x, mz = 0.5f * (spc_z[i] + spc_z[j]) - cam.pos.z;
-            if (mx * mx + mz * mz > 4500.0f * 4500.0f) continue;
-            ground_strip(spc_x[i], spc_z[i], spc_x[j], spc_z[j], SPC_HALF, asph);
-            ground_disc(spc_x[j], spc_z[j], SPC_HALF, asph);
-            strip_off(spc_x[i], spc_z[i], spc_x[j], spc_z[j],  SPC_HALF - 0.6f, 0.18f, wht);
-            strip_off(spc_x[i], spc_z[i], spc_x[j], spc_z[j], -(SPC_HALF - 0.6f), 0.18f, wht);
-        }
-        // The long straights (the launch strip is the third): a dashed yellow center line on the circuit's straights.
-        ground_dashes(SPC_CX - (SPC_HX - SPC_R), SPC_CZ + SPC_HZ, SPC_CX + (SPC_HX - SPC_R), SPC_CZ + SPC_HZ, 0.18f, 6.0f, 16.0f, 900.0f, yel);
-        ground_dashes(SPC_CX - (SPC_HX - SPC_R), SPC_CZ - SPC_HZ, SPC_CX + (SPC_HX - SPC_R), SPC_CZ - SPC_HZ, 0.18f, 6.0f, 16.0f, 900.0f, yel);
-        // The road in from the east-west road, past the pit, to the circuit.
-        {
-            const float ax = SPG_SX(120.0f), az = SPG_SZ(-25.0f), bx = SPG_SX(120.0f), bz = SPG_SZ(200.0f);
-            ground_strip(ax, az, bx, bz, 6.5f, asph);
-            ground_disc(bx, bz, 6.5f, asph);
-            spg_curve(bx, bz, SPG_SX(190.0f), SPG_SZ(200.0f), SPG_SX(210.0f), SPG_SZ(300.0f), SPG_SX(262.0f), SPG_SZ(300.0f), 6.5f, asph);
-            spg_curve(SPG_SX(170.0f), SPG_SZ(300.0f), SPG_SX(170.0f), SPG_SZ(380.0f), SPG_SX(150.0f), SPG_SZ(440.0f), SPG_SX(175.0f), SPG_SZ(500.0f), 6.0f, asph);
-        }
-        // The pit: a big pad with a yellow border.
-        {
-            const float x0 = SPG_SX(110.0f), x1 = SPG_SX(230.0f), z0 = SPG_SZ(575.0f), z1 = SPG_SZ(505.0f);
-            spg_rect(x0, z0, x1, z1, pad); spg_frame(x0, z0, x1, z1, 1.2f, yel);
-        }
-        // The launch strip along the north edge, with the landing pad at its end.
-        {
-            const float z = SPG_SZ(72.0f), x0 = SPG_SX(300.0f), x1 = SPG_SX(770.0f);
-            ground_strip(x0, z, x1, z, 8.0f, asph);
-            strip_off(x0, z, x1, z,  7.2f, 0.2f, wht); strip_off(x0, z, x1, z, -7.2f, 0.2f, wht);
-            ground_dashes(x0, z, x1, z, 0.2f, 10.0f, 28.0f, 800.0f, wht);
-            const float lx0 = SPG_SX(845.0f), lx1 = SPG_SX(965.0f), lz0 = SPG_SZ(88.0f), lz1 = SPG_SZ(56.0f);
-            spg_rect(lx0, lz0, lx1, lz1, pad); spg_frame(lx0, lz0, lx1, lz1, 1.2f, yel);
-            ground_strip(SPG_SX(770.0f), z, lx0, z, 8.0f, RGBA8(110, 112, 120, 255));
-        }
-        // The run-ups: to the pond ramp, and to the loop ramp inside the circuit.
-        ground_strip(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f), 8.0f, asph);
-        strip_off(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f),  7.2f, 0.2f, wht); strip_off(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f), -7.2f, 0.2f, wht);
-        ground_strip(SPG_SX(680.0f), SPG_SZ(445.0f), SPG_SX(680.0f), SPG_SZ(285.0f), 8.0f, asph);
-        strip_off(SPG_SX(680.0f), SPG_SZ(445.0f), SPG_SX(680.0f), SPG_SZ(285.0f),  7.2f, 0.2f, wht); strip_off(SPG_SX(680.0f), SPG_SZ(445.0f), SPG_SX(680.0f), SPG_SZ(285.0f), -7.2f, 0.2f, wht);
-        // The trick pad: a big pad with three Strake bars, a sign from the air.
-        {
-            const float x0 = SPG_SX(420.0f), x1 = SPG_SX(570.0f), z0 = SPG_SZ(350.0f), z1 = SPG_SZ(240.0f);
-            spg_rect(x0, z0, x1, z1, pad); spg_frame(x0, z0, x1, z1, 1.6f, yel);
-            for (int k = 0; k < 3; k++) {
-                const float cx = 0.5f * (x0 + x1) + (k - 1) * 70.0f, cz = 0.5f * (z0 + z1);
-                V3 q[4] = { v3(cx - 7.0f, 0.04f, cz - 50.0f), v3(cx + 7.0f, 0.04f, cz - 50.0f), v3(cx + 33.0f, 0.04f, cz + 50.0f), v3(cx + 19.0f, 0.04f, cz + 50.0f) };
-                draw_world_poly(q, 4, yel);
-            }
-        }
-        // The landing platform by the pond: a pad with a target.
-        {
-            const float x0 = SPG_SX(830.0f), x1 = SPG_SX(880.0f), z0 = SPG_SZ(530.0f), z1 = SPG_SZ(470.0f);
-            spg_rect(x0, z0, x1, z1, pad); spg_frame(x0, z0, x1, z1, 1.2f, yel);
-            const float cx = SPG_SX(855.0f), cz = SPG_SZ(500.0f);
-            ground_disc(cx, cz, 22.0f, wht); ground_disc(cx, cz, 17.0f, RGBA8(226, 60, 44, 255)); ground_disc(cx, cz, 10.0f, wht); ground_disc(cx, cz, 4.0f, RGBA8(226, 60, 44, 255));
-        }
-    }
-
-    // The ramps and the loop ramp's track are painted each frame, before the car and the other solids are drawn. As solid faces the
-    // long slopes under the car were drawn after parts of it, and hid them.
     if (near_site) {
         const unsigned int blue = RGBA8(60, 74, 126, 255), edge = RGBA8(246, 200, 44, 255), sideA = RGBA8(150, 154, 164, 255), sideB = RGBA8(192, 196, 206, 255), wall = RGBA8(128, 132, 144, 255);
         for (int i = 0; i < SPG_NRAMP; i++) {
@@ -366,6 +322,74 @@ static void draw_proving_ground(void) {
                     draw_world_poly(q, 3, on ? RGBA8(120, 210, 255, 255) : RGBA8(70, 76, 90, 255));
                 }
             }
+        }
+    }
+
+}
+
+static void draw_proving_ground(void) {
+    const float dx = SPG_X - cam.pos.x, dz = SPG_Z - cam.pos.z;
+    const bool near_site = dx * dx + dz * dz < 6500.0f * 6500.0f;
+    spc_build();
+    const unsigned int asph = RGBA8(64, 66, 74, 255), pad = RGBA8(86, 88, 96, 255), yel = RGBA8(246, 200, 44, 255), wht = PAINT_W;
+    if (near_site) {
+        // The circuit: tarmac, white edge lines, and the start line at the first gate.
+        for (int i = 0; i < SPC_N; i++) {
+            const int j = (i + 1) % SPC_N;
+            const float mx = 0.5f * (spc_x[i] + spc_x[j]) - cam.pos.x, mz = 0.5f * (spc_z[i] + spc_z[j]) - cam.pos.z;
+            if (mx * mx + mz * mz > 4500.0f * 4500.0f) continue;
+            ground_strip(spc_x[i], spc_z[i], spc_x[j], spc_z[j], SPC_HALF, asph);
+            ground_disc(spc_x[j], spc_z[j], SPC_HALF, asph);
+            strip_off(spc_x[i], spc_z[i], spc_x[j], spc_z[j],  SPC_HALF - 0.6f, 0.18f, wht);
+            strip_off(spc_x[i], spc_z[i], spc_x[j], spc_z[j], -(SPC_HALF - 0.6f), 0.18f, wht);
+        }
+        // The long straights (the launch strip is the third): a dashed yellow center line on the circuit's straights.
+        ground_dashes(SPC_CX - (SPC_HX - SPC_R), SPC_CZ + SPC_HZ, SPC_CX + (SPC_HX - SPC_R), SPC_CZ + SPC_HZ, 0.18f, 6.0f, 16.0f, 900.0f, yel);
+        ground_dashes(SPC_CX - (SPC_HX - SPC_R), SPC_CZ - SPC_HZ, SPC_CX + (SPC_HX - SPC_R), SPC_CZ - SPC_HZ, 0.18f, 6.0f, 16.0f, 900.0f, yel);
+        // The road in from the east-west road, past the pit, to the circuit.
+        {
+            const float ax = SPG_SX(120.0f), az = SPG_SZ(-25.0f), bx = SPG_SX(120.0f), bz = SPG_SZ(200.0f);
+            ground_strip(ax, az, bx, bz, 6.5f, asph);
+            ground_disc(bx, bz, 6.5f, asph);
+            spg_curve(bx, bz, SPG_SX(190.0f), SPG_SZ(200.0f), SPG_SX(210.0f), SPG_SZ(300.0f), SPG_SX(262.0f), SPG_SZ(300.0f), 6.5f, asph);
+            spg_curve(SPG_SX(170.0f), SPG_SZ(300.0f), SPG_SX(170.0f), SPG_SZ(380.0f), SPG_SX(150.0f), SPG_SZ(440.0f), SPG_SX(175.0f), SPG_SZ(500.0f), 6.0f, asph);
+        }
+        // The pit: a big pad with a yellow border.
+        {
+            const float x0 = SPG_SX(110.0f), x1 = SPG_SX(230.0f), z0 = SPG_SZ(575.0f), z1 = SPG_SZ(505.0f);
+            spg_rect(x0, z0, x1, z1, pad); spg_frame(x0, z0, x1, z1, 1.2f, yel);
+        }
+        // The launch strip along the north edge, with the landing pad at its end.
+        {
+            const float z = SPG_SZ(72.0f), x0 = SPG_SX(300.0f), x1 = SPG_SX(770.0f);
+            ground_strip(x0, z, x1, z, 8.0f, asph);
+            strip_off(x0, z, x1, z,  7.2f, 0.2f, wht); strip_off(x0, z, x1, z, -7.2f, 0.2f, wht);
+            ground_dashes(x0, z, x1, z, 0.2f, 10.0f, 28.0f, 800.0f, wht);
+            const float lx0 = SPG_SX(845.0f), lx1 = SPG_SX(965.0f), lz0 = SPG_SZ(88.0f), lz1 = SPG_SZ(56.0f);
+            spg_rect(lx0, lz0, lx1, lz1, pad); spg_frame(lx0, lz0, lx1, lz1, 1.2f, yel);
+            ground_strip(SPG_SX(770.0f), z, lx0, z, 8.0f, RGBA8(110, 112, 120, 255));
+        }
+        // The run-ups: to the pond ramp, and to the loop ramp inside the circuit.
+        ground_strip(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f), 8.0f, asph);
+        strip_off(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f),  7.2f, 0.2f, wht); strip_off(SPG_SX(560.0f), SPG_SZ(500.0f), SPG_SX(750.0f), SPG_SZ(500.0f), -7.2f, 0.2f, wht);
+        ground_strip(SPG_SX(680.0f), SPG_SZ(445.0f), SPG_SX(680.0f), SPG_SZ(285.0f), 8.0f, asph);
+        strip_off(SPG_SX(680.0f), SPG_SZ(445.0f), SPG_SX(680.0f), SPG_SZ(285.0f),  7.2f, 0.2f, wht); strip_off(SPG_SX(680.0f), SPG_SZ(445.0f), SPG_SX(680.0f), SPG_SZ(285.0f), -7.2f, 0.2f, wht);
+        // The trick pad: a big pad with three Strake bars, a sign from the air.
+        {
+            const float x0 = SPG_SX(420.0f), x1 = SPG_SX(570.0f), z0 = SPG_SZ(350.0f), z1 = SPG_SZ(240.0f);
+            spg_rect(x0, z0, x1, z1, pad); spg_frame(x0, z0, x1, z1, 1.6f, yel);
+            for (int k = 0; k < 3; k++) {
+                const float cx = 0.5f * (x0 + x1) + (k - 1) * 70.0f, cz = 0.5f * (z0 + z1);
+                V3 q[4] = { v3(cx - 7.0f, 0.04f, cz - 50.0f), v3(cx + 7.0f, 0.04f, cz - 50.0f), v3(cx + 33.0f, 0.04f, cz + 50.0f), v3(cx + 19.0f, 0.04f, cz + 50.0f) };
+                draw_world_poly(q, 4, yel);
+            }
+        }
+        // The landing platform by the pond: a pad with a target.
+        {
+            const float x0 = SPG_SX(830.0f), x1 = SPG_SX(880.0f), z0 = SPG_SZ(530.0f), z1 = SPG_SZ(470.0f);
+            spg_rect(x0, z0, x1, z1, pad); spg_frame(x0, z0, x1, z1, 1.2f, yel);
+            const float cx = SPG_SX(855.0f), cz = SPG_SZ(500.0f);
+            ground_disc(cx, cz, 22.0f, wht); ground_disc(cx, cz, 17.0f, RGBA8(226, 60, 44, 255)); ground_disc(cx, cz, 10.0f, wht); ground_disc(cx, cz, 4.0f, RGBA8(226, 60, 44, 255));
         }
     }
 
