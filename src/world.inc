@@ -641,6 +641,7 @@ static void settle_mountains(void) {
 #define SPG_Z (-2350.0f)
 #define SPG_HX 1000.0f           // half length (x)
 #define SPG_HZ 600.0f            // half depth (z)
+static void build_proving_ground(void);                                // (testtrack.inc)
 static void build_knowles(void) {
     const float FX = KW_FX, FZ = KW_FZ;
     // The hall: a very large plain shed with a dark band round it.
@@ -910,6 +911,7 @@ static void build_world(void) {
     build_pinecrest_country();
 #endif
     build_knowles();
+    build_proving_ground();
     build_coast();
     build_city();
     settle_mountains();
