@@ -149,6 +149,7 @@ static void draw_scene(void) {
     draw_lana_all();
     draw_spaceport_all();
     draw_proving_ground();
+    if (tod != TOD_DAY || true) kc_draw_world();
     draw_landing_light();
 
     // 3b. The aircraft's shadow (not needed in the cockpit).

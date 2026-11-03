@@ -9,7 +9,7 @@
 #ifndef SCORE_PATH
 #define SCORE_PATH "ux0:data/skyhawk_scores.txt"      /* (the old file name is kept so saved scores carry over) */
 #endif
-enum { MODE_FREE = 0, MODE_LANDING = 1 };
+enum { MODE_FREE = 0, MODE_LANDING = 1, MODE_KX = 2 };       // (MODE_KX: a KX-1 session at Strake Proving Ground: kxchal.inc)
 enum { CH_IDLE = 0, CH_FLYING, CH_TOUCHED, CH_DONE };
 
 typedef struct {
@@ -42,6 +42,8 @@ static int      ch_best_a[AC_COUNT][CK_COUNT], ch_att_a[AC_COUNT][CK_COUNT];    
 #define ch_best     ch_best_a[ac_flying][ch_kind]
 #define ch_attempts ch_att_a[ac_flying][ch_kind]
 static ChResult chr;
+static int kc_best[8];                   // the KX-1 challenges: best result in hundredths (a time for the speed run), 0 = none yet
+static void kc_restart(void);            // (kxchal.inc)
 
 static void scores_load(void) {
     FILE *f = fopen(SCORE_PATH, "r");
@@ -57,6 +59,7 @@ static void scores_load(void) {
         if (!strcmp(key, "gyro_sens")) { if (v >= 0 && v < 3) gy_sens = v; continue; }
         if (!strcmp(key, "panel_tap")) { if (v >= 0 && v < 4) sw_dt = v; continue; }
         if (!strcmp(key, "sound")) { if (v >= 0 && v < 4) snd_level = v; continue; }            // the volume setting
+        for (int k = 0; k < 8; k++) { char b[24]; snprintf(b, sizeof(b), "kx%d_best", k); if (!strcmp(key, b)) kc_best[k] = v; }
         for (int a = 0; a < AC_COUNT; a++)
             for (int k = 0; k < CK_COUNT; k++) {
                 char b[72];                                           // the K-4's keys have no prefix, as in older files
@@ -72,6 +75,7 @@ static void scores_save(void) {
     fprintf(f, "sound=%d\n", snd_level);
     fprintf(f, "gyro=%d\ngyro_roll_rev=%d\ngyro_pitch_rev=%d\ngyro_sens=%d\npanel_tap=%d\n", gy_mode, gy_rinv, gy_pinv, gy_sens, sw_dt);
     fprintf(f, "found_gps=%d\n", ap_found);
+    for (int k = 0; k < 8; k++) fprintf(f, "kx%d_best=%d\n", k, kc_best[k]);
     for (int a = 0; a < AC_COUNT; a++)
         for (int k = 0; k < CK_COUNT; k++)
             fprintf(f, "%s%s%s_best=%d\n%s%s%s_attempts=%d\n", a ? SPECS[a].key : "", a ? "_" : "", CK_KEYS[k], ch_best_a[a][k],

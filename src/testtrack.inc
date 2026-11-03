@@ -35,8 +35,8 @@ static void spc_build(void) {
     }
 }
 
-// The five gates of the speed run, where the plan has its yellow marks: {map x, map y, across the road in x (1) or z (0)}.
-static const float SPG_GATES[5][3] = { { 522.0f, 150.0f, 1.0f }, { 402.0f, 450.0f, 1.0f }, { 660.0f, 450.0f, 1.0f }, { 780.0f, 318.0f, 0.0f }, { 260.0f, 318.0f, 0.0f } };
+// The five gates of the speed run, where the plan has its yellow marks: {map x, map y, 1 if the gap runs across x (a road running north-south), 0 if across z (a road running east-west)}.
+static const float SPG_GATES[5][3] = { { 522.0f, 150.0f, 0.0f }, { 402.0f, 450.0f, 0.0f }, { 660.0f, 450.0f, 0.0f }, { 780.0f, 318.0f, 1.0f }, { 260.0f, 318.0f, 1.0f } };
 #define SPG_GATE_HW 13.0f                // half the gap between the posts
 
 static void build_proving_ground(void) {

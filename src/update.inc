@@ -46,7 +46,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
         if (!ff_sub) { gyro_recenter(); gear_say("GYRO CENTERED"); }
         sel_used = true; pressed &= ~SCE_CTRL_TRIANGLE;
     }
-    if (pressed & SCE_CTRL_TRIANGLE) { if (game_mode == MODE_LANDING) challenge_begin(); else reset_free(); return; }
+    if (pressed & SCE_CTRL_TRIANGLE) { if (game_mode == MODE_LANDING) challenge_begin(); else if (game_mode == MODE_KX) kc_restart(); else reset_free(); return; }
     wx_update();                                       // the weather keeps changing, even after a crash
     if (!pl.crashed && ++trk_t >= 90) {                // a breadcrumb every second and a half, for the chart
         trk_t = 0;

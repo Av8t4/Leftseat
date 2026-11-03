@@ -8,6 +8,7 @@ static void draw_overlays(vita2d_pgf *pgf) {
         static const char *names[3] = { "COCKPIT VIEW", "CHASE VIEW", "TOWER VIEW" };
         vita2d_pgf_draw_text(pgf, 20, 388, white, 0.95f, names[view_mode]);
     }
+    kc_draw_hud(pgf);
     if (game_mode == MODE_LANDING && (ch_state == CH_FLYING || ch_state == CH_TOUCHED)) {
         unsigned int gold = RGBA8(255, 206, 130, 255);
         float to_thr = (-1000.0f - pl.pos.z) / 1000.0f;

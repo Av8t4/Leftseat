@@ -423,8 +423,11 @@ static void kx_fly(const SceCtrlData *pad) {
     }
 }
 
-static void kx_update(const SceCtrlData *pad, unsigned int pressed) {
+static bool kc_hold;                                       // the countdown: the car is held where it is (kxchal.inc)
+static void kx_update(const SceCtrlData *pad_in, unsigned int pressed) {
     (void)pressed;
+    SceCtrlData held = *pad_in; const SceCtrlData *pad = pad_in;
+    if (kc_hold) { held.buttons = 0; held.lx = held.ly = held.rx = held.ry = 128; pad = &held; }
     eng_on = sw.batt; eng_n += ((sw.batt ? 1.0f : 0.0f) - eng_n) * 0.05f;       // (the motor: it runs when the battery is on)
     kx.jet_hop = kx.jet_roof = 0.0f; kx.cp = kx.cr = kx.cy = 0.0f;
     if (!kx.air) {

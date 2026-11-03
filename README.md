@@ -176,6 +176,15 @@ Bounces and a nose-wheel-first landing cost points, and a crash scores 0. Your b
 | **Backcountry** | The same trip to Pinecrest. Find the grass strip and put it down in the first few hundred feet. The scoring area is smaller, so touching down early matters more |
 | **Lake rings** | You start in the air north of Lana Lake and fly through 7 gold rings that bend over and around the lake. 80 points for the rings, plus up to 20 for beating the par time. A missed ring is skipped, and a crash scores 0 |
 
+### Strake KX-1 challenges
+
+The last line of the Challenges list is **Strake KX-1**. It opens its own list, and every KX-1 challenge is held at Strake Proving Ground.
+
+| Challenge | What happens |
+|---|---|
+| **Free roam** | Drive and fly around the proving ground with no clock. Leave the site and you are put back at the start |
+| **Speed run** | A three-second countdown, then one lap of the circuit through five gates in order. A light column marks the next gate. Your lap time is saved, with gold, silver and bronze medals. △ restarts |
+
 ## Weather, time and sound
 
 **Weather** can be clear, breezy, overcast, fog, rain, storm or random. Random starts anywhere and drifts from one kind to another. Wind, gusts and turbulence move the aircraft, clouds drift and can be flown through, and fog cuts visibility. Rain falls with the wind, and storms flash with lightning.
@@ -262,6 +271,7 @@ src/modelkit.inc   kit for smooth models: lofted fuselages, airfoil wings, tail 
 src/k10.inc, jet1.inc, k30.inc, a22.inc, a11.inc   the other aircraft models and cockpit parts
 src/fleet.inc      chooses the model for the aircraft being flown
 src/kx1.inc        the Strake KX-1: the car model, the driving, the cold-gas thrusters and the landing grading
+src/kxchal.inc     the KX-1 challenges: speed run, free roam, countdown, gates, timing and results
 src/testtrack.inc  Strake Proving Ground, the KX-1's test site: circuit, gates, pit, pads, beacon tower and night lights
 src/soundcore.inc  the sound engine: makes every sound on the fly (knows nothing about the Vita)
 src/sound.inc      plays it on a background thread and tells it what the aircraft is doing
