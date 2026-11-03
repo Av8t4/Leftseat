@@ -37,6 +37,7 @@ static int   kc_lift0, kc_land0;             // the lift-off and landing counter
 static bool  kc_pass;                        // hoop or gantry passed
 static float kc_pass_d, kc_pts;              // how far off center the pass was; points banked so far (trick run)
 static int   kc_tricks;                      // trick run: tricks landed
+static bool  kc_assisted;                    // this run has the computer assist on: silver is the most it can earn, and it has its own best
 static bool  kc_unlocked_now;                // set on the run that completed the set of five golds: the result card shows the message
 static const float KC_TRICK_TIME = 90.0f;
 #define KC_PAD(x, z, x0, x1, z0, z1) ((x) >= (x0) && (x) <= (x1) && (z) >= (z0) && (z) <= (z1))
@@ -54,6 +55,12 @@ static int kc_medal_for(int kind, int hundredths) {
     if (kind == KC_SPEED) return t <= KC_SPEED_MEDAL[0] ? 3 : (t <= KC_SPEED_MEDAL[1] ? 2 : (t <= KC_SPEED_MEDAL[2] ? 1 : 0));
     return t >= KC_PTS_MEDAL[kind][0] ? 3 : (t >= KC_PTS_MEDAL[kind][1] ? 2 : (t >= KC_PTS_MEDAL[kind][2] ? 1 : 0));
 }
+// The medal for a run: with the assist, silver at most. The best medal on the menu: the unassisted best, or the assisted best (silver at most).
+static int kc_medal_best(int k) {
+    const int a = kc_medal_for(k, kc_best[k]); int b = kc_medal_for(k, kc_best_as[k]); if (b > 2) b = 2;
+    return a > b ? a : b;
+}
+static int *kc_bestp(void) { return kc_assisted ? kc_best_as : kc_best; }
 static const char *const KC_MEDAL_NAME[4] = { "NO MEDAL", "BRONZE", "SILVER", "GOLD" };
 static unsigned int kc_medal_color(int m) { return m == 3 ? RGBA8(255, 206, 80, 255) : (m == 2 ? RGBA8(214, 220, 232, 255) : (m == 1 ? RGBA8(214, 140, 80, 255) : RGBA8(110, 130, 180, 255))); }
 
@@ -92,7 +99,7 @@ static void kc_start(int kind) {
         kc_place(SPG_SX(177.0f), SPG_SZ(550.0f), 0.0f);
     }
     if (kind >= KC_HOOP) sw.arm = true;                                    // the jets are the point of these: armed from the start
-    kc_unlocked_now = false; kc_lift0 = kx_ev_lift; kc_land0 = kx_ev_land; kc_pass = false; kc_pass_d = 0.0f; kc_pts = 0.0f; kc_tricks = 0;
+    kc_assisted = kx_assist; kc_unlocked_now = false; kc_lift0 = kx_ev_lift; kc_land0 = kx_ev_land; kc_pass = false; kc_pass_d = 0.0f; kc_pts = 0.0f; kc_tricks = 0;
     kc_gi = 0; kc_t = 0.0f; kc_go_t = 0.0f; kc_fail = false; kc_newbest = false; kc_why[0] = 0; kc_msg_t = 0;
     kc_prev = pl.pos;
     if (kind == KC_FREE) { kc_st = KS_RUN; kc_hold = false; }
@@ -101,6 +108,12 @@ static void kc_start(int kind) {
 static void kc_restart(void) { kc_start(kc_kind); }
 
 static void kc_say(const char *s) { snprintf(kc_msg, sizeof(kc_msg), "%s", s); kc_msg_t = 120; }
+// The assist switch was flipped: a challenge in progress starts over (so it cannot be switched on just for the landing).
+static void kc_assist_changed(void) {
+    if (game_mode != MODE_KX) return;
+    if (kc_kind != KC_FREE && (kc_st == KS_READY || kc_st == KS_RUN)) { kc_restart(); kc_say(kx_assist ? "ASSIST ON: STARTING OVER" : "ASSIST OFF: STARTING OVER"); }
+    else kc_say(kx_assist ? "COMPUTER ASSIST ON" : "COMPUTER ASSIST OFF");
+}
 
 // Is every flight challenge done in gold? (the unlock)
 static bool kc_all_gold(void) {
@@ -115,8 +128,9 @@ static void kc_finish_pts(bool fail, const char *why, float pts) {
     kc_result = (kc_kind == KC_SPEED) ? kc_t : pts; kc_newbest = false;
     if (!fail) {
         const int h = (int)(kc_result * 100.0f + 0.5f);
-        if (kc_kind == KC_SPEED) { if (kc_best[kc_kind] <= 0 || h < kc_best[kc_kind]) { kc_best[kc_kind] = h; kc_newbest = true; } }
-        else if (h > kc_best[kc_kind]) { kc_best[kc_kind] = h; kc_newbest = true; }
+        int *bp = kc_bestp();
+        if (kc_kind == KC_SPEED) { if (bp[kc_kind] <= 0 || h < bp[kc_kind]) { bp[kc_kind] = h; kc_newbest = true; } }
+        else if (h > bp[kc_kind]) { bp[kc_kind] = h; kc_newbest = true; }
         scores_save();
     }
     kc_unlocked_now = !was_gold && kc_all_gold();
@@ -257,12 +271,13 @@ static void kc_draw_hud(vita2d_pgf *pgf) {
             default:         snprintf(info, sizeof(info), "%s  INVERTED %.1f S", kc_pass ? "GANTRY: PASSED" : "GANTRY: AHEAD", kx_inv_t); break;
         }
         vita2d_pgf_draw_textf(pgf, 540, 28, gold, 0.8f, "%s    %s", KC_NAMES[kc_kind], info);
+        if (kc_assisted) vita2d_pgf_draw_text(pgf, 540, 70, RGBA8(120, 210, 255, 255), 0.62f, "ASSIST: SILVER IS THE MOST");
         kc_time_text(b, sizeof(b), kc_kind == KC_TRICK ? fmaxf(0.0f, KC_TRICK_TIME - kc_t) : kc_t);
         int tw = vita2d_pgf_text_width(pgf, 1.5f, b);
         vita2d_pgf_draw_text(pgf, 480 - tw / 2, 70, white, 1.5f, b);
-        if (kc_best[kc_kind] > 0) {
+        if (kc_bestp()[kc_kind] > 0) {
             char c[40];
-            if (kc_kind == KC_SPEED) kc_time_text(c, sizeof(c), kc_best[kc_kind] / 100.0f); else snprintf(c, sizeof(c), "%d PTS", (kc_best[kc_kind] + 50) / 100);
+            if (kc_kind == KC_SPEED) kc_time_text(c, sizeof(c), kc_bestp()[kc_kind] / 100.0f); else snprintf(c, sizeof(c), "%d PTS", (kc_bestp()[kc_kind] + 50) / 100);
             vita2d_pgf_draw_textf(pgf, 540, 50, RGBA8(190, 205, 235, 255), 0.65f, "BEST %s", c);
         }
         if (kc_st == KS_READY) {
@@ -283,6 +298,10 @@ static void kc_draw_hud(vita2d_pgf *pgf) {
             vita2d_draw_fill_circle(cx + 11.0f * sinf(rel), cy - 11.0f * cosf(rel), 4.0f, gold);
         }
     }
+    if (kx_assist_t > 0.0f && kc_st == KS_RUN) {
+        const char *a = "COMPUTER ASSIST";
+        vita2d_pgf_draw_text(pgf, 480 - vita2d_pgf_text_width(pgf, 0.8f, a) / 2, 196, RGBA8(120, 210, 255, 255), 0.8f, a);
+    }
     if (kc_msg_t > 0) {
         int tw = vita2d_pgf_text_width(pgf, 1.1f, kc_msg);
         vita2d_pgf_draw_text(pgf, 480 - tw / 2, 160, gold, 1.1f, kc_msg);
@@ -301,15 +320,17 @@ static void kc_draw_result(vita2d_pgf *pgf) {
     } else {
         if (kc_kind == KC_SPEED) kc_time_text(b, sizeof(b), kc_result); else snprintf(b, sizeof(b), "%d POINTS", (int)(kc_result + 0.5f));
         vita2d_pgf_draw_text(pgf, 280, 160, white, 2.0f, b);
-        const int m = kc_medal_for(kc_kind, (int)(kc_result * 100.0f + 0.5f));
+        int m = kc_medal_for(kc_kind, (int)(kc_result * 100.0f + 0.5f));
+        if (kc_assisted && m > 2) m = 2;
         vita2d_pgf_draw_text(pgf, 280, 205, kc_medal_color(m), 1.3f, KC_MEDAL_NAME[m]);
         if (kc_newbest) vita2d_pgf_draw_text(pgf, 280, 238, gold, 0.95f, "NEW BEST");
-        else if (kc_best[kc_kind] > 0) {
+        else if (kc_bestp()[kc_kind] > 0) {
             char c[40];
-            if (kc_kind == KC_SPEED) kc_time_text(c, sizeof(c), kc_best[kc_kind] / 100.0f); else snprintf(c, sizeof(c), "%d POINTS", (kc_best[kc_kind] + 50) / 100);
+            if (kc_kind == KC_SPEED) kc_time_text(c, sizeof(c), kc_bestp()[kc_kind] / 100.0f); else snprintf(c, sizeof(c), "%d POINTS", (kc_bestp()[kc_kind] + 50) / 100);
             vita2d_pgf_draw_textf(pgf, 280, 238, pale, 0.9f, "BEST %s", c);
         }
         if (kc_why[0]) vita2d_pgf_draw_text(pgf, 280, 268, pale, 0.8f, kc_why);
+        else if (kc_assisted) vita2d_pgf_draw_text(pgf, 280, 268, RGBA8(120, 210, 255, 255), 0.8f, "ASSISTED: SILVER IS THE MOST");
         if (kc_unlocked_now) vita2d_pgf_draw_text(pgf, 280, 298, gold, 0.95f, "GOLD ON ALL FIVE: STRAKE TROPHY WON");
     }
     vita2d_pgf_draw_text(pgf, 280, 328, pale, 0.85f, "X: try again     O: menu");

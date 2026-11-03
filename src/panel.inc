@@ -358,7 +358,7 @@ static void draw_kx_switch(vita2d_pgf *pgf, int i) {
     const float cx = x + w * 0.5f;
     vita2d_draw_rectangle(x - 1, y - 1, w + 2, h + 2, RGBA8(96, 98, 108, 255));
     vita2d_draw_rectangle(x, y, w, h, RGBA8(24, 25, 30, 255));
-    vita2d_draw_fill_circle(cx, y + 9, 3.0f, on ? (i == SWI_PUMP ? RGBA8(255, 150, 70, 255) : RGBA8(60, 230, 90, 255)) : RGBA8(40, 46, 44, 255));
+    vita2d_draw_fill_circle(cx, y + 9, 3.0f, on ? (i == SWI_PUMP ? RGBA8(255, 150, 70, 255) : (i == SWI_NAV ? RGBA8(90, 200, 255, 255) : RGBA8(60, 230, 90, 255))) : RGBA8(40, 46, 44, 255));
     const float py = y + 42.0f, ty = on ? y + 22.0f : y + 62.0f;
     vita2d_draw_fill_circle(cx, py, 10.0f, RGBA8(70, 72, 80, 255));
     vita2d_draw_fill_circle(cx, py, 7.0f, RGBA8(30, 31, 36, 255));
@@ -366,7 +366,7 @@ static void draw_kx_switch(vita2d_pgf *pgf, int i) {
     pb_line(cx - 1.0f, py, cx - 1.0f, ty, 2.0f, RGBA8(210, 212, 220, 255));
     pb_flush();
     vita2d_draw_fill_circle(cx, ty, 5.0f, on ? RGBA8(255, 255, 255, 255) : RGBA8(210, 212, 220, 255));
-    const char *lb = i == SWI_BATT ? "BATTERY" : (i == SWI_PUMP ? "THRUST" : "LIGHTS");
+    const char *lb = i == SWI_BATT ? "BATTERY" : (i == SWI_PUMP ? "THRUST" : (i == SWI_LAND ? "LIGHTS" : "ASSIST"));
     const int tw1 = vita2d_pgf_text_width(pgf, 1.0f, lb);                           // as big as fits under the switch (as on the other panels)
     float sc = tw1 > 0 ? (w - 6.0f) / (float)tw1 : 0.6f;
     if (sc > 0.62f) sc = 0.62f;
@@ -384,7 +384,7 @@ static void draw_kx_panel(vita2d_pgf *pgf) {
     draw_attitude(392, dy, R);
     draw_vsi(pgf, 488, dy, R, pl.vs * 196.85f);
     draw_kx_gas(pgf, 584, dy, R, kx.gas);
-    for (int i = 0; i < 3; i++) draw_kx_switch(pgf, KX_SW[i]);
+    for (int i = 0; i < 4; i++) draw_kx_switch(pgf, KX_SW[i]);
     // The pedal bar: power above the middle, brake and reverse below it.
     const float y0 = VIEW_H + 18.0f, y1 = VIEW_H + 98.0f, tx = 910.0f, ym = (y0 + y1) / 2;
     slider_track(tx, y0, y1);

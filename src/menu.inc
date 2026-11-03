@@ -304,7 +304,8 @@ static unsigned int menu_touch_taps(void) {
                     int row = (int)floorf((ty - HG_LY) / rowh);
                     if (row == *selp) vp = SCE_CTRL_CROSS;                       // a second tap on the same row chooses it
                     else { *selp = row; snd_event(EV_CLICK, 1.0f); }
-                } else if (ty >= HG_BY && ty <= HG_BY + HG_BH && tx >= HG_PX && tx <= HG_PX + 200.0f) vp = SCE_CTRL_CROSS;
+                } else if (menu_chopen == 2 && ty >= 476.0f && ty <= 496.0f && tx >= HG_LX && tx <= HG_LX + HG_LW) vp = SCE_CTRL_SQUARE;
+                else if (ty >= HG_BY && ty <= HG_BY + HG_BH && tx >= HG_PX && tx <= HG_PX + 200.0f) vp = SCE_CTRL_CROSS;
                 else if (ty >= HG_BY && ty <= HG_BY + HG_BH && tx >= HG_PX + 220.0f && tx <= HG_PX + HG_PW) vp = SCE_CTRL_CIRCLE;
             } else {
                 for (int i = 0; i < menu_count(); i++) {
@@ -457,6 +458,7 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
         if (mv) { *selp = (*selp + mv + n) % n; snd_event(EV_CLICK, 1.0f); }
         if (pad->buttons & SCE_CTRL_LEFT)  menu_hang -= 0.035f;       // turn the picture
         if (pad->buttons & SCE_CTRL_RIGHT) menu_hang += 0.035f;
+        if (menu_chopen == 2 && (pressed & SCE_CTRL_SQUARE)) { kx_assist = !kx_assist; snd_event(EV_CLICK, 1.0f); scores_save(); return 0; }
         if (pressed & SCE_CTRL_CIRCLE) { menu_chopen = (menu_chopen == 2) ? 1 : 0; snd_event(EV_CLICK, 1.0f); return 0; }
         if (pressed & SCE_CTRL_CROSS) {
             if (menu_chopen == 2) {                           // the KX-1's challenges
@@ -1081,7 +1083,7 @@ static void draw_menu(vita2d_pgf *pgf) {
                 title = KC_NAMES[k]; sub = KC_DESC[k];
                 if (!KC_BUILT[k]) snprintf(bb, sizeof(bb), "SOON");
                 else if (k == KC_FREE) snprintf(bb, sizeof(bb), "PRACTICE");
-                else if (kc_best[k] > 0) { int m = kc_medal_for(k, kc_best[k]); snprintf(bb, sizeof(bb), "%s", KC_MEDAL_NAME[m]); bc = kc_medal_color(m); }
+                else if (kc_best[k] > 0 || kc_best_as[k] > 0) { int m = kc_medal_best(k); snprintf(bb, sizeof(bb), "%s", KC_MEDAL_NAME[m]); bc = kc_medal_color(m); }
                 else snprintf(bb, sizeof(bb), "NOT RUN");
             } else if (k < 0) {
                 title = "RESUME"; snprintf(sb, sizeof(sb), "Continue the %s challenge (%s)", CK_NAMES[ch_kind], SPECS[ac_flying].key); sub = sb;
@@ -1121,6 +1123,10 @@ static void draw_menu(vita2d_pgf *pgf) {
                 vita2d_draw_rectangle(bxs[b], HG_BY, 1, HG_BH, gold); vita2d_draw_rectangle(bxs[b] + bws[b] - 1, HG_BY, 1, HG_BH, gold);
                 vita2d_pgf_draw_text(pgf, (int)(bxs[b] + (bws[b] - vita2d_pgf_text_width(pgf, 1.0f, bl[b])) * 0.5f), HG_BY + 31, white, 1.0f, bl[b]);
             }
+        }
+        if (kxs) {
+            char ab[96]; snprintf(ab, sizeof(ab), "COMPUTER ASSIST: %s   (Square or tap)   silver max", kx_assist ? "ON" : "OFF");
+            vita2d_pgf_draw_text(pgf, HG_LX, 488, kx_assist ? RGBA8(120, 210, 255, 255) : pale, 0.66f, ab);
         }
         vita2d_pgf_draw_text(pgf, HG_LX, 508, pale, 0.66f, "Touch: tap a row, tap it again to choose");
         vita2d_pgf_draw_text(pgf, HG_LX, 525, pale, 0.66f, "Up / Down: choose   Left / Right: turn the picture   X: select   O: back");

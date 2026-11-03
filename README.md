@@ -189,6 +189,8 @@ The last line of the Challenges list is **Strake KX-1**. It opens its own list, 
 | **Precision landing** | Run up the pond ramp, cross the pond and land on the target ring on the platform. Score out of 100: up to 70 for distance from the center and 30 for the gas you have left. Missing the platform scores nothing |
 | **Upside-down flip** | Climb the ramp inside the circuit, fly through the gantry upside down, then roll back and land on the wheels. Score out of 100: 40 for the pass, up to 30 for time upside down (2 seconds is the most), up to 30 for a soft landing |
 
+**Computer assist.** The fourth switch on the KX-1's gauge panel (ASSIST), or Square on the KX-1 challenge list, turns on the car's driving computer. In the air, when you are low and falling, it levels the car if you are not on the sticks and burns the hop jets to cushion the touchdown (it uses your gas, so the gas-left points still suffer). On the ground it eases off in hard corners and keeps the car from sliding. With the assist on, silver is the most you can earn, and the result card says so. Assisted runs have their own best, so they never replace an unassisted one, and only unassisted golds count toward the trophy. Switching it during a challenge starts the challenge over.
+
 The thrusters are armed from the start in every KX-1 challenge except the speed run. All five challenges have bronze, silver and gold, and gold on all five wins the Strake trophy, shown on the Challenges screen. The ramps are the only raised ground on the site: the car climbs them, leaves the end of them as a jump, and has to be flown from there.
 
 ## Weather, time and sound

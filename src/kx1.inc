@@ -175,6 +175,7 @@ static KX kx;
 static int   kx_ev_lift, kx_ev_land;                   // counters: leaving the ground, a clean touchdown
 static float kx_cum_p, kx_cum_r, kx_inv_t;             // this flight: pitch and roll turned (radians), seconds upside down
 static float kx_last_p, kx_last_r, kx_last_inv, kx_last_sink, kx_last_air, kx_land_x, kx_land_z;   // the flight that just ended
+static float kx_assist_t;                              // seconds left to show "COMPUTER ASSIST" (the computer just stepped in)
 static float kx_climb;                                 // how fast the ground is rising under the wheels (m/s), for leaving a ramp
 
 static int kx_npuff;                                  // (the thruster puffs: see below)
@@ -209,6 +210,7 @@ static void kx_drive(const SceCtrlData *pad) {
     } else kx.reverse_t = 0.0f;
     if (kx.thr > 0.05f && u < -0.5f) brake = kx.thr * 0.7f;        // power while rolling backwards: brake first
 
+    if (kx_assist && u > 38.0f && fabsf(steer_in) > 0.75f && brake < 0.2f) { brake = 0.2f; kx_assist_t = 0.6f; }     // the computer slows it for a hard corner
     // Motor and brakes. About 240 W/kg: traction limited up to about 58 mph, then power limited, with a top speed near 160 mph.
     float ax = 0.0f;
     kx.power = 0.0f;
@@ -236,7 +238,7 @@ static void kx_drive(const SceCtrlData *pad) {
     const float down = 1.0f + 0.00022f * u * u / 1.2f;
     // Steering: a lot of lock when slow; at speed full stick is just a little over what the tires can hold.
     const float grip = 1.2f * down * KX_G;
-    float r_lim = grip / fmaxf(fabsf(u), 1.5f);
+    float r_lim = grip / fmaxf(fabsf(u), 1.5f) * (kx_assist ? 0.88f : 1.0f);
     float dmax = 0.52f / (1.0f + (u / 16.0f) * (u / 16.0f)) + 0.035f;
     dmax = fminf(dmax, 1.25f * atanf(r_lim * KX_WHEELBASE / fmaxf(fabsf(u), 1.5f)));
     kx.steer += (steer_in * dmax - kx.steer) * fminf(1.0f, 6.0f * dt);
@@ -245,7 +247,7 @@ static void kx_drive(const SceCtrlData *pad) {
     kx.yawrate += (r_want - kx.yawrate) * fminf(1.0f, 7.0f * dt);
 
     // Rear grip: it gives way under the handbrake, and when a lot of power meets a low speed.
-    float mu_r = 1.4f * down;
+    float mu_r = 1.4f * down * (kx_assist ? 1.15f : 1.0f);
     if (kx.hand) mu_r = 0.38f;
     mu_r -= 0.35f * throttle * clampf(1.0f - fabsf(u) / 25.0f, 0.0f, 1.0f);
     float ay = -clampf(9.0f * kx.w, -mu_r * KX_G, mu_r * KX_G);
@@ -381,6 +383,19 @@ static void kx_fly(const SceCtrlData *pad) {
         cp = shape(stick(pad->ly)); cr = shape(stick(pad->lx)); cy = shape(stick(pad->rx));
         if (gy_mode) cr = clampf(cr + gy_ail, -1.0f, 1.0f);
     }
+    // The computer assist: low and falling, it levels the car if the sticks are alone, and burns the hop jets to cushion the touchdown.
+    if (kx_assist && sw.batt && kx.gas > 0.0f) {
+        const float hg = pl.pos.y - spg_h(pl.pos.x, pl.pos.z), sk = -pl.vel.y;
+        if (sk > 0.5f && hg < (pl.u.y < 0.3f ? 70.0f : 30.0f) && fabsf(cp) < 0.1f && fabsf(cr) < 0.1f) {
+            const float roll = atan2f(-pl.r.y, pl.u.y), pitch = asinf(clampf(pl.f.y, -1.0f, 1.0f));
+            const float sp1 = fmaxf(10.0f, sqrtf(vdot(pl.vel, pl.vel)));
+            const float pt = 0.3f * asinf(clampf(pl.vel.y / sp1, -1.0f, 1.0f));
+            cr = clampf((clampf(-roll * 3.0f, -3.5f, 3.5f) - kx.ry) * 1.2f, -1.0f, 1.0f);
+            cp = clampf((clampf((pt - pitch) * 2.0f, -1.5f, 1.5f) - kx.rx) * 0.8f, -1.0f, 1.0f);
+            if (fabsf(roll) > 0.15f || fabsf(pitch - pt) > 0.15f) kx_assist_t = 0.6f;
+        }
+        if (sk > 6.0f && pl.u.y > 0.5f && hg < (sk * sk - 30.0f) / (2.0f * fmaxf(3.0f, KX_HOP_ACC * pl.u.y - KX_G)) + 1.5f) { hop = 1.0f; kx_assist_t = 0.6f; }
+    }
     float use = hop * KX_HOP_USE + roof * KX_ROOF_USE + fwd * KX_FWD_USE + (fabsf(cp) + fabsf(cr) + fabsf(cy)) * KX_RCS_USE;
     if (use * dt > kx.gas) { float k = kx.gas / (use * dt); hop *= k; roof *= k; fwd *= k; cp *= k; cr *= k; cy *= k; use = kx.gas / dt; }
     kx.gas = fmaxf(0.0f, kx.gas - use * dt);
@@ -450,6 +465,7 @@ static void kx_fly(const SceCtrlData *pad) {
 static bool kc_hold;                                       // the countdown: the car is held where it is (kxchal.inc)
 static void kx_update(const SceCtrlData *pad_in, unsigned int pressed) {
     (void)pressed;
+    if (kx_assist_t > 0.0f) kx_assist_t -= DT;
     SceCtrlData held = *pad_in; const SceCtrlData *pad = pad_in;
     if (kc_hold) { held.buttons = 0; held.lx = held.ly = held.rx = held.ry = 128; pad = &held; }
     eng_on = sw.batt; eng_n += ((sw.batt ? 1.0f : 0.0f) - eng_n) * 0.05f;       // (the motor: it runs when the battery is on)
