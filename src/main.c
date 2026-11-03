@@ -12,7 +12,6 @@
 #include <psp2/touch.h>
 #include <psp2/motion.h>
 #include <psp2/camera.h>
-#include <psp2/power.h>
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/processmgr.h>
 #include <vita2d.h>
@@ -85,10 +84,6 @@ static unsigned long long prof_last = 0;
 int main(void) {
     logfile = fopen("ux0:data/skyhawk.log", "w");           // (the old file name is kept)
     if (logfile) { fputs("start\n", logfile); fflush(logfile); }
-    scePowerSetArmClockFrequency(444);                       // full speed: the Vita starts an application at 333 MHz, and the scene is drawn on the CPU
-    scePowerSetBusClockFrequency(222);
-    scePowerSetGpuClockFrequency(222);
-    scePowerSetGpuXbarClockFrequency(166);
     vita2d_init();
     if (logfile) { fputs("vita2d_init ok\n", logfile); fflush(logfile); }
     vita2d_set_clear_color(RGBA8(118, 176, 236, 255));     // sky
