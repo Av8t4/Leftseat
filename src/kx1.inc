@@ -169,14 +169,22 @@ typedef struct {
     float jet_hop, jet_roof, jet_fwd;   // 0..1 jets in use this frame
     float cp, cr, cy;      // attitude commands this frame, -1..1
     float air_t;           // seconds since leaving the ground
+    bool  loop;            // on the loop ramp (the curl and the overhead track), held by the suction fans
+    float ls;              // how far along the loop ramp the wheels are (m)
 } KX;
 static KX kx;
+// What the challenges (kxchal.inc) read from the last flight.
+static int   kx_ev_lift, kx_ev_land;                   // counters: leaving the ground, a clean touchdown
+static float kx_cum_p, kx_cum_r, kx_inv_t;             // this flight: pitch and roll turned (radians), seconds upside down
+static float kx_last_p, kx_last_r, kx_last_inv, kx_last_sink, kx_last_air, kx_land_x, kx_land_z;   // the flight that just ended
+static float kx_assist_t;                              // seconds left to show "COMPUTER ASSIST" (the computer just stepped in)
+static float kx_climb;                                 // how fast the ground is rising under the wheels (m/s), for leaving a ramp
 
 static int kx_npuff;                                  // (the thruster puffs: see below)
 static void kx_reset(float heading) {
     memset(&kx, 0, sizeof(kx));
     kx.psi = heading; kx.batt = 1.0f; kx.gas = 100.0f;
-    kx_steer_vis = 0.0f; kx_braking = false;
+    kx_steer_vis = 0.0f; kx_braking = false; kx_fans_on = false;
     kx_npuff = 0;
 }
 
@@ -186,7 +194,7 @@ static void kx_reset(float heading) {
 #define KX_G         9.81f
 static void kx_drive(const SceCtrlData *pad) {
     const float dt = DT;
-    float steer_in = shape(stick(pad->rx));                              // right stick: steering
+    float steer_in = shape(stick(pad->lx));                              // left stick left/right: steering (the right hand is free for the jets)
     if (gy_mode) steer_in = clampf(steer_in + gy_ail, -1.0f, 1.0f);
     float drive_in = -stick(pad->ly);                              // left stick up: power, down: brake and then reverse (the other way: brake first, then power)
     kx.hand = (pad->buttons & SCE_CTRL_RTRIGGER) != 0;                  // R: the handbrake
@@ -204,6 +212,7 @@ static void kx_drive(const SceCtrlData *pad) {
     } else kx.reverse_t = 0.0f;
     if (kx.thr > 0.05f && u < -0.5f) brake = kx.thr * 0.7f;        // power while rolling backwards: brake first
 
+    if (kx_assist && u > 38.0f && fabsf(steer_in) > 0.75f && brake < 0.2f) { brake = 0.2f; kx_assist_t = 0.6f; }     // the computer slows it for a hard corner
     // Motor and brakes. About 240 W/kg: traction limited up to about 58 mph, then power limited, with a top speed near 160 mph.
     float ax = 0.0f;
     kx.power = 0.0f;
@@ -222,20 +231,25 @@ static void kx_drive(const SceCtrlData *pad) {
     if (brake > 0.0f) { ax -= (u > 0.0f ? 1.0f : -1.0f) * brake * 11.0f; kx.power = -brake; }
     if (kx.hand) ax -= (u > 0.0f ? 1.0f : -1.0f) * 6.0f * fminf(1.0f, fabsf(u) / 2.0f);
     if (kx.power < 0.0f && u > 3.0f && brake < 0.01f) kx.power = 0.0f;
+    const float slope = spg_slope(pl.pos.x, pl.pos.z, sinf(kx.psi), cosf(kx.psi));         // on a ramp: gravity pulls it back down the slope
+    ax -= KX_G * slope / sqrtf(1.0f + slope * slope);
     ax -= (u > 0.0f ? 1.0f : -1.0f) * (0.12f * fminf(1.0f, fabsf(u) / 1.5f) + 0.0006f * u * u);        // rolling resistance and drag
     if (throttle < 0.02f && brake < 0.01f && u > 1.0f) ax -= 0.5f * clampf(u / 20.0f, 0.0f, 1.0f);     // lifting off: a little regeneration
 
-    // Steering: a lot of lock when slow, a little when fast; the front tires can only give so much sideways grip.
-    const float dmax = 0.52f / (1.0f + (u / 16.0f) * (u / 16.0f)) + 0.035f;
+    // Grip: the wing and the underbody press the car down, so it holds more in fast corners (about 1.2 g slow, 2 g at 100 mph).
+    const float down = 1.0f + 0.00022f * u * u / 1.2f;
+    // Steering: a lot of lock when slow; at speed full stick is just a little over what the tires can hold.
+    const float grip = 1.2f * down * KX_G;
+    float r_lim = grip / fmaxf(fabsf(u), 1.5f) * (kx_assist ? 0.88f : 1.0f);
+    float dmax = 0.52f / (1.0f + (u / 16.0f) * (u / 16.0f)) + 0.035f;
+    dmax = fminf(dmax, 1.25f * atanf(r_lim * KX_WHEELBASE / fmaxf(fabsf(u), 1.5f)));
     kx.steer += (steer_in * dmax - kx.steer) * fminf(1.0f, 6.0f * dt);
     float r_want = u / KX_WHEELBASE * tanf(kx.steer);
-    const float grip = 1.12f * KX_G;
-    float r_lim = grip / fmaxf(fabsf(u), 1.5f);
     r_want = clampf(r_want, -r_lim, r_lim);
     kx.yawrate += (r_want - kx.yawrate) * fminf(1.0f, 7.0f * dt);
 
     // Rear grip: it gives way under the handbrake, and when a lot of power meets a low speed.
-    float mu_r = 1.10f;
+    float mu_r = 1.4f * down * (kx_assist ? 1.15f : 1.0f);
     if (kx.hand) mu_r = 0.38f;
     mu_r -= 0.35f * throttle * clampf(1.0f - fabsf(u) / 25.0f, 0.0f, 1.0f);
     float ay = -clampf(9.0f * kx.w, -mu_r * KX_G, mu_r * KX_G);
@@ -250,7 +264,7 @@ static void kx_drive(const SceCtrlData *pad) {
     kx.ax += (ax - kx.ax) * fminf(1.0f, 6.0f * dt);
     kx.ay += ((ay + kx.u * kx.yawrate) - kx.ay) * fminf(1.0f, 6.0f * dt);
     kx.roll  += (clampf(-0.004f * kx.u * kx.yawrate, -0.04f, 0.04f) - kx.roll) * fminf(1.0f, 8.0f * dt);
-    kx.pitch += (clampf(0.0035f * kx.ax, -0.04f, 0.035f) - kx.pitch) * fminf(1.0f, 8.0f * dt);
+    kx.pitch += (clampf(0.0035f * kx.ax, -0.04f, 0.035f) + atanf(slope) - kx.pitch) * fminf(1.0f, 8.0f * dt);
     kx_braking = brake > 0.1f || kx.hand;
     kx_steer_vis = kx.steer;
     kx.batt = clampf(kx.batt - fmaxf(0.0f, kx.power) * 0.00004f * dt * 60.0f + fmaxf(0.0f, -kx.power) * 0.000005f * dt * 60.0f, 0.0f, 1.0f);
@@ -329,7 +343,8 @@ static const KXPt KXP[] = {
 static void kx_lift_off(void) {
     kx.air = true; kx.air_t = 0.0f;
     kx.rx = kx.ry = kx.rz = 0.0f;
-    pl.pos.y = 0.03f;
+    pl.pos.y += 0.03f;
+    kx_cum_p = kx_cum_r = kx_inv_t = 0.0f; kx_ev_lift++;
 }
 
 // Touches down. Returns false (after setting the crash reason) when the landing is not survivable.
@@ -345,14 +360,16 @@ static bool kx_touch_down(float lowest_wheel, float lowest_body) {
     if (pl.u.y < 0.857f) { crash_why("landed on its side"); return false; }
     if (sink > 7.0f)     { crash_why("landed too hard"); return false; }
     if (fabsf(w) > 9.0f) { crash_why("landed sideways"); return false; }
-    pl.pos.y -= lowest_wheel; if (pl.pos.y < 0.0f) pl.pos.y = 0.0f;
+    pl.pos.y -= lowest_wheel;
+    kx_last_p = kx_cum_p; kx_last_r = kx_cum_r; kx_last_inv = kx_inv_t; kx_last_sink = sink; kx_last_air = kx.air_t;
+    kx_land_x = pl.pos.x; kx_land_z = pl.pos.z; kx_ev_land++;
     kx.u = u; kx.w = w; kx.yawrate = kx.rz * 0.0f;
     kx.pitch = asinf(clampf(pl.f.y, -1.0f, 1.0f));
     kx.roll  = asinf(clampf(-pl.r.y / fmaxf(0.3f, cosf(kx.pitch)), -1.0f, 1.0f));
     kx.steer = 0.0f; kx.thr = 0.0f;
     kx.air = false; kx.rx = kx.ry = kx.rz = 0.0f;
     kx.ax = kx.ay = 0.0f;
-    pl.pos.y = 0.0f; pl.vel.y = 0.0f;
+    pl.pos.y = spg_h(pl.pos.x, pl.pos.z); pl.vel.y = 0.0f;
     return true;
 }
 
@@ -368,6 +385,19 @@ static void kx_fly(const SceCtrlData *pad) {
         cp = shape(stick(pad->ly)); cr = shape(stick(pad->lx)); cy = shape(stick(pad->rx));
         if (gy_mode) cr = clampf(cr + gy_ail, -1.0f, 1.0f);
     }
+    // The computer assist: low and falling, it levels the car if the sticks are alone, and burns the hop jets to cushion the touchdown.
+    if (kx_assist && sw.batt && kx.gas > 0.0f) {
+        const float hg = pl.pos.y - spg_h(pl.pos.x, pl.pos.z), sk = -pl.vel.y;
+        if (sk > 0.5f && hg < (pl.u.y < 0.3f ? 70.0f : 30.0f) && fabsf(cp) < 0.1f && fabsf(cr) < 0.1f) {
+            const float roll = atan2f(-pl.r.y, pl.u.y), pitch = asinf(clampf(pl.f.y, -1.0f, 1.0f));
+            const float sp1 = fmaxf(10.0f, sqrtf(vdot(pl.vel, pl.vel)));
+            const float pt = 0.3f * asinf(clampf(pl.vel.y / sp1, -1.0f, 1.0f));
+            cr = clampf((clampf(-roll * 3.0f, -3.5f, 3.5f) - kx.ry) * 1.2f, -1.0f, 1.0f);
+            cp = clampf((clampf((pt - pitch) * 2.0f, -1.5f, 1.5f) - kx.rx) * 0.8f, -1.0f, 1.0f);
+            if (fabsf(roll) > 0.15f || fabsf(pitch - pt) > 0.15f) kx_assist_t = 0.6f;
+        }
+        if (sk > 6.0f && pl.u.y > 0.5f && hg < (sk * sk - 30.0f) / (2.0f * fmaxf(3.0f, KX_HOP_ACC * pl.u.y - KX_G)) + 1.5f) { hop = 1.0f; kx_assist_t = 0.6f; }
+    }
     float use = hop * KX_HOP_USE + roof * KX_ROOF_USE + fwd * KX_FWD_USE + (fabsf(cp) + fabsf(cr) + fabsf(cy)) * KX_RCS_USE;
     if (use * dt > kx.gas) { float k = kx.gas / (use * dt); hop *= k; roof *= k; fwd *= k; cp *= k; cr *= k; cy *= k; use = kx.gas / dt; }
     kx.gas = fmaxf(0.0f, kx.gas - use * dt);
@@ -377,8 +407,18 @@ static void kx_fly(const SceCtrlData *pad) {
     // Spin: the jets change it, nothing else does. Leave it alone and it keeps turning.
     kx.rx += cp * KX_RCS_ACC * dt; kx.ry += cr * KX_RCS_ACC * dt; kx.rz += cy * KX_RCS_ACC * dt;
     kx.rx = clampf(kx.rx, -6.0f, 6.0f); kx.ry = clampf(kx.ry, -7.0f, 7.0f); kx.rz = clampf(kx.rz, -4.0f, 4.0f);
+    // Right way up and hands off: the wing and the nose weathervane the car a little toward its path (kills a drift, not a flip).
+    if (pl.u.y > 0.5f && fabsf(cp) < 0.1f && fabsf(kx.rx) < 1.2f) {
+        const float sp0 = sqrtf(vdot(pl.vel, pl.vel));
+        if (sp0 > 10.0f) {
+            const float err = 0.3f * asinf(clampf(pl.vel.y / sp0, -1.0f, 1.0f)) - asinf(clampf(pl.f.y, -1.0f, 1.0f));
+            kx.rx += (clampf(err, -0.8f, 0.8f) * 2.0f - kx.rx * 2.5f) * dt;
+        }
+    }
     rot_pitch(kx.rx * dt); rot_roll(kx.ry * dt); rot_yaw(kx.rz * dt);
     orthonormalize();
+    kx_cum_p += kx.rx * dt; kx_cum_r += kx.ry * dt;
+    if (pl.u.y < -0.2f) kx_inv_t += dt;
 
     // Forces: gravity, drag, and the jets along the body's own up axis.
     V3 a = v3(0.0f, -KX_G, 0.0f);
@@ -416,17 +456,76 @@ static void kx_fly(const SceCtrlData *pad) {
     float lw = 1e9f, lb = 1e9f;
     for (int i = 0; i < KX_NPT; i++) {
         V3 P = body_pt(KXP[i].x, KXP[i].y, KXP[i].z);
+        P.y -= spg_h(P.x, P.z);
         if (KXP[i].wheel) { if (P.y < lw) lw = P.y; } else if (P.y < lb) lb = P.y;
     }
-    if (lw < 0.0f || lb < 0.0f) {
+    if (kx.air_t > 0.3f && (lw < 0.0f || lb < 0.0f)) {         // (the first moments leaving a ramp: the rear wheels may still graze it)
         if (!kx_touch_down(lw, lb)) { crash(); return; }
     }
 }
 
-static void kx_update(const SceCtrlData *pad, unsigned int pressed) {
+// The loop ramp: the wheels follow the curl and the overhead track. The suction fans (the thrusters' switch, and gas) hold the car on;
+// without them it only stays while it is fast enough, and falls off the overhead track at once.
+#define KX_FAN_USE 2.5f
+static void kx_loop_pose(void) {
+    float t, y, th; spg_loop_pt(kx.ls, &t, &y, &th);
+    pl.pos = v3(SPG_LOOP_X, y, SPG_LOOP_Z + t);
+    const float st = sinf(th), ct = cosf(th);
+    pl.f = v3(0.0f, st, ct); pl.u = v3(0.0f, ct, -st); pl.r = vcross(pl.u, pl.f);
+    pl.vel = vscale(pl.f, kx.u);
+}
+static void kx_loop_step(const SceCtrlData *pad) {
+    const float dt = DT;
+    float drive_in = -stick(pad->ly);
+    if (!sw.batt) drive_in = fminf(drive_in, 0.0f);
+    kx.thr += (drive_in - kx.thr) * fminf(1.0f, 10.0f * dt);
+    kx.hand = (pad->buttons & SCE_CTRL_RTRIGGER) != 0;
+    const bool fans = sw.arm && sw.batt && kx.gas > 0.0f;
+    kx_fans_on = fans;
+    if (fans) kx.gas = fmaxf(0.0f, kx.gas - KX_FAN_USE * dt);
+    float t, y, th; spg_loop_pt(kx.ls, &t, &y, &th);
+    const float u = kx.u;
+    float acc = 0.0f;
+    if (kx.thr > 0.05f) acc = kx.thr * 9.0f;
+    else if (kx.thr < -0.05f) acc = (u > 0.5f) ? kx.thr * 11.0f : kx.thr * 4.5f * clampf(1.0f - (-u) / 11.0f, 0.0f, 1.0f);
+    if (kx.hand) acc -= (u > 0.0f ? 1.0f : -1.0f) * 6.0f * fminf(1.0f, fabsf(u) / 2.0f);
+    acc -= KX_G * sinf(th);                                                   // gravity along the track: pulls back down the curl
+    acc -= (u > 0.0f ? 1.0f : -1.0f) * (0.12f * fminf(1.0f, fabsf(u) / 1.5f) + 0.0006f * u * u);
+    kx.power = kx.thr > 0.0f ? kx.thr : 0.0f;
+    // Without the fans the car needs the speed to stay on the curl (the overhead track is a fall).
+    const bool arc = kx.ls < PI_F * SPG_LOOP_R;
+    const float normal = (arc ? u * u / SPG_LOOP_R : 0.0f) + KX_G * cosf(th);
+    kx.u += acc * dt;
+    kx.ls += kx.u * dt;
+    kx_loop_pose();
+    pl.on_ground = false; pl.gs = 0.0f; pl.touched = true;
+    pl.hdg = atan2f(pl.f.x, pl.f.z); pl.pitch = asinf(clampf(pl.f.y, -1.0f, 1.0f)); pl.roll = asinf(clampf(-pl.r.y, -1.0f, 1.0f));
+    pl.speed = fabsf(kx.u); pl.vs = pl.vel.y; pl.hdg_g = pl.hdg;
+    pl.throttle = fmaxf(0.0f, kx.thr); pl.rpm = 100.0f * clampf(pl.speed / 72.0f, 0.0f, 1.0f); pl.fuel = kx.gas / 100.0f;
+    kx.ax += (acc - kx.ax) * fminf(1.0f, 6.0f * dt); kx.ay = 0.0f; kx_braking = kx.thr < -0.1f || kx.hand;
+    kx.odo += fabsf(kx.u) * dt;
+    kx.hiss += ((fans ? 0.55f : 0.0f) - kx.hiss) * fminf(1.0f, 10.0f * dt);
+    kx_cam_below = pl.u.y < 0.2f;
+    if (kx.ls < 0.0f) {                                                        // rolled back off the bottom of the curl
+        kx.loop = false; kx_fans_on = false;
+        kx.psi = 0.0f; kx.w = 0.0f; kx.pitch = kx.roll = 0.0f; kx.steer = 0.0f;
+        pl.pos = v3(SPG_LOOP_X, 0.0f, SPG_LOOP_Z + kx.ls);
+        return;
+    }
+    if (!fans && normal < 0.0f) { kx.loop = false; kx_fans_on = false; kx_lift_off(); return; }      // came off the curl, or the overhead track
+    if (kx.ls >= PI_F * SPG_LOOP_R + SPG_LOOP_LB) { kx.loop = false; kx_fans_on = false; kx_lift_off(); return; }   // drove off the end of the overhead track, upside down
+}
+
+static bool kc_hold;                                       // the countdown: the car is held where it is (kxchal.inc)
+static void kx_update(const SceCtrlData *pad_in, unsigned int pressed) {
     (void)pressed;
+    if (kx_assist_t > 0.0f) kx_assist_t -= DT;
+    SceCtrlData held = *pad_in; const SceCtrlData *pad = pad_in;
+    if (kc_hold) { held.buttons = 0; held.lx = held.ly = held.rx = held.ry = 128; pad = &held; }
     eng_on = sw.batt; eng_n += ((sw.batt ? 1.0f : 0.0f) - eng_n) * 0.05f;       // (the motor: it runs when the battery is on)
     kx.jet_hop = kx.jet_roof = 0.0f; kx.cp = kx.cr = kx.cy = 0.0f;
+    kx_cam_below = false;
+    if (kx.loop) { kx_loop_step(pad); kx_puffs_step(); return; }
     if (!kx.air) {
         kx.hiss += ((kx.jet_fwd > 0.0f ? 0.75f : 0.0f) - kx.hiss) * fminf(1.0f, 10.0f * DT);
         // A parked car takes on gas, slowly.
@@ -460,7 +559,24 @@ static void kx_update(const SceCtrlData *pad, unsigned int pressed) {
     if (kx.jet_fwd > 0.0f) { kx_emit(-0.30f, 0.45f, -2.15f, 0.0f, 0.0f, -1.0f, 16.0f, 0.20f); kx_emit(0.30f, 0.45f, -2.15f, 0.0f, 0.0f, -1.0f, 16.0f, 0.20f); }
     const float sh = sinf(kx.psi), ch = cosf(kx.psi);
     pl.vel = v3(sh * kx.u + ch * kx.w, 0.0f, ch * kx.u - sh * kx.w);
-    pl.pos.x += pl.vel.x * DT; pl.pos.z += pl.vel.z * DT; pl.pos.y = 0.0f;
+    {   // Follow the ground: up a ramp, and off the end of it into the air.
+        const float nx = pl.pos.x + pl.vel.x * DT, nz = pl.pos.z + pl.vel.z * DT, hn = spg_h(nx, nz), dh = hn - pl.pos.y;
+        if (kx.u > 3.0f && pl.pos.z < SPG_LOOP_Z && nz >= SPG_LOOP_Z && fabsf(nx - SPG_LOOP_X) < SPG_LOOP_HW + 1.5f) {      // the foot of the loop ramp
+            if (fabsf(nx - SPG_LOOP_X) > SPG_LOOP_HW - 0.4f || fabsf(sinf(kx.psi)) > 0.5f || cosf(kx.psi) < 0.0f) { pl.pos.x = nx; pl.pos.z = nz; crash_why("missed the loop ramp"); crash(); return; }
+            kx.loop = true; kx.ls = nz - SPG_LOOP_Z; kx.w = 0.0f; kx_climb = 0.0f;
+            kx_loop_pose();
+            return;
+        }
+        if (dh > 0.6f) { pl.pos.x = nx; pl.pos.z = nz; crash_why("hit a ramp"); crash(); return; }
+        if (dh < -0.12f && pl.pos.y > 0.3f) {                                     // the ground fell away: the climb carries on as a jump
+            pl.pos.x = nx; pl.pos.z = nz;
+            pl.vel.y = fmaxf(0.0f, kx_climb); kx_climb = 0.0f;
+            kx_lift_off();
+            return;
+        }
+        kx_climb += ((dh / DT) - kx_climb) * 0.5f;
+        pl.pos.x = nx; pl.pos.z = nz; pl.pos.y = hn;
+    }
     pl.on_ground = true; pl.gs = kx.u; pl.hdg_g = kx.psi; pl.gpitch = 0.0f;
     set_axes(kx.psi, kx.pitch, kx.roll);
     pl.hdg = kx.psi; pl.pitch = kx.pitch; pl.roll = kx.roll;

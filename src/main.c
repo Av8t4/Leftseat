@@ -48,6 +48,7 @@
 #include "spaceport.inc"
 #include "testtrack.inc"
 #include "kx1.inc"
+#include "kxchal.inc"
 #include "scene.inc"
 #include "panel.inc"
 #include "screenshot.inc"
@@ -152,6 +153,13 @@ int main(void) {
                 gyro_recenter();
                 game_state = ST_FLY;
             }
+            if (act == 5) {                                           // a KX-1 session at the proving ground: free roam or a challenge
+                { int pick = (menu_wx == WX_COUNT) ? (frame_count / 3) % WX_COUNT : menu_wx; wx_start(pick, menu_wx == WX_COUNT); wx_dirty = false; }
+                kc_start(menu_kc_pick); flight_world = 0;
+                tod = menu_tod;
+                gyro_recenter();
+                game_state = ST_FLY;
+            }
             if (act == 4) {                                           // a challenge picked from the list: start it, or resume
                 if (menu_ch_pick >= 0) { ch_kind = menu_ch_pick; start_challenge(); }
                 tod = menu_tod;
@@ -179,7 +187,7 @@ int main(void) {
             menu_quit_t = 0;
             menu_stick = 0;
         } else if (game_state == ST_RESULT) {                         // landing score card over the frozen scene
-            if (pressed & SCE_CTRL_CROSS)       { snd_event(EV_CONFIRM, 1.0f); start_challenge(); game_state = ST_FLY; }
+            if (pressed & SCE_CTRL_CROSS)       { snd_event(EV_CONFIRM, 1.0f); if (game_mode == MODE_KX) kc_restart(); else start_challenge(); game_state = ST_FLY; }
             else if (pressed & (SCE_CTRL_CIRCLE | SCE_CTRL_START)) { snd_event(EV_CLICK, 1.0f); ch_state = CH_IDLE; game_state = ST_MENU; menu_quit_t = 0; menu_stick = 0; }
 
             vita2d_start_drawing();
@@ -187,7 +195,7 @@ int main(void) {
             draw_scene();
             draw_overlays(pgf);
             draw_panel(pgf);
-            draw_result(pgf);
+            if (game_mode == MODE_KX) kc_draw_result(pgf); else draw_result(pgf);
             vita2d_end_drawing();
             vita2d_swap_buffers();
         } else {
@@ -197,6 +205,7 @@ int main(void) {
             sw_input(g_touch.n, g_touch.x, g_touch.y, g_touch.id, back_n);
             update(&pad, pressed);
             challenge_update();
+            kc_update();
             for (int k = 1; k < FF_MULT[ff_level] && !pl.crashed && ch_state != CH_DONE; k++) {   // fast forward: extra sim steps, no new button presses
                 ff_sub = true;
                 update(&pad, 0);
@@ -205,6 +214,7 @@ int main(void) {
             }
             if (pl.crashed || (pressed & SCE_CTRL_TRIANGLE)) ff_level = 0;
             if (game_mode == MODE_LANDING && ch_state == CH_DONE) { game_state = ST_RESULT; ff_level = 0; }
+            if (game_mode == MODE_KX && kc_kind != KC_FREE && kc_st == KS_DONE) { game_state = ST_RESULT; ff_level = 0; }
 
             unsigned long long pt1 = sceKernelGetProcessTimeWide();
             vita2d_start_drawing();
@@ -213,7 +223,7 @@ int main(void) {
             unsigned long long pt2 = sceKernelGetProcessTimeWide();
             draw_overlays(pgf);
             draw_panel(pgf);
-            if (game_state == ST_RESULT) draw_result(pgf);
+            if (game_state == ST_RESULT) { if (game_mode == MODE_KX) kc_draw_result(pgf); else draw_result(pgf); }
             unsigned long long pt3 = sceKernelGetProcessTimeWide();
             vita2d_end_drawing();
             vita2d_swap_buffers();

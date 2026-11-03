@@ -46,16 +46,16 @@ static void sw_cell(int i, float *x, float *y, float *w, float *h) {
     *y = VIEW_H + 24.0f; *w = (i == SWI_QUICK) ? 86.0f : 60.0f; *h = 96.0f;
 }
 // The KX-1 keeps its three switches on the gauge panel (battery, thrusters, headlights), so there is nothing to open.
-static const int KX_SW[3] = { SWI_BATT, SWI_PUMP, SWI_LAND };
+static const int KX_SW[4] = { SWI_BATT, SWI_PUMP, SWI_LAND, SWI_NAV };       // (NAV's place is the computer assist)
 static void kx_sw_cell(int i, float *x, float *y, float *w, float *h) {
-    const int k = i == SWI_BATT ? 0 : (i == SWI_PUMP ? 1 : 2);
-    *x = 650.0f + 68.0f * k; *y = VIEW_H + 14.0f; *w = 64.0f; *h = 88.0f;
+    const int k = i == SWI_BATT ? 0 : (i == SWI_PUMP ? 1 : (i == SWI_LAND ? 2 : 3));
+    *x = 650.0f + 61.0f * k; *y = VIEW_H + 14.0f; *w = 58.0f; *h = 88.0f;
 }
 static bool *sw_flag(int i) {
     switch (i) {
         case SWI_BATT: return &sw.batt;   case SWI_PUMP: return spec->model == 6 ? &sw.arm : &sw.pump;   case SWI_IGN: return spec->model == 6 ? NULL : &sw.ign;
         case SWI_BEACON: case SWI_NAV: case SWI_STROBE:
-            if (spec->model == 6) return NULL;
+            if (spec->model == 6) return i == SWI_NAV ? &kx_assist : NULL;
             return i == SWI_BEACON ? &sw.beacon : i == SWI_NAV ? &sw.nav : &sw.strobe;
         case SWI_LAND: return &sw.landing;
         case SWI_TAXI: case SWI_PITOT: case SWI_AVI: case SWI_CABIN: return spec->model == 6 ? NULL : (i == SWI_TAXI ? &sw.taxi : i == SWI_PITOT ? &sw.pitot : i == SWI_AVI ? &sw.avionics : &sw.cabin);
@@ -101,11 +101,14 @@ static void sw_input(int nf, const float *fx, const float *fy, const int *fid, i
         if (y < VIEW_H) continue;
         bool hit = false;
         if (spec->model == 6 && !sw_open) {
-            for (int k = 0; k < 3; k++) {
+            for (int k = 0; k < 4; k++) {
                 float cx, cy, cw, ch; kx_sw_cell(KX_SW[k], &cx, &cy, &cw, &ch);
                 if (x < cx - 4.0f || x > cx + cw + 4.0f || y < cy - 4.0f || y > cy + ch + 4.0f) continue;
                 hit = true;
-                if (fresh) { bool *f = sw_flag(KX_SW[k]); if (f) { *f = !*f; snd_event(EV_CLICK, 1.0f); } }
+                if (fresh) {
+                    bool *f = sw_flag(KX_SW[k]); if (f) { *f = !*f; snd_event(EV_CLICK, 1.0f); }
+                    if (KX_SW[k] == SWI_NAV) kc_assist_changed();                  // a run in progress starts over, so the assist cannot be switched on just for the landing
+                }
             }
         }
         if (sw_open) {
