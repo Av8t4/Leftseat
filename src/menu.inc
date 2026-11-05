@@ -89,7 +89,7 @@ static int  menu_ch_pick = -1;      // result: -1 = resume the running challenge
 static int  menu_ksel;              // highlighted row in the KX-1 list (menu_chopen == 2)
 static int  menu_kc_pick;           // result: the KX-1 session to start (kxchal.inc)
 static int  menu_pk;                // which message the box shows: 0 = "not implemented", 1 = the KX-1 is not for the open world, 2 = choose an aircraft first, 3 = not built yet
-#define CH_ROW 50.0f                // rows of the challenge screens
+#define CH_ROW 46.0f                // rows of the challenge screens
 static bool ch_running(void) { return ch_state == CH_FLYING || ch_state == CH_TOUCHED; }
 static int  menu_ap;                // airport picked for the open world (start and Triangle reset)
 static int  menu_ac;                // aircraft picked in the hangar for the next flight
@@ -297,7 +297,7 @@ static unsigned int menu_touch_taps(void) {
                 } else if (ty >= HG_BY && ty <= HG_BY + HG_BH && tx >= HG_PX && tx <= HG_PX + 210.0f) vp = SCE_CTRL_CROSS;
                 else if (ty >= HG_BY && ty <= HG_BY + HG_BH && tx >= HG_PX + 230.0f) vp = SCE_CTRL_CIRCLE;
             } else if (menu_chopen) {
-                const int n = (menu_chopen == 2) ? KC_COUNT : CK_COUNT + 1 + (ch_running() ? 1 : 0);
+                const int n = (menu_chopen == 2) ? KC_COUNT : CK_COUNT + 1 + (ap_found ? 1 : 0) + (ch_running() ? 1 : 0);
                 const float rowh = (menu_chopen == 2) ? 56.0f : CH_ROW;
                 int *selp = (menu_chopen == 2) ? &menu_ksel : &menu_chsel;
                 if (tx >= HG_LX && tx <= HG_LX + HG_LW && ty >= HG_LY && ty < HG_LY + n * rowh) {
@@ -448,7 +448,7 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
             return 0;
         }
         const bool run = ch_running();
-        const int n = (menu_chopen == 2) ? KC_COUNT : CK_COUNT + 1 + (run ? 1 : 0);
+        const int n = (menu_chopen == 2) ? KC_COUNT : CK_COUNT + 1 + (ap_found ? 1 : 0) + (run ? 1 : 0);
         int *selp = (menu_chopen == 2) ? &menu_ksel : &menu_chsel, mv = 0;
         if (pressed & SCE_CTRL_UP)   mv = -1;
         if (pressed & SCE_CTRL_DOWN) mv = 1;
@@ -469,7 +469,8 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
             }
             const int k = menu_chsel - (run ? 1 : 0);
             if (k == CK_COUNT) { menu_chopen = 2; menu_ksel = 0; snd_event(EV_CLICK, 1.0f); return 0; }          // the KX-1 line opens its own screen
-            if (k >= 0 && SPECS[menu_ac].model == 6) { menu_popup = 0; menu_pk = 2; menu_popup_t = 300; return 0; }   // flying challenges need an aircraft
+            if (k == CK_COUNT + 1) { snd_event(EV_CONFIRM, 1.0f); menu_chopen = 0; return 6; }                  // the HX-1: Hop Test at the spaceport
+            if (k >= 0 && SPECS[menu_ac].model >= 6) { menu_popup = 0; menu_pk = 2; menu_popup_t = 300; return 0; }   // flying challenges need an aircraft
             snd_event(EV_CONFIRM, 1.0f);
             menu_chopen = 0;
             menu_ch_pick = k < 0 ? -1 : k;
@@ -504,7 +505,7 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
             menu_popen = menu_sel; menu_psel = pk_cur(menu_popen); menu_psnd = snd_level & 3; menu_pparent = 0;
             return 0;
         }
-        if (menu_sel == 0 && SPECS[menu_ac].model == 6) { menu_popup = 0; menu_pk = 1; menu_popup_t = 300; return 0; }     // the KX-1 is only for the proving ground challenges
+        if (menu_sel == 0 && SPECS[menu_ac].model >= 6) { menu_popup = 0; menu_pk = SPECS[menu_ac].model == 7 ? 4 : 1; menu_popup_t = 300; return 0; }     // the KX-1 is only for the proving ground challenges
         if (menu_sel == 0) return 1;
         if (menu_sel == 1) {                                  // X also steps through the airports
             menu_ap = ap_next(menu_ap, 1);
@@ -645,10 +646,11 @@ static void draw_hangar_preview(int ac, float ang) {
     spec = &SPECS[ac]; ac_flying = ac; tod = TOD_DAY; fog_vis = 35000.0f;
     memset(&pl, 0, sizeof pl);
     pl.pos = v3(0.0f, 0.0f, 0.0f); pl.gear = 1.0f; pl.gear_cmd = true; pl.on_ground = true; pl.rpm = 700.0f;
-    set_axes(ang, 0.0f, 0.0f);
+    set_axes(ang, spec->model == 7 ? HX_UP : 0.0f, 0.0f);
+    if (spec->model == 7) pl.pos.y = HX_HALF;                               // (the ship stands on its tail)
     g_focal = 520.0f; g_near = 0.5f;
-    float rm = fmaxf(spec->tip_x, fmaxf(-spec->tail_z, spec->model == 6 ? 2.3f : 4.5f)), D = 3.3f * rm;
-    V3 pivot = v3(0.0f, spec->piv_y * 0.8f, 0.0f);
+    float rm = fmaxf(spec->tip_x, fmaxf(-spec->tail_z, spec->model == 7 ? 34.0f : (spec->model == 6 ? 2.3f : 4.5f))), D = 3.3f * rm;
+    V3 pivot = v3(0.0f, spec->model == 7 ? HX_HALF : spec->piv_y * 0.8f, 0.0f);
     look_at(vadd(pivot, v3(0.0f, D * 0.30f, -D * 0.95f)), pivot);
     float cxp = HG_PX + HG_PW * 0.5f, cyp = HG_PY + HG_PH * 0.52f;       // where the aircraft should appear on the screen
     cam.pos = vsub(cam.pos, vscale(cam.r, (cxp - CX) * D / g_focal));
@@ -1060,14 +1062,14 @@ static void draw_menu(vita2d_pgf *pgf) {
             "Fly through a course of rings over and around Lana Lake." };
         const unsigned int card = RGBA8(10, 22, 56, 255), dimc = RGBA8(150, 172, 215, 255), pale = RGBA8(190, 205, 235, 255);
         const bool run = ch_running(), kxs = (menu_chopen == 2);
-        const int n = kxs ? KC_COUNT : CK_COUNT + 1 + (run ? 1 : 0);
+        const int n = kxs ? KC_COUNT : CK_COUNT + 1 + (ap_found ? 1 : 0) + (run ? 1 : 0);
         const float rowh = kxs ? 56.0f : CH_ROW;
         const int sel = kxs ? menu_ksel : menu_chsel;
         const int kk = kxs ? sel : sel - (run ? 1 : 0);                      // the kind under the highlight (level 1: -1 = resume, CK_COUNT = the KX-1)
-        const bool on_kx = kxs || kk == CK_COUNT;
+        const bool on_kx = kxs || kk == CK_COUNT, on_hx = !kxs && kk == CK_COUNT + 1;
         vita2d_draw_rectangle(20, 12, 920, 520, gold);
         vita2d_draw_rectangle(24, 16, 912, 512, card);
-        draw_menu_picture(on_kx ? AC_KX1 : (SPECS[menu_ac].model == 6 ? AC_K4 : menu_ac), menu_hang);
+        draw_menu_picture(on_hx ? AC_HX1 : on_kx ? AC_KX1 : (SPECS[menu_ac].model >= 6 ? AC_K4 : menu_ac), menu_hang);
         vita2d_pgf_draw_text(pgf, HG_LX, 54, white, 1.3f, kxs ? "STRAKE KX-1" : "CHALLENGES");
         if (kxs) vita2d_pgf_draw_text(pgf, HG_LX + 250, 54, RGBA8(176, 150, 96, 255), 0.7f, "PROVING GROUND");
         for (int i = 0; i < n; i++) {
@@ -1089,6 +1091,8 @@ static void draw_menu(vita2d_pgf *pgf) {
                 title = "RESUME"; snprintf(sb, sizeof(sb), "Continue the %s challenge (%s)", CK_NAMES[ch_kind], SPECS[ac_flying].key); sub = sb;
             } else if (k == CK_COUNT) {
                 title = "STRAKE KX-1"; sub = "The rocket-assisted coupe: Proving Ground"; snprintf(bb, sizeof(bb), "%s", kc_all_gold() ? "TROPHY" : ">"); bc = gold;
+            } else if (k == CK_COUNT + 1) {
+                title = "STRAKE HX-1"; sub = "Hop Test: Gulf Point Spaceport"; snprintf(bb, sizeof(bb), "PAD VIEW"); bc = gold;
             } else {
                 title = CK_NAMES[k]; sub = DESC[k];
                 if (ch_best_a[menu_ac][k] > 0) { snprintf(bb, sizeof(bb), "BEST %d", ch_best_a[menu_ac][k]); bc = gold; } else snprintf(bb, sizeof(bb), "NOT FLOWN");
@@ -1109,14 +1113,15 @@ static void draw_menu(vita2d_pgf *pgf) {
                 }
             } else if (kk < 0) { t1 = "RESUME"; t2 = "Continue the challenge in progress."; }
             else if (kk == CK_COUNT) { t1 = "STRAKE KX-1"; t2 = "Drive, hop and flip it at Strake Proving Ground."; t3 = kc_all_gold() ? "Gold on all five: you have the Strake trophy." : "Gold on all five wins the Strake trophy."; }
-            else { t1 = CK_NAMES[kk]; t2 = DESC[kk]; if (SPECS[menu_ac].model == 6) t3 = "Choose an aircraft in the hangar first."; }
+            else if (kk == CK_COUNT + 1) { t1 = "STRAKE HX-1"; t2 = "The hop-test ship at Gulf Point Spaceport."; t3 = "Pad view only for now: the flight itself is coming."; }
+            else { t1 = CK_NAMES[kk]; t2 = DESC[kk]; if (SPECS[menu_ac].model >= 6) t3 = "Choose an aircraft in the hangar first."; }
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 32, white, 1.25f, t1);
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 58, pale, 0.74f, t2);
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 80, dimc, 0.7f, l3[0] ? l3 : t3);
         }
         {                                                                    // buttons
             const float bxs[2] = { HG_PX, HG_PX + 220.0f }, bws[2] = { 200.0f, HG_PW - 220.0f };
-            const char *bl[2] = { (kxs ? (KC_BUILT[kk] ? "START" : "SOON") : (on_kx ? "OPEN" : (kk < 0 ? "RESUME" : "START"))), "BACK" };
+            const char *bl[2] = { (kxs ? (KC_BUILT[kk] ? "START" : "SOON") : (on_hx ? "START" : on_kx ? "OPEN" : (kk < 0 ? "RESUME" : "START"))), "BACK" };
             for (int b = 0; b < 2; b++) {
                 vita2d_draw_rectangle(bxs[b], HG_BY, bws[b], HG_BH, b == 0 ? RGBA8(36, 64, 110, 255) : RGBA8(30, 52, 96, 255));
                 vita2d_draw_rectangle(bxs[b], HG_BY, bws[b], 1, gold); vita2d_draw_rectangle(bxs[b], HG_BY + HG_BH - 1, bws[b], 1, gold);
@@ -1136,10 +1141,10 @@ static void draw_menu(vita2d_pgf *pgf) {
     if (menu_popup >= 0) {
         vita2d_draw_rectangle(220, 180, 520, 170, gold);
         vita2d_draw_rectangle(224, 184, 512, 162, RGBA8(10, 22, 56, 255));
-        static const char *const PT[4] = { "", "KX-1: CHALLENGES ONLY", "CHOOSE AN AIRCRAFT", "COMING SOON" };
-        static const char *const PS[4] = { "FUTURE UPDATE", "STRAKE PROVING GROUND", "THE KX-1 IS A CAR", "NEXT UPDATE" };
-        static const char *const PM[4] = { "Not implemented yet - coming in a later version.", "The KX-1 stays at the track. Pick an aircraft to fly free.",
-                                           "These challenges are flown in an aircraft. Choose one in the hangar.", "This KX-1 challenge is not built yet." };
+        static const char *const PT[5] = { "", "KX-1: CHALLENGES ONLY", "CHOOSE AN AIRCRAFT", "COMING SOON", "HX-1: CHALLENGES ONLY" };
+        static const char *const PS[5] = { "FUTURE UPDATE", "STRAKE PROVING GROUND", "THE KX-1 IS A CAR", "NEXT UPDATE", "GULF POINT SPACEPORT" };
+        static const char *const PM[5] = { "Not implemented yet - coming in a later version.", "The KX-1 stays at the track. Pick an aircraft to fly free.",
+                                           "These challenges are flown in an aircraft. Choose one in the hangar.", "This KX-1 challenge is not built yet.", "The HX-1 flies from the spaceport. Choose it under Challenges." };
         vita2d_pgf_draw_text(pgf, 256, 232, white, 1.3f, menu_pk ? PT[menu_pk] : MENU_ITEMS[menu_popup]);
         vita2d_pgf_draw_text(pgf, 256, 276, gold, 1.1f, PS[menu_pk]);
         vita2d_pgf_draw_text(pgf, 256, 308, RGBA8(200, 214, 240, 255), 0.8f, PM[menu_pk]);

@@ -5,6 +5,7 @@
 /* 3D camera + polygon projection                                      */
 /* ------------------------------------------------------------------ */
 
+static V3 hx_chase_target(void);                          // (hx1.inc)
 static void look_at(V3 eye, V3 target) {
     V3 f = vnorm(vsub(target, eye));
     V3 r = vcross(v3(0.0f, 1.0f, 0.0f), f);
@@ -19,7 +20,7 @@ static void setup_camera(void) {
     V3 pivot = v3(pl.pos.x, pl.pos.y + spec->piv_y, pl.pos.z);
 
     if (view_mode == 1) {                                   // chase: behind and above, level horizon
-        V3 t = vnorm(v3(pl.f.x, pl.f.y * 0.5f, pl.f.z));
+        V3 t = (spec->model == 7 && fabsf(pl.f.y) > 0.7f) ? vnorm(hx_chase_target()) : vnorm(v3(pl.f.x, pl.f.y * 0.5f, pl.f.z));   // (the HX-1 stands upright: look along the way it faces)
         chase_dir = vnorm(vadd(chase_dir, vscale(vsub(t, chase_dir), 0.08f)));
         float lc = cosf(-look_ang), ls = sinf(-look_ang);              // L / R swing the camera round the aircraft
         V3 cd = v3(chase_dir.x * lc + chase_dir.z * ls, chase_dir.y, -chase_dir.x * ls + chase_dir.z * lc);
