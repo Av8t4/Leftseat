@@ -69,7 +69,13 @@ static void collect_flights(int *ni) {
     if ((frame_count % 150) < 40) add_flight(sea_coast_x(LH_Z) - 240.0f, 31.5f, LH_Z, 3.4f, 40000.0f, RGBA8(255, 250, 220, 255), ni);   // the lighthouse
 }
 
+// Where a frame's scene time goes (averaged and written to the log by main.c): 0 sky and ground fill, 1 tiles, roads, rivers, towns,
+// 2 runway, airports, spaceport, proving ground, 3 collecting solids and sorting, 4 drawing the sorted solids; st_items = solids drawn.
+static unsigned long long st_t[6], st_items;
+static unsigned long long st_mark;
+#define ST_LAP(i) do { unsigned long long t_ = sceKernelGetProcessTimeWide(); st_t[i] += t_ - st_mark; st_mark = t_; } while (0)
 static void draw_scene(void) {
+    st_mark = sceKernelGetProcessTimeWide();
     wx_frame_setup();
     setup_camera();
     draw_sky_extras();
@@ -102,6 +108,7 @@ static void draw_scene(void) {
         }
     }
 
+    ST_LAP(0);
     // 2. Checkerboard of darker tiles gives a sense of speed and altitude.
     {
         int i0 = (int)floorf(cam.pos.x / TILE), j0 = (int)floorf(cam.pos.z / TILE);
@@ -139,6 +146,7 @@ static void draw_scene(void) {
         draw_bridges();
     }
 
+    ST_LAP(1);
     // 3. Runway.
     draw_ground_quad(-22, -1000, 22, 1000, RGBA8(72, 72, 78, 255));
     draw_ground_quad(-22, -1000, -20.5f, 1000, RGBA8(235, 235, 235, 255));
@@ -166,6 +174,7 @@ static void draw_scene(void) {
         draw_plane_shadow();
     }
 
+    ST_LAP(2);
     collect_trees();
 
     // 4. Solid objects and the aircraft, sorted far to near (painter's algorithm).
@@ -213,6 +222,8 @@ static void draw_scene(void) {
         items[ni].dist = d2; items[ni].idx = MAX_FACES + k; ni++;
     }
     sort_items(ni);
+    ST_LAP(3);
+    st_items += (unsigned long long)ni;
     for (int i = 0; i < ni; i++) {
         int idx = items[i].idx;
         if (idx == SPG_IDX) {
@@ -238,6 +249,7 @@ static void draw_scene(void) {
         }
     }
 
+    ST_LAP(4);
     if (view_mode != 0) draw_plane_lights();                 // the aircraft's own lights, on top of everything (seen from outside only)
     flush_batch();
     draw_rain();

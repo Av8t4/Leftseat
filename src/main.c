@@ -225,9 +225,11 @@ int main(void) {
                     fprintf(logfile, "timing (avg us/frame over 300): sim %llu  scene %llu  hud+panel %llu  gpu/vsync %llu  total %llu  = %.1f fps  [ac=%d view=%d ff=%d]\n",
                             prof_t[0] / 300, prof_t[1] / 300, prof_t[2] / 300, prof_t[3] / 300, prof_t[4] / 300,
                             prof_t[4] ? 300.0e6 / (double)prof_t[4] : 0.0, ac_flying, view_mode, ff_level);
+                    fprintf(logfile, "   scene us: ground %llu  tiles+roads %llu  airports+site %llu  collect+sort %llu  solids %llu  [solids/frame %llu]\n",
+                            st_t[0] / 300, st_t[1] / 300, st_t[2] / 300, st_t[3] / 300, st_t[4] / 300, st_items / 300);
                     fflush(logfile);
                 }
-                memset(prof_t, 0, sizeof prof_t); prof_n = 0;
+                memset(prof_t, 0, sizeof prof_t); memset(st_t, 0, sizeof st_t); st_items = 0; prof_n = 0;
             }
         }
 
