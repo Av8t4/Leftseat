@@ -23,9 +23,9 @@ static void setup_camera(void) {
         chase_dir = vnorm(vadd(chase_dir, vscale(vsub(t, chase_dir), 0.08f)));
         float lc = cosf(-look_ang), ls = sinf(-look_ang);              // L / R swing the camera round the aircraft
         V3 cd = v3(chase_dir.x * lc + chase_dir.z * ls, chase_dir.y, -chase_dir.x * ls + chase_dir.z * lc);
-        V3 eye = vadd(vsub(pivot, vscale(cd, spec->chase_dist)), v3(0.0f, kx_cam_below ? -spec->chase_up * 0.7f : spec->chase_up, 0.0f));
+        V3 eye = vadd(vsub(pivot, vscale(cd, spec->chase_dist)), v3(0.0f, spec->chase_up, 0.0f));
         if (eye.y < 1.8f) eye.y = 1.8f;
-        look_at(eye, vadd(vadd(pivot, vscale(cd, 10.0f)), v3(0.0f, kx_cam_below ? -1.0f : 1.0f, 0.0f)));
+        look_at(eye, vadd(vadd(pivot, vscale(cd, 10.0f)), v3(0.0f, 1.0f, 0.0f)));
         return;
     }
     if (view_mode == 2) {                                   // control tower, zooming in on the aircraft
