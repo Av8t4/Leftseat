@@ -192,6 +192,7 @@ static void sp_rocket(const Airport *a, float lx, float lz) {
 /* The spaceport                                                        */
 /* ------------------------------------------------------------------ */
 
+static void hx_build_pad(const Airport *a);                                                                 // (hx1.inc)
 static void build_spaceport(void) {
     const Airport *a = &AIRPORTS[AP_SPACE];
     // The airfield: a hangar, a small terminal and the tower, on the east side of the runway.
@@ -205,6 +206,7 @@ static void build_spaceport(void) {
     // The launch site, on the beach side: two mounts with their towers; the rocket is on the first.
     sp_mount(a, 1160.0f, -120.0f); sp_tower(a, 1196.0f, -120.0f); sp_rocket(a, 1160.0f, -120.0f);
     sp_mount(a, 1160.0f, 130.0f);  sp_tower(a, 1196.0f, 130.0f);
+    hx_build_pad(a);                                                                                        // the HX-1's landing pad
     for (int i = 0; i < 8; i++) {                                                                           // the tank farm
         float lx = 1100.0f + (i & 1) * 18.0f, lz = -340.0f + (i >> 1) * 22.0f;
         V3 c = ap_pt(a, lx, 0.0f, lz);

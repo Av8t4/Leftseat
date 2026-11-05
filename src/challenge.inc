@@ -9,7 +9,7 @@
 #ifndef SCORE_PATH
 #define SCORE_PATH "ux0:data/skyhawk_scores.txt"      /* (the old file name is kept so saved scores carry over) */
 #endif
-enum { MODE_FREE = 0, MODE_LANDING = 1, MODE_KX = 2 };       // (MODE_KX: a KX-1 session at Strake Proving Ground: kxchal.inc)
+enum { MODE_FREE = 0, MODE_LANDING = 1, MODE_KX = 2, MODE_HX = 3 };       // (MODE_KX: a KX-1 session at Strake Proving Ground: kxchal.inc)
 enum { CH_IDLE = 0, CH_FLYING, CH_TOUCHED, CH_DONE };
 
 typedef struct {

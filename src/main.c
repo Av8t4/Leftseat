@@ -49,6 +49,7 @@
 #include "testtrack.inc"
 #include "kx1.inc"
 #include "kxchal.inc"
+#include "hx1.inc"
 #include "scene.inc"
 #include "panel.inc"
 #include "screenshot.inc"
@@ -156,6 +157,13 @@ int main(void) {
             if (act == 5) {                                           // a KX-1 session at the proving ground: free roam or a challenge
                 { int pick = (menu_wx == WX_COUNT) ? (frame_count / 3) % WX_COUNT : menu_wx; wx_start(pick, menu_wx == WX_COUNT); wx_dirty = false; }
                 kc_start(menu_kc_pick); flight_world = 0;
+                tod = menu_tod;
+                gyro_recenter();
+                game_state = ST_FLY;
+            }
+            if (act == 6) {                                           // the HX-1 at Gulf Point Spaceport
+                { int pick = (menu_wx == WX_COUNT) ? (frame_count / 3) % WX_COUNT : menu_wx; wx_start(pick, menu_wx == WX_COUNT); wx_dirty = false; }
+                hx_start(); flight_world = 0;
                 tod = menu_tod;
                 gyro_recenter();
                 game_state = ST_FLY;
