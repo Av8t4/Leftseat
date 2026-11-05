@@ -101,7 +101,7 @@ In **Options**, set **Controls** to **Gyro**. Tilt the Vita like a control colum
 
 ## Aircraft
 
-Seven vehicles: four aircraft from Knowles Aircraft Co., two from Ashley Aerospace and one car from Strake Corporation. Each has its own 3D model, cockpit, handling, gauges and best scores. Pick one in the Hangar and it applies to Open World and every challenge.
+Six aircraft: four from Knowles Aircraft Co. and two from Ashley Aerospace. Each has its own 3D model, cockpit, handling, gauges and best scores. Pick one in the Hangar and it applies to Open World and every challenge.
 
 | Aircraft | What it is | Numbers |
 |---|---|---|
@@ -111,7 +111,6 @@ Seven vehicles: four aircraft from Knowles Aircraft Co., two from Ashley Aerospa
 | **K-30 Courier** | Twin jet with a T-tail, nose canards and retractable gear | Rotates at about 100 kt, cruises at about 320 kt, stalls at 82 kt. One throttle drives both engines |
 | **Ashley Twin A22** | Six-seat twin turboprop with pusher props, twin booms, a forward-swept wing, an inverted-V tail and retractable gear | Cruises at about 200 kt, stalls at about 62 kt with full flaps, carries 320 gallons. One throttle drives both engines |
 | **Ashley Single A11** | Four-seat single pusher with a swept wing, twin booms and an H-tail | Cruises at about 150 kt, stalls at about 52 kt with full flaps, carries 70 gallons. Fixed gear |
-| **Strake KX-1** | Two-seat electric coupe from Strake Corporation. It is driven, not flown | 0 to 60 mph in about 3 seconds, top speed about 160 mph. The left stick does it all: up for power, down for the brake and then reverse, left and right to steer. R is the handbrake. Arm the thrusters (a switch on the gauge panel) and Square fires the forward jets (0 to 60 in under a second), X the hop jets and O the roof jets. The KX-1 is only used in its challenges at Strake Proving Ground, never in the open world |
 
 **Gear lights.** The K-30 and Ashley Twin have three gear lights on the panel, like a jet: three green when the gear is down and locked, red while it moves, dark when it is up. Raise the gear once you're climbing and lower it before you land.
 
@@ -148,7 +147,7 @@ There are four airports, and one more place you have to find. Hold **Select** fo
 | **Pinecrest Airstrip (PNC)** | About 11 NM west-north-west of KAK | A 650 m mown-grass strip (runway 12/30, no markings) with a small hangar and cabin, in a forested valley between two ridges. After dark it has low runway lights. From far away you need the chart |
 | **Lana Lake Regional (LLK)** | About 8 NM south of KAK | Runway 16/34 with markings, PAPI lights, a parallel taxiway, apron, terminal, tower and three hangars, on the shore of a lake. Edge, threshold and taxiway lights and a beacon after dark |
 
-**Around Knowles Field.** Downtown Knowles is a real city: houses thin out into streets and blocks, then into a tower district with rooftop lights at night (the red beacons all flash on their own timing). East of the airport is Strake Corporation, a giant factory with a village beside it.
+**Around Knowles Field.** Downtown Knowles is a real city: houses thin out into streets and blocks, then into a tower district with rooftop lights at night (the red beacons all flash on their own timing). East of the airport is Strake Corporation, a giant factory with a village beside it, and south of the east-west road is Strake Proving Ground: a circuit, pads, ramps, a hoop and a loop ramp on a concrete floor, with a beacon tower and floodlights after dark.
 
 **The countryside.** Patchwork fields, forests, lakes with sandy shores and red desert in the north. Mountains rise between the airports, with snow on the tallest. A river runs from the hills to a lake, with roads, a highway and bridges crossing it. Towns have streets, a plaza, water towers, churches and silos, and their windows light up at night. A windsock by each runway shows the wind.
 
@@ -175,23 +174,6 @@ Bounces and a nose-wheel-first landing cost points, and a crash scores 0. Your b
 | **Cross-country** | Take off from Knowles Field, fly to Redrock and land from either end. The HUD shows bearing and distance, and the result card shows trip time and fuel used. Landing anywhere else scores 0 |
 | **Backcountry** | The same trip to Pinecrest. Find the grass strip and put it down in the first few hundred feet. The scoring area is smaller, so touching down early matters more |
 | **Lake rings** | You start in the air north of Lana Lake and fly through 7 gold rings that bend over and around the lake. 80 points for the rings, plus up to 20 for beating the par time. A missed ring is skipped, and a crash scores 0 |
-
-### Strake KX-1 challenges
-
-The last line of the Challenges list is **Strake KX-1**. It opens its own list, and every KX-1 challenge is held at Strake Proving Ground.
-
-| Challenge | What happens |
-|---|---|
-| **Free roam** | Drive and fly around the proving ground with no clock. Leave the site and you are put back at the start |
-| **Speed run** | A three-second countdown, then one lap of the circuit through five gates in order. A light column marks the next gate. Your lap time is saved, with gold, silver and bronze medals. △ restarts |
-| **Hoop jump** | Race down the launch strip, up the ramp and through the hoop, then land on the far pad. Score out of 100: 40 for the pass (the closer to the center the better), 30 for landing on the pad and 30 for the gas you have left. A landing from a jump is hard: a burst of the hop jets (X) just before touchdown cushions it |
-| **Trick run** | 90 seconds on the trick pad. Hop off with X, flip and roll with the left stick (pitch and roll) and land on the wheels on the pad. Each flip or roll scores 50, with a bonus for stringing several into one jump, and a soft landing counts in full. A crash keeps the points you already have |
-| **Precision landing** | Run up the pond ramp, cross the pond and land on the target ring on the platform. Score out of 100: up to 70 for distance from the center and 30 for the gas you have left. Missing the platform scores nothing |
-| **Upside-down flip** | Drive up the loop ramp inside the circuit: the ground curls up and over, 180 degrees, onto an overhead track. The suction fans (the THRUST switch, they use gas) hold the car to it. Stay upside down as long as you like (the points stop at 4 seconds), then drive off the end, roll back over (the roof jets, O, slow the fall while you are upside down) and land on the wheels. Score out of 100: 30 for reaching the track, up to 30 for time held and up to 40 for a soft landing. Without the fans the car falls off the overhead track |
-
-**Computer assist.** The fourth switch on the KX-1's gauge panel (ASSIST), or Square on the KX-1 challenge list, turns on the car's driving computer. In the air, when you are low and falling, it levels the car if you are not on the sticks and burns the hop jets to cushion the touchdown (it uses your gas, so the gas-left points still suffer). On the ground it eases off in hard corners and keeps the car from sliding. With the assist on, silver is the most you can earn, and the result card says so. Assisted runs have their own best, so they never replace an unassisted one, and only unassisted golds count toward the trophy. Switching it during a challenge starts the challenge over.
-
-The thrusters are armed from the start in every KX-1 challenge except the speed run. All five challenges have bronze, silver and gold, and gold on all five wins the Strake trophy, shown on the Challenges screen. The ramps are the only raised ground on the site: the car climbs them, leaves the end of them as a jump, and has to be flown from there.
 
 ## Weather, time and sound
 
@@ -278,9 +260,7 @@ src/models.inc     3D K-4 model, cockpit nose, shadow
 src/modelkit.inc   kit for smooth models: lofted fuselages, airfoil wings, tail surfaces, tires
 src/k10.inc, jet1.inc, k30.inc, a22.inc, a11.inc   the other aircraft models and cockpit parts
 src/fleet.inc      chooses the model for the aircraft being flown
-src/kx1.inc        the Strake KX-1: the car model, the driving, the cold-gas thrusters and the landing grading
-src/kxchal.inc     the KX-1 challenges: the five challenges and free roam, countdown, scoring, medals and results
-src/testtrack.inc  Strake Proving Ground, the KX-1's test site: circuit, gates, pit, pads, ramps and height map, hoop, loop ramp, beacon tower and night lights
+src/testtrack.inc  Strake Proving Ground, Strake Corporation's test site: circuit, gates, pit, pads, ramps and height map, hoop, loop ramp, beacon tower and night lights
 src/soundcore.inc  the sound engine: makes every sound on the fly (knows nothing about the Vita)
 src/sound.inc      plays it on a background thread and tells it what the aircraft is doing
 src/sky.inc        clouds, windsock, rain

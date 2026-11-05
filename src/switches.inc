@@ -42,23 +42,14 @@ enum { SWI_BATT = 0, SWI_PUMP, SWI_IGN, SWI_START, SWI_BEACON, SWI_NAV, SWI_STRO
 
 static void sw_cell(int i, float *x, float *y, float *w, float *h) {
     static const float X[SWI_N] = { 22, 86, 150, 214,  298, 362, 426, 490, 554,  640, 704, 768,  852 };
-    if (spec->model == 6) { static const float KXX[SWI_N] = { 22, 86, 0, 0, 0, 0, 0, 150, 0, 0, 0, 0, 852 }; *x = KXX[i]; } else *x = X[i];
-    *y = VIEW_H + 24.0f; *w = (i == SWI_QUICK) ? 86.0f : 60.0f; *h = 96.0f;
-}
-// The KX-1 keeps its three switches on the gauge panel (battery, thrusters, headlights), so there is nothing to open.
-static const int KX_SW[4] = { SWI_BATT, SWI_PUMP, SWI_LAND, SWI_NAV };       // (NAV's place is the computer assist)
-static void kx_sw_cell(int i, float *x, float *y, float *w, float *h) {
-    const int k = i == SWI_BATT ? 0 : (i == SWI_PUMP ? 1 : (i == SWI_LAND ? 2 : 3));
-    *x = 650.0f + 61.0f * k; *y = VIEW_H + 14.0f; *w = 58.0f; *h = 88.0f;
+    *x = X[i]; *y = VIEW_H + 24.0f; *w = (i == SWI_QUICK) ? 86.0f : 60.0f; *h = 96.0f;
 }
 static bool *sw_flag(int i) {
     switch (i) {
-        case SWI_BATT: return &sw.batt;   case SWI_PUMP: return spec->model == 6 ? &sw.arm : &sw.pump;   case SWI_IGN: return spec->model == 6 ? NULL : &sw.ign;
-        case SWI_BEACON: case SWI_NAV: case SWI_STROBE:
-            if (spec->model == 6) return i == SWI_NAV ? &kx_assist : NULL;
-            return i == SWI_BEACON ? &sw.beacon : i == SWI_NAV ? &sw.nav : &sw.strobe;
-        case SWI_LAND: return &sw.landing;
-        case SWI_TAXI: case SWI_PITOT: case SWI_AVI: case SWI_CABIN: return spec->model == 6 ? NULL : (i == SWI_TAXI ? &sw.taxi : i == SWI_PITOT ? &sw.pitot : i == SWI_AVI ? &sw.avionics : &sw.cabin);
+        case SWI_BATT: return &sw.batt;   case SWI_PUMP: return &sw.pump;   case SWI_IGN: return &sw.ign;
+        case SWI_BEACON: return &sw.beacon; case SWI_NAV: return &sw.nav;  case SWI_STROBE: return &sw.strobe;
+        case SWI_LAND: return &sw.landing; case SWI_TAXI: return &sw.taxi; case SWI_PITOT: return &sw.pitot;
+        case SWI_AVI: return &sw.avionics; case SWI_CABIN: return &sw.cabin;
         default: return NULL;
     }
 }
@@ -100,25 +91,13 @@ static void sw_input(int nf, const float *fx, const float *fy, const int *fid, i
         const float x = fx[k], y = fy[k];
         if (y < VIEW_H) continue;
         bool hit = false;
-        if (spec->model == 6 && !sw_open) {
-            for (int k = 0; k < 4; k++) {
-                float cx, cy, cw, ch; kx_sw_cell(KX_SW[k], &cx, &cy, &cw, &ch);
-                if (x < cx - 4.0f || x > cx + cw + 4.0f || y < cy - 4.0f || y > cy + ch + 4.0f) continue;
-                hit = true;
-                if (fresh) {
-                    bool *f = sw_flag(KX_SW[k]); if (f) { *f = !*f; snd_event(EV_CLICK, 1.0f); }
-                    if (KX_SW[k] == SWI_NAV) kc_assist_changed();                  // a run in progress starts over, so the assist cannot be switched on just for the landing
-                }
-            }
-        }
         if (sw_open) {
             for (int i = 0; i < SWI_N; i++) {
                 float cx, cy, cw, ch; sw_cell(i, &cx, &cy, &cw, &ch);
                 if (x < cx - 3.0f || x > cx + cw + 3.0f || y < cy - 3.0f || y > cy + ch + 3.0f) continue;
-                if (spec->model == 6 && i != SWI_BATT && i != SWI_PUMP && i != SWI_LAND && i != SWI_QUICK) continue;       // (the KX-1 has only these)
                 hit = true;
                 if (i == SWI_START) { start_down = true; if (fresh) snd_event(EV_CLICK, 1.0f); }
-                else if (fresh && i == SWI_QUICK) { sw_run_all(); snd_event(EV_CONFIRM, 1.0f); gear_say(spec->model == 6 ? "QUICK START: BATTERY ON, HEADLIGHTS ON" : "QUICK START: ENGINE RUNNING"); }
+                else if (fresh && i == SWI_QUICK) { sw_run_all(); snd_event(EV_CONFIRM, 1.0f); gear_say("QUICK START: ENGINE RUNNING"); }
                 else if (fresh) { bool *f = sw_flag(i); if (f) { *f = !*f; snd_event(EV_CLICK, 1.0f); } }
             }
         }
@@ -131,6 +110,5 @@ static void sw_input(int nf, const float *fx, const float *fy, const int *fid, i
     for (int k = 0; k < prev_n; k++) prev_id[k] = fid[k];
     starter_held = sw_open && start_down;
     (void)had_hold;
-    if (spec->model == 6) { toggle_panel = false; sw_open = false; }                 // (the KX-1 has no switch panel: its switches are on the gauges)
     if (toggle_panel) { sw_open = !sw_open; snd_event(EV_CLICK, 1.0f); starter_held = false; }
 }

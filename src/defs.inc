@@ -78,7 +78,7 @@ static void   chart_begin(void);
 static bool   engine_failed;     // the engine has stopped (engine-out challenge), whatever the fuel gauge says
 
 // The switch panel (double-tap the back of the Vita): the cockpit switches and the engine start-up.
-typedef struct { bool batt, pump, ign, beacon, nav, strobe, landing, taxi, pitot, avionics, cabin, arm; } Switches;       // (arm: the KX-1's thrusters)
+typedef struct { bool batt, pump, ign, beacon, nav, strobe, landing, taxi, pitot, avionics, cabin; } Switches;
 static Switches sw;
 static bool   eng_on;            // the engine is burning fuel (it has been started and not shut down)
 static float  eng_n;             // 0..1: how far the engine has spun up (it takes a moment after the start, and runs down after a shutdown)
@@ -92,7 +92,6 @@ static inline bool lt_nav(void)     { return sw.batt && sw.nav; }
 static inline bool lt_strobe(void)  { return sw.batt && sw.strobe; }
 static inline bool lt_beacon(void)  { return sw.batt && sw.beacon; }
 static inline bool lt_landing(void) { return sw.batt && sw.landing; }
-static inline bool lt_head(void)    { return sw.batt && sw.landing; }       // (the KX-1: the headlights, with the tail lights)
 // Cold and dark: everything off and the engine stopped (a new flight, or Triangle).
 static void sw_cold(void) {
     memset(&sw, 0, sizeof(sw));
@@ -106,6 +105,5 @@ static void sw_run_all(void) {
 static int    view_banner;      // frames left to show the view name
 static float  look_ang;         // head / camera turn from straight ahead (radians, right is positive)
 static V3     chase_dir = { 0.0f, 0.0f, 1.0f };
-static bool   kx_cam_below;                 // (kx1.inc: the KX-1 is upside down on the loop ramp, so the chase camera sits under it)
 static FILE  *logfile;
 

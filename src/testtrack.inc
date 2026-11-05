@@ -1,5 +1,5 @@
-// Left Seat: Strake Proving Ground, the KX-1's test site. It is always part of the world, so aircraft can fly over it and see it,
-// day and night. The KX-1 only comes here for its challenges (it is never driven in the open world).
+// Left Seat: Strake Proving Ground, Strake Corporation's test site. It is always part of the world, so aircraft can fly over it and see it,
+// day and night.
 // Part of Left Seat's single translation unit: this file is #included by main.c, in order.
 //
 // The layout follows the plan: x east, z north, about 2 km by 1.2 km around (SPG_X, SPG_Z). "Map" coordinates (px, py) are the
@@ -37,8 +37,6 @@ static void spc_build(void) {
 
 // The five gates of the speed run, where the plan has its yellow marks: {map x, map y, 1 if the gap runs across x (a road running north-south), 0 if across z (a road running east-west)}.
 static const float SPG_GATES[5][3] = { { 522.0f, 150.0f, 0.0f }, { 402.0f, 450.0f, 0.0f }, { 660.0f, 450.0f, 0.0f }, { 780.0f, 318.0f, 1.0f }, { 260.0f, 318.0f, 1.0f } };
-static int kc_kind;                      // (the KX-1 challenge being run: kxchal.inc)
-static bool kx_fans_on;                  // (the suction fans are holding the car on the loop ramp: kx1.inc)
 #define SPG_GATE_HW 13.0f                // half the gap between the posts
 
 // The ramps. Each is a wedge: it rises from the ground at its base to H meters at its top, then drops away.
@@ -301,7 +299,7 @@ static void draw_spg_solids(void) {
     if (near_site) {
         const float hx = SPG_HOOP_X - cam.pos.x, hz = SPG_HOOP_Z - cam.pos.z;
         if (hx * hx + hz * hz < 3500.0f * 3500.0f) {
-            const unsigned int hc = (game_mode == MODE_KX && kc_kind == 2 /* KC_HOOP */) ? RGBA8(255, 214, 70, 255) : RGBA8(226, 60, 44, 255);
+            const unsigned int hc = RGBA8(226, 60, 44, 255);
             for (int i = 0; i < 24; i++) {
                 const float a0 = i * (2.0f * PI_F / 24), a1 = (i + 1) * (2.0f * PI_F / 24);
                 const float ro = SPG_HOOP_R + 0.7f, ri = SPG_HOOP_R - 0.7f;
@@ -312,7 +310,7 @@ static void draw_spg_solids(void) {
         }
         const float gx = SPG_LOOP_X - cam.pos.x, gz = SPG_LOOP_Z - 20.0f - cam.pos.z;
         if (gx * gx + gz * gz < 3500.0f * 3500.0f) {                                   // the suction fans, under the deck, on both sides of the track
-            const bool on = kx_fans_on;
+            const bool on = false;
             const float spin = frame_count * (on ? 0.9f : 0.12f);
             for (int s = -1; s <= 1; s += 2) for (int f = 0; f < 2; f++) {
                 const float fx = SPG_LOOP_X + s * 2.9f, fz = SPG_LOOP_Z - SPG_LOOP_LB * (f == 0 ? 0.3f : 0.72f), fy = 2.0f * SPG_LOOP_R - 0.05f;

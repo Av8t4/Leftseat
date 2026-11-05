@@ -82,7 +82,6 @@ static void reset_plane_at(int ap) {
     engine_failed = false;
     ntrk = 0; trk_i = 0; trk_t = 0;
     pl.rpm = 0.0f;                                     // (cold: the engine is stopped)
-    if (spec->model == 6) { kx_reset(a->hdg); sw.arm = false; sw.batt = true; sw.pump = sw.ign = true; eng_on = true; eng_n = 1.0f; }     // the KX-1: electric, ready to drive
     pl.touched = true;
     set_axes(a->hdg, 0, 0);
     chase_dir = pl.f;

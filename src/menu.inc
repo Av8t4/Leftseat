@@ -86,9 +86,6 @@ static const char *MENU_ITEMS[9] = { "OPEN WORLD", "AIRPORT", "CHALLENGES", "HAN
 static int  menu_chopen;            // the challenge list is showing
 static int  menu_chsel;             // highlighted row in that list
 static int  menu_ch_pick = -1;      // result: -1 = resume the running challenge, otherwise the kind to start
-static int  menu_ksel;              // highlighted row in the KX-1 list (menu_chopen == 2)
-static int  menu_kc_pick;           // result: the KX-1 session to start (kxchal.inc)
-static int  menu_pk;                // which message the box shows: 0 = "not implemented", 1 = the KX-1 is not for the open world, 2 = choose an aircraft first, 3 = not built yet
 #define CH_ROW 50.0f                // rows of the challenge screens
 static bool ch_running(void) { return ch_state == CH_FLYING || ch_state == CH_TOUCHED; }
 static int  menu_ap;                // airport picked for the open world (start and Triangle reset)
@@ -297,15 +294,14 @@ static unsigned int menu_touch_taps(void) {
                 } else if (ty >= HG_BY && ty <= HG_BY + HG_BH && tx >= HG_PX && tx <= HG_PX + 210.0f) vp = SCE_CTRL_CROSS;
                 else if (ty >= HG_BY && ty <= HG_BY + HG_BH && tx >= HG_PX + 230.0f) vp = SCE_CTRL_CIRCLE;
             } else if (menu_chopen) {
-                const int n = (menu_chopen == 2) ? KC_COUNT : CK_COUNT + 1 + (ch_running() ? 1 : 0);
-                const float rowh = (menu_chopen == 2) ? 56.0f : CH_ROW;
-                int *selp = (menu_chopen == 2) ? &menu_ksel : &menu_chsel;
+                const int n = CK_COUNT + (ch_running() ? 1 : 0);
+                const float rowh = CH_ROW;
+                int *selp = &menu_chsel;
                 if (tx >= HG_LX && tx <= HG_LX + HG_LW && ty >= HG_LY && ty < HG_LY + n * rowh) {
                     int row = (int)floorf((ty - HG_LY) / rowh);
                     if (row == *selp) vp = SCE_CTRL_CROSS;                       // a second tap on the same row chooses it
                     else { *selp = row; snd_event(EV_CLICK, 1.0f); }
-                } else if (menu_chopen == 2 && ty >= 476.0f && ty <= 496.0f && tx >= HG_LX && tx <= HG_LX + HG_LW) vp = SCE_CTRL_SQUARE;
-                else if (ty >= HG_BY && ty <= HG_BY + HG_BH && tx >= HG_PX && tx <= HG_PX + 200.0f) vp = SCE_CTRL_CROSS;
+                } else if (ty >= HG_BY && ty <= HG_BY + HG_BH && tx >= HG_PX && tx <= HG_PX + 200.0f) vp = SCE_CTRL_CROSS;
                 else if (ty >= HG_BY && ty <= HG_BY + HG_BH && tx >= HG_PX + 220.0f && tx <= HG_PX + HG_PW) vp = SCE_CTRL_CIRCLE;
             } else {
                 for (int i = 0; i < menu_count(); i++) {
@@ -441,15 +437,15 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
         if (pressed & (SCE_CTRL_CIRCLE | SCE_CTRL_CROSS)) { menu_kopen = 0; snd_event(EV_CLICK, 1.0f); }
         return 0;
     }
-    if (menu_chopen) {                                        // the challenge screens: 1 = the list, 2 = the KX-1's challenges
+    if (menu_chopen) {                                        // the challenge screen
         if (menu_popup >= 0) {                                // a message is showing: X / O (or a timeout) closes it
             if (menu_popup_t > 0) menu_popup_t--;
             if ((pressed & (SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)) || menu_popup_t == 0) menu_popup = -1;
             return 0;
         }
         const bool run = ch_running();
-        const int n = (menu_chopen == 2) ? KC_COUNT : CK_COUNT + 1 + (run ? 1 : 0);
-        int *selp = (menu_chopen == 2) ? &menu_ksel : &menu_chsel, mv = 0;
+        const int n = CK_COUNT + (run ? 1 : 0);
+        int *selp = &menu_chsel, mv = 0;
         if (pressed & SCE_CTRL_UP)   mv = -1;
         if (pressed & SCE_CTRL_DOWN) mv = 1;
         int sy = pad->ly < 64 ? -1 : (pad->ly > 192 ? 1 : 0);
@@ -458,18 +454,9 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
         if (mv) { *selp = (*selp + mv + n) % n; snd_event(EV_CLICK, 1.0f); }
         if (pad->buttons & SCE_CTRL_LEFT)  menu_hang -= 0.035f;       // turn the picture
         if (pad->buttons & SCE_CTRL_RIGHT) menu_hang += 0.035f;
-        if (menu_chopen == 2 && (pressed & SCE_CTRL_SQUARE)) { kx_assist = !kx_assist; snd_event(EV_CLICK, 1.0f); scores_save(); return 0; }
-        if (pressed & SCE_CTRL_CIRCLE) { menu_chopen = (menu_chopen == 2) ? 1 : 0; snd_event(EV_CLICK, 1.0f); return 0; }
+        if (pressed & SCE_CTRL_CIRCLE) { menu_chopen = 0; snd_event(EV_CLICK, 1.0f); return 0; }
         if (pressed & SCE_CTRL_CROSS) {
-            if (menu_chopen == 2) {                           // the KX-1's challenges
-                if (!KC_BUILT[menu_ksel]) { menu_popup = 0; menu_pk = 3; menu_popup_t = 240; return 0; }
-                snd_event(EV_CONFIRM, 1.0f);
-                menu_chopen = 0; menu_kc_pick = menu_ksel;
-                return 5;
-            }
             const int k = menu_chsel - (run ? 1 : 0);
-            if (k == CK_COUNT) { menu_chopen = 2; menu_ksel = 0; snd_event(EV_CLICK, 1.0f); return 0; }          // the KX-1 line opens its own screen
-            if (k >= 0 && SPECS[menu_ac].model == 6) { menu_popup = 0; menu_pk = 2; menu_popup_t = 300; return 0; }   // flying challenges need an aircraft
             snd_event(EV_CONFIRM, 1.0f);
             menu_chopen = 0;
             menu_ch_pick = k < 0 ? -1 : k;
@@ -504,7 +491,6 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
             menu_popen = menu_sel; menu_psel = pk_cur(menu_popen); menu_psnd = snd_level & 3; menu_pparent = 0;
             return 0;
         }
-        if (menu_sel == 0 && SPECS[menu_ac].model == 6) { menu_popup = 0; menu_pk = 1; menu_popup_t = 300; return 0; }     // the KX-1 is only for the proving ground challenges
         if (menu_sel == 0) return 1;
         if (menu_sel == 1) {                                  // X also steps through the airports
             menu_ap = ap_next(menu_ap, 1);
@@ -534,7 +520,7 @@ static int menu_update(const SceCtrlData *pad, unsigned int pressed) {
             menu_tod = (menu_tod + 1) % TOD_COUNT;
             return 0;
         }
-        menu_popup = menu_sel; menu_pk = 0;                   // everything else is a placeholder for now
+        menu_popup = menu_sel;                                // everything else is a placeholder for now
         menu_popup_t = 240;
     }
     if (pressed & SCE_CTRL_START) {
@@ -647,7 +633,7 @@ static void draw_hangar_preview(int ac, float ang) {
     pl.pos = v3(0.0f, 0.0f, 0.0f); pl.gear = 1.0f; pl.gear_cmd = true; pl.on_ground = true; pl.rpm = 700.0f;
     set_axes(ang, 0.0f, 0.0f);
     g_focal = 520.0f; g_near = 0.5f;
-    float rm = fmaxf(spec->tip_x, fmaxf(-spec->tail_z, spec->model == 6 ? 2.3f : 4.5f)), D = 3.3f * rm;
+    float rm = fmaxf(spec->tip_x, fmaxf(-spec->tail_z, 4.5f)), D = 3.3f * rm;
     V3 pivot = v3(0.0f, spec->piv_y * 0.8f, 0.0f);
     look_at(vadd(pivot, v3(0.0f, D * 0.30f, -D * 0.95f)), pivot);
     float cxp = HG_PX + HG_PW * 0.5f, cyp = HG_PY + HG_PH * 0.52f;       // where the aircraft should appear on the screen
@@ -791,7 +777,7 @@ static void draw_menu(vita2d_pgf *pgf) {
             vita2d_draw_rectangle(HG_LX + HG_LW + 6, HG_LY + (HG_LH - th) * (menu_hscroll / hm), 3, th, gold);
         }
         {                                                                    // the facts about the aircraft in the picture
-            const char *maker = menu_hsel == AC_KX1 ? "STRAKE CORPORATION" : (menu_hsel == AC_A22 || menu_hsel == AC_A11) ? "ASHLEY AEROSPACE" : "KNOWLES AIRCRAFT CO.";
+            const char *maker = (menu_hsel == AC_A22 || menu_hsel == AC_A11) ? "ASHLEY AEROSPACE" : "KNOWLES AIRCRAFT CO.";
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 32, white, 1.25f, SPECS[menu_hsel].name);
             vita2d_pgf_draw_text(pgf, HG_PX + HG_PW - vita2d_pgf_text_width(pgf, 0.65f, maker), HG_PY + HG_PH + 32, RGBA8(176, 150, 96, 255), 0.65f, maker);
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 58, pale, 0.78f, SPECS[menu_hsel].line1);
@@ -1059,36 +1045,26 @@ static void draw_menu(vita2d_pgf *pgf) {
             "Fly 11 NM to a short grass strip in the mountains.",
             "Fly through a course of rings over and around Lana Lake." };
         const unsigned int card = RGBA8(10, 22, 56, 255), dimc = RGBA8(150, 172, 215, 255), pale = RGBA8(190, 205, 235, 255);
-        const bool run = ch_running(), kxs = (menu_chopen == 2);
-        const int n = kxs ? KC_COUNT : CK_COUNT + 1 + (run ? 1 : 0);
-        const float rowh = kxs ? 56.0f : CH_ROW;
-        const int sel = kxs ? menu_ksel : menu_chsel;
-        const int kk = kxs ? sel : sel - (run ? 1 : 0);                      // the kind under the highlight (level 1: -1 = resume, CK_COUNT = the KX-1)
-        const bool on_kx = kxs || kk == CK_COUNT;
+        const bool run = ch_running();
+        const int n = CK_COUNT + (run ? 1 : 0);
+        const float rowh = CH_ROW;
+        const int sel = menu_chsel;
+        const int kk = sel - (run ? 1 : 0);                                  // the kind under the highlight (-1 = resume)
         vita2d_draw_rectangle(20, 12, 920, 520, gold);
         vita2d_draw_rectangle(24, 16, 912, 512, card);
-        draw_menu_picture(on_kx ? AC_KX1 : (SPECS[menu_ac].model == 6 ? AC_K4 : menu_ac), menu_hang);
-        vita2d_pgf_draw_text(pgf, HG_LX, 54, white, 1.3f, kxs ? "STRAKE KX-1" : "CHALLENGES");
-        if (kxs) vita2d_pgf_draw_text(pgf, HG_LX + 250, 54, RGBA8(176, 150, 96, 255), 0.7f, "PROVING GROUND");
+        draw_menu_picture(menu_ac, menu_hang);
+        vita2d_pgf_draw_text(pgf, HG_LX, 54, white, 1.3f, "CHALLENGES");
         for (int i = 0; i < n; i++) {
             const float ry = HG_LY + i * rowh;
             const bool s2 = (i == sel);
-            const int k = kxs ? i : i - (run ? 1 : 0);
+            const int k = i - (run ? 1 : 0);
             vita2d_draw_rectangle(HG_LX, ry, HG_LW, rowh - 5.0f, s2 ? RGBA8(22, 46, 104, 255) : RGBA8(14, 30, 70, 255));
             if (s2) vita2d_draw_rectangle(HG_LX, ry, 6, rowh - 5.0f, gold);
             const unsigned int tc = s2 ? white : dimc;
             char bb[28]; bb[0] = 0; unsigned int bc = RGBA8(110, 130, 180, 255);
             const char *title, *sub; char sb[64];
-            if (kxs) {
-                title = KC_NAMES[k]; sub = KC_DESC[k];
-                if (!KC_BUILT[k]) snprintf(bb, sizeof(bb), "SOON");
-                else if (k == KC_FREE) snprintf(bb, sizeof(bb), "PRACTICE");
-                else if (kc_best[k] > 0 || kc_best_as[k] > 0) { int m = kc_medal_best(k); snprintf(bb, sizeof(bb), "%s", KC_MEDAL_NAME[m]); bc = kc_medal_color(m); }
-                else snprintf(bb, sizeof(bb), "NOT RUN");
-            } else if (k < 0) {
+            if (k < 0) {
                 title = "RESUME"; snprintf(sb, sizeof(sb), "Continue the %s challenge (%s)", CK_NAMES[ch_kind], SPECS[ac_flying].key); sub = sb;
-            } else if (k == CK_COUNT) {
-                title = "STRAKE KX-1"; sub = "The rocket-assisted coupe: Proving Ground"; snprintf(bb, sizeof(bb), "%s", kc_all_gold() ? "TROPHY" : ">"); bc = gold;
             } else {
                 title = CK_NAMES[k]; sub = DESC[k];
                 if (ch_best_a[menu_ac][k] > 0) { snprintf(bb, sizeof(bb), "BEST %d", ch_best_a[menu_ac][k]); bc = gold; } else snprintf(bb, sizeof(bb), "NOT FLOWN");
@@ -1099,34 +1075,21 @@ static void draw_menu(vita2d_pgf *pgf) {
         }
         {                                                                    // the details of the highlighted row
             const char *t1 = "", *t2 = "", *t3 = ""; char l3[80]; l3[0] = 0;
-            if (kxs) {
-                t1 = KC_NAMES[kk]; t2 = KC_DESC[kk]; t3 = KC_HOW[kk];
-                if (kk == KC_SPEED) {
-                    char g[16], sv[16], br[16]; kc_time_text(g, sizeof(g), KC_SPEED_MEDAL[0]); kc_time_text(sv, sizeof(sv), KC_SPEED_MEDAL[1]); kc_time_text(br, sizeof(br), KC_SPEED_MEDAL[2]);
-                    snprintf(l3, sizeof(l3), "GOLD %s    SILVER %s    BRONZE %s", g, sv, br);
-                } else if (kk >= KC_HOOP) {
-                    snprintf(l3, sizeof(l3), "GOLD %d    SILVER %d    BRONZE %d POINTS", (int)KC_PTS_MEDAL[kk][0], (int)KC_PTS_MEDAL[kk][1], (int)KC_PTS_MEDAL[kk][2]);
-                }
-            } else if (kk < 0) { t1 = "RESUME"; t2 = "Continue the challenge in progress."; }
-            else if (kk == CK_COUNT) { t1 = "STRAKE KX-1"; t2 = "Drive, hop and flip it at Strake Proving Ground."; t3 = kc_all_gold() ? "Gold on all five: you have the Strake trophy." : "Gold on all five wins the Strake trophy."; }
-            else { t1 = CK_NAMES[kk]; t2 = DESC[kk]; if (SPECS[menu_ac].model == 6) t3 = "Choose an aircraft in the hangar first."; }
+            if (kk < 0) { t1 = "RESUME"; t2 = "Continue the challenge in progress."; }
+            else { t1 = CK_NAMES[kk]; t2 = DESC[kk]; }
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 32, white, 1.25f, t1);
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 58, pale, 0.74f, t2);
             vita2d_pgf_draw_text(pgf, HG_PX, HG_PY + HG_PH + 80, dimc, 0.7f, l3[0] ? l3 : t3);
         }
         {                                                                    // buttons
             const float bxs[2] = { HG_PX, HG_PX + 220.0f }, bws[2] = { 200.0f, HG_PW - 220.0f };
-            const char *bl[2] = { (kxs ? (KC_BUILT[kk] ? "START" : "SOON") : (on_kx ? "OPEN" : (kk < 0 ? "RESUME" : "START"))), "BACK" };
+            const char *bl[2] = { (kk < 0 ? "RESUME" : "START"), "BACK" };
             for (int b = 0; b < 2; b++) {
                 vita2d_draw_rectangle(bxs[b], HG_BY, bws[b], HG_BH, b == 0 ? RGBA8(36, 64, 110, 255) : RGBA8(30, 52, 96, 255));
                 vita2d_draw_rectangle(bxs[b], HG_BY, bws[b], 1, gold); vita2d_draw_rectangle(bxs[b], HG_BY + HG_BH - 1, bws[b], 1, gold);
                 vita2d_draw_rectangle(bxs[b], HG_BY, 1, HG_BH, gold); vita2d_draw_rectangle(bxs[b] + bws[b] - 1, HG_BY, 1, HG_BH, gold);
                 vita2d_pgf_draw_text(pgf, (int)(bxs[b] + (bws[b] - vita2d_pgf_text_width(pgf, 1.0f, bl[b])) * 0.5f), HG_BY + 31, white, 1.0f, bl[b]);
             }
-        }
-        if (kxs) {
-            char ab[96]; snprintf(ab, sizeof(ab), "COMPUTER ASSIST: %s   (Square or tap)   silver max", kx_assist ? "ON" : "OFF");
-            vita2d_pgf_draw_text(pgf, HG_LX, 488, kx_assist ? RGBA8(120, 210, 255, 255) : pale, 0.66f, ab);
         }
         vita2d_pgf_draw_text(pgf, HG_LX, 508, pale, 0.66f, "Touch: tap a row, tap it again to choose");
         vita2d_pgf_draw_text(pgf, HG_LX, 525, pale, 0.66f, "Up / Down: choose   Left / Right: turn the picture   X: select   O: back");
@@ -1136,13 +1099,9 @@ static void draw_menu(vita2d_pgf *pgf) {
     if (menu_popup >= 0) {
         vita2d_draw_rectangle(220, 180, 520, 170, gold);
         vita2d_draw_rectangle(224, 184, 512, 162, RGBA8(10, 22, 56, 255));
-        static const char *const PT[4] = { "", "KX-1: CHALLENGES ONLY", "CHOOSE AN AIRCRAFT", "COMING SOON" };
-        static const char *const PS[4] = { "FUTURE UPDATE", "STRAKE PROVING GROUND", "THE KX-1 IS A CAR", "NEXT UPDATE" };
-        static const char *const PM[4] = { "Not implemented yet - coming in a later version.", "The KX-1 stays at the track. Pick an aircraft to fly free.",
-                                           "These challenges are flown in an aircraft. Choose one in the hangar.", "This KX-1 challenge is not built yet." };
-        vita2d_pgf_draw_text(pgf, 256, 232, white, 1.3f, menu_pk ? PT[menu_pk] : MENU_ITEMS[menu_popup]);
-        vita2d_pgf_draw_text(pgf, 256, 276, gold, 1.1f, PS[menu_pk]);
-        vita2d_pgf_draw_text(pgf, 256, 308, RGBA8(200, 214, 240, 255), 0.8f, PM[menu_pk]);
+        vita2d_pgf_draw_text(pgf, 256, 232, white, 1.3f, MENU_ITEMS[menu_popup]);
+        vita2d_pgf_draw_text(pgf, 256, 276, gold, 1.1f, "FUTURE UPDATE");
+        vita2d_pgf_draw_text(pgf, 256, 308, RGBA8(200, 214, 240, 255), 0.8f, "Not implemented yet - coming in a later version.");
         vita2d_pgf_draw_text(pgf, 256, 334, RGBA8(150, 172, 215, 255), 0.75f, "Press X to close");
     }
     draw_shot_msg(pgf);
