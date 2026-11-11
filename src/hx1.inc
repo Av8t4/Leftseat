@@ -77,12 +77,13 @@ static void build_hx1(void) {
         (void)fc;
         pf_poly(4, pad, NULL, 50, 52, 60, PF_TWO, 255);
     }
-    for (int f = 0; f < 4; f++) {                                                  // the four flaps: hinged on the belly side, 0 = folded down along the hull, 1 = out sideways
-        const float s = (f & 1) ? 1.0f : -1.0f;
+    for (int f = 0; f < 4; f++) {                                                  // the four flaps: hinged on the sides, low on the belly side
+        const float s = (f & 1) ? 1.0f : -1.0f;                                    // (the belly is the black side; the flaps are on the sides next to it)
         const bool fore = f < 2;
         const float z0 = fore ? 6.0f : -20.0f, z1 = fore ? 11.5f : -8.0f, span = fore ? 3.4f : 5.2f;
-        const float ang = hx.flap[f] * 1.45f, dx = s * sinf(ang), dy = -cosf(ang);
-        const float hx0 = s * HX_R * 0.96f, hy0 = -HX_R * 0.25f;
+        const float th = -0.55f + hx.flap[f] * 2.3f;                               // 0 = stowed, tucked up the side toward the back; 1 = out and a little toward the belly
+        const float dx = s * sinf(th), dy = cosf(th);
+        const float hx0 = s * HX_R * 0.9f, hy0 = -HX_R * 0.4f;
         V3 q[4] = { MW(hx0, hy0, z0), MW(hx0, hy0, z1), MW(hx0 + dx * span, hy0 + dy * span, fore ? z1 - 1.0f : z1 - 1.5f), MW(hx0 + dx * span, hy0 + dy * span, fore ? z0 + 1.0f : z0 + 0.5f) };
         pf_poly(4, q, NULL, HX_SHIELD[0] + 20, HX_SHIELD[1] + 20, HX_SHIELD[2] + 22, PF_TWO, 255);
     }
