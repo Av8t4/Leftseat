@@ -5,6 +5,8 @@
 /* 3D camera + polygon projection                                      */
 /* ------------------------------------------------------------------ */
 
+static V3 hx_chase_target(void);
+static V3 hx_pad_cam(void);                               // (hx1.inc)                          // (hx1.inc)
 static void look_at(V3 eye, V3 target) {
     V3 f = vnorm(vsub(target, eye));
     V3 r = vcross(v3(0.0f, 1.0f, 0.0f), f);
@@ -18,8 +20,26 @@ static void setup_camera(void) {
     g_near = 2.0f;
     V3 pivot = v3(pl.pos.x, pl.pos.y + spec->piv_y, pl.pos.z);
 
+    if (view_mode == 1 && spec->model == 7 && hx_cam == 1) {  // the HX-1 pad camera: a fixed spot beside the landing pad, zooming in on the ship
+        V3 eye = v3(hx_pad_cam().x, 3.0f, hx_pad_cam().z);
+        V3 d = vsub(pivot, eye);
+        g_focal = clampf(520.0f * sqrtf(vdot(d, d)) / 90.0f, 520.0f, 4500.0f);
+        look_at(eye, pivot);
+        return;
+    }
+    if (view_mode == 1 && spec->model == 7 && hx_cam == 2) {  // the HX-1 nose camera: up by the nose, looking down the hull at the ground (and the pad)
+        V3 f = vnorm(vadd(vscale(pl.f, -1.0f), vscale(pl.r, 0.55f)));
+        V3 up = pl.u;
+        V3 r = vcross(up, f);
+        float rl = sqrtf(vdot(r, r));
+        r = rl > 1e-4f ? vscale(r, 1.0f / rl) : pl.r;
+        cam.f = f; cam.r = r; cam.u = vcross(f, r);
+        cam.pos = vadd(vadd(pivot, vscale(pl.r, 6.5f)), vscale(pl.f, 20.0f));
+        g_focal = 400.0f; g_near = 0.8f;
+        return;
+    }
     if (view_mode == 1) {                                   // chase: behind and above, level horizon
-        V3 t = vnorm(v3(pl.f.x, pl.f.y * 0.5f, pl.f.z));
+        V3 t = (spec->model == 7) ? vnorm(hx_chase_target()) : vnorm(v3(pl.f.x, pl.f.y * 0.5f, pl.f.z));   // (the HX-1: from behind when it stands, from the side when it lies flat)
         chase_dir = vnorm(vadd(chase_dir, vscale(vsub(t, chase_dir), 0.08f)));
         float lc = cosf(-look_ang), ls = sinf(-look_ang);              // L / R swing the camera round the aircraft
         V3 cd = v3(chase_dir.x * lc + chase_dir.z * ls, chase_dir.y, -chase_dir.x * ls + chase_dir.z * lc);

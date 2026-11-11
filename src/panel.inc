@@ -406,6 +406,7 @@ static void draw_kx_panel(vita2d_pgf *pgf) {
 
 static void draw_panel(vita2d_pgf *pgf) {
     if (sw_open) { draw_switch_panel(pgf); return; }
+    if (spec->model == 7) { draw_hx_panel(pgf); return; }
     if (spec->model == 6) { draw_kx_panel(pgf); return; }
     unsigned int txt = RGBA8(222, 224, 230, 255), dim = RGBA8(150, 154, 166, 255);
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, SCREEN_H - VIEW_H, RGBA8(48, 48, 54, 255));

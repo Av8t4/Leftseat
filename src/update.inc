@@ -34,7 +34,10 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
                 chart_begin(); chart_open = true; sel_used = true; ff_level = 0;
             }
         } else {
-            if (sel_hold > 0 && sel_hold < 18 && !sel_used) {
+            if (sel_hold > 0 && sel_hold < 18 && !sel_used && spec->model == 7) {    // the HX-1: chase -> pad camera -> nose camera
+                hx_cam = (hx_cam + 1) % 3;
+                view_banner = 150;
+            } else if (sel_hold > 0 && sel_hold < 18 && !sel_used) {
                 view_mode = (view_mode + 1) % (ENABLE_TOWER_VIEW ? 3 : 2);   // cockpit -> chase (-> tower)
                 view_banner = 150;
                 chase_dir = pl.f;
@@ -46,7 +49,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
         if (!ff_sub) { gyro_recenter(); gear_say("GYRO CENTERED"); }
         sel_used = true; pressed &= ~SCE_CTRL_TRIANGLE;
     }
-    if (pressed & SCE_CTRL_TRIANGLE) { if (game_mode == MODE_LANDING) challenge_begin(); else if (game_mode == MODE_KX) kc_restart(); else reset_free(); return; }
+    if (pressed & SCE_CTRL_TRIANGLE) { if (game_mode == MODE_LANDING) challenge_begin(); else if (game_mode == MODE_KX) kc_restart(); else if (game_mode == MODE_HX) hx_start(); else reset_free(); return; }
     wx_update();                                       // the weather keeps changing, even after a crash
     if (!pl.crashed && ++trk_t >= 90) {                // a breadcrumb every second and a half, for the chart
         trk_t = 0;
@@ -64,6 +67,7 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
         look_ang += (lt - look_ang) * 0.22f;
     }
     if (pl.crashed) return;
+    if (spec->model == 7) { hx_update(pad, pressed); return; }        // the HX-1 stands on its pad: it has its own update
     if (spec->model == 6) { kx_update(pad, pressed); return; }        // the KX-1 is a car: it has its own driving
 
     if (spec->retract) {                                // Square: landing gear up / down

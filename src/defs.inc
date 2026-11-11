@@ -68,6 +68,7 @@ static bool   invert_pitch;
 static int    frame_count;
 static float  g_focal = 520.0f;
 static float  g_near  = 2.0f;
+static int    hx_cam;           // the HX-1 camera: 0 chase, 1 pad camera, 2 nose camera
 static int    view_mode;        // 0 cockpit, 1 chase, 2 control tower
 static float  trk_x[300], trk_z[300];   // breadcrumbs of where you have flown, for the chart
 static int    ntrk, trk_i, trk_t;
