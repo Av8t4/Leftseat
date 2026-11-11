@@ -26,6 +26,9 @@ typedef struct {
     float wx, wy, wz;              // turn rates about the ship's own axes: x = right (nose toward the belly), y = back (nose to the right), z = long axis (radians per second)
     V3    fh, uh;                  // the attitude the computer is holding: where the nose points and which way the back faces
     bool  dep;                     // the flaps are asked to open
+    float leg; bool legc;          // the landing legs: how far out (0 = folded against the hull, 1 = out) and whether they are asked out
+    bool  assist, flip;            // the computer helps (it does the flip and the landing burn); the flip has been asked for
+    float agl, manual;             // how far the legs are above what is under them (m); seconds the pilot has had a hand on the throttle
     float dp, dr;                  // the computer's flap trims for pitch and roll (-1 to 1)
     float maxalt, td, t;           // highest point (m, engines), last touchdown speed (m/s), a clock for the flame
     V3    pad;                     // the landing pad's center
@@ -81,16 +84,19 @@ static void build_hx1(void) {
             for (int k = 0; k < 6; k++) { const int m = (k + 1) % 6; V3 q[4] = { r0[k], r0[m], r1[m], r1[k] }; pf_poly(4, q, &cc, 34, 34, 40, PF_TWO, 255); }
         }
     }
-    for (int i = 0; i < 4; i++) {                                                  // four landing legs: flat struts that splay out from the lower hull
-        const float a = i * (PI_F / 2.0f) + PI_F / 4.0f, sa = sinf(a), ca = cosf(a), ta = -ca, tb = sa;      // outward (sa, ca) and the tangent
-        V3 q[4] = { MW(sa * HX_R * 0.98f + ta * 0.35f, ca * HX_R * 0.98f + tb * 0.35f, -9.0f), MW(sa * HX_R * 0.98f - ta * 0.35f, ca * HX_R * 0.98f - tb * 0.35f, -9.0f),
-                    MW(sa * 7.4f - ta * 0.35f, ca * 7.4f - tb * 0.35f, -25.0f), MW(sa * 7.4f + ta * 0.35f, ca * 7.4f + tb * 0.35f, -25.0f) };
-        V3 fc = MW(sa * 7.4f, ca * 7.4f, -25.0f);
-        pf_poly(4, q, NULL, HX_DARK[0], HX_DARK[1], HX_DARK[2], PF_TWO, 255);
-        V3 pad[4] = { MW(sa * 7.4f + 0.9f * sa - 0.9f * ta, ca * 7.4f + 0.9f * ca - 0.9f * tb, -25.0f), MW(sa * 7.4f + 0.9f * sa + 0.9f * ta, ca * 7.4f + 0.9f * ca + 0.9f * tb, -25.0f),
-                      MW(sa * 7.4f - 0.9f * sa + 0.9f * ta, ca * 7.4f - 0.9f * ca + 0.9f * tb, -25.0f), MW(sa * 7.4f - 0.9f * sa - 0.9f * ta, ca * 7.4f - 0.9f * ca - 0.9f * tb, -25.0f) };
-        (void)fc;
-        pf_poly(4, pad, NULL, 50, 52, 60, PF_TWO, 255);
+    {                                                                              // four landing legs: flat struts that fold against the hull and swing out to land
+        const float rf = 4.7f + 2.7f * hx.leg;
+        for (int i = 0; i < 4; i++) {
+            const float a = i * (PI_F / 2.0f) + PI_F / 4.0f, sa = sinf(a), ca = cosf(a), ta = -ca, tb = sa;      // outward (sa, ca) and the tangent
+            V3 q[4] = { MW(sa * HX_R * 0.98f + ta * 0.35f, ca * HX_R * 0.98f + tb * 0.35f, -9.0f), MW(sa * HX_R * 0.98f - ta * 0.35f, ca * HX_R * 0.98f - tb * 0.35f, -9.0f),
+                        MW(sa * rf - ta * 0.35f, ca * rf - tb * 0.35f, -25.0f), MW(sa * rf + ta * 0.35f, ca * rf + tb * 0.35f, -25.0f) };
+            pf_poly(4, q, NULL, HX_DARK[0], HX_DARK[1], HX_DARK[2], PF_TWO, 255);
+            if (hx.leg > 0.3f) {
+                V3 pad[4] = { MW(sa * rf + 0.9f * sa - 0.9f * ta, ca * rf + 0.9f * ca - 0.9f * tb, -25.0f), MW(sa * rf + 0.9f * sa + 0.9f * ta, ca * rf + 0.9f * ca + 0.9f * tb, -25.0f),
+                              MW(sa * rf - 0.9f * sa + 0.9f * ta, ca * rf - 0.9f * ca + 0.9f * tb, -25.0f), MW(sa * rf - 0.9f * sa - 0.9f * ta, ca * rf - 0.9f * ca - 0.9f * tb, -25.0f) };
+                pf_poly(4, pad, NULL, 50, 52, 60, PF_TWO, 255);
+            }
+        }
     }
     if (hx.eng && !pl.crashed) {                                                   // the flame: three cones of fire
         const float L = (4.0f + 14.0f * hx.thr) * (0.85f + 0.15f * sinf(hx.t * 53.0f) * cosf(hx.t * 31.0f));
@@ -141,6 +147,7 @@ static void hx_start(void) {
     hx.psi = a->hdg;
     for (int i = 0; i < 4; i++) hx.flap[i] = 0.0f;
     hx.eng = false; hx.ground = true; hx.thr = 0.6f; hx.fuel = 1.0f;
+    hx.leg = 0.0f; hx.legc = false; hx.assist = true; hx.flip = false; hx.agl = 0.0f; hx.manual = 0.0f;       // the legs are folded: the ship is held on its mount
     hx.wx = hx.wy = hx.wz = 0.0f; hx.dep = false; hx.dp = hx.dr = 0.0f; hx.maxalt = 0.0f; hx.td = 0.0f; hx.t = 0.0f;
     hx.pad = ap_pt(a, HX_PAD_LX, 0.0f, HX_PAD_LZ);
     set_axes(hx.psi, HX_UP, 0.0f);
@@ -260,9 +267,47 @@ static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
     if ((pressed & SCE_CTRL_CROSS) && !hx.eng && hx.fuel > 0.0f) hx.eng = true;
     else if (pressed & SCE_CTRL_CROSS) hx.eng = false;
     if (pressed & SCE_CTRL_SQUARE) hx.dep = !hx.dep;
+    if (pressed & SCE_CTRL_CIRCLE) hx.legc = !hx.legc;
+    if (pressed & SCE_CTRL_LEFT)   { hx.assist = !hx.assist; if (!hx.assist) hx.flip = false; }
+    if (pressed & SCE_CTRL_RIGHT && hx.assist && !hx.ground) hx.flip = !hx.flip;
+    if (pad->buttons & (SCE_CTRL_UP | SCE_CTRL_DOWN)) hx.manual = 1.5f;
+    else hx.manual = fmaxf(0.0f, hx.manual - dt);
     if (pad->buttons & SCE_CTRL_UP)   hx.thr += 0.5f * dt;
     if (pad->buttons & SCE_CTRL_DOWN) hx.thr -= 0.5f * dt;
+
+    // The computer's landing guidance (the flip, the burn, the legs): when the flip has been asked for it points the engines so the ship
+    // comes to the pad, lights them when it must to stop in time, holds the descent to what it can stop, and puts the legs out.
+    const float mf0 = 1.0f / (0.55f + 0.45f * hx.fuel);
+    const bool stirred = fabsf(stick(pad->ly)) > 0.35f || fabsf(stick(pad->lx)) > 0.35f;
+    if (hx.flip && (hx.ground || stirred)) hx.flip = false;                       // touched down, or the pilot takes over
+    const bool guide = hx.assist && hx.flip && !hx.ground;
+    if (guide) {
+        const float aeff = fmaxf(1.0f, (HX_TWR * 0.9f * mf0 * 0.92f - 1.0f) * HX_G * 0.8f);       // the braking it can count on (tilted a little, throttle in hand)
+        const float vy = pl.vel.y, h = fmaxf(0.0f, hx.agl);
+        // Aim: where the engines must push to bring the ship over the pad and then straight down.
+        const float ex = hx.pad.x - pl.pos.x, ez = hx.pad.z - pl.pos.z, d = sqrtf(ex * ex + ez * ez);
+        const float vmax = clampf(h * 0.12f, 2.0f, 30.0f);
+        const float k = d > 1.0f ? fminf(0.12f * d, vmax) / d : 0.0f;
+        float ahx = 0.8f * (ex * k - pl.vel.x), ahz = 0.8f * (ez * k - pl.vel.z);
+        if (h < 40.0f) { ahx = -1.0f * pl.vel.x; ahz = -1.0f * pl.vel.z; }
+        const float lim = (h > 100.0f ? 0.45f : 0.15f) * HX_G;
+        const float am = sqrtf(ahx * ahx + ahz * ahz);
+        if (am > lim) { ahx *= lim / am; ahz *= lim / am; }
+        hx.fh = vnorm(v3(ahx, HX_G, ahz));
+        if (pl.f.y > 0.6f) hx.dep = false;                                         // flaps away once the nose is coming up
+        if (h < 120.0f) hx.legc = true;
+        // The burn: light the engines when the ship is upright and could just stop in time.
+        if (!hx.eng && hx.fuel > 0.0f && pl.f.y > 0.85f && vy < -5.0f && h < 1.25f * vy * vy / (2.0f * aeff) + 50.0f) hx.eng = true;
+        // The throttle: hold the sink rate to what the engines can stop (a little less near the ground).
+        if (hx.eng && hx.manual <= 0.0f) {
+            const float vt = -fminf(sqrtf(2.0f * aeff * fmaxf(h - 4.0f, 0.0f)) * 0.95f, 150.0f) - 1.0f;
+            const float ff = h > 4.0f ? aeff * 0.9f : 0.0f;                         // the braking the profile itself calls for
+            const float ac = clampf(ff + 3.0f * (vt - vy), -0.9f * HX_G, 1.5f * HX_G);
+            hx.thr = (HX_G + ac) / (HX_TWR * HX_G * mf0 * fmaxf(pl.f.y, 0.5f));
+        }
+    }
     hx.thr = clampf(hx.thr, HX_MINTHR, 1.0f);
+    hx.leg += clampf((hx.legc ? 1.0f : 0.0f) - hx.leg, -0.5f * dt, 0.5f * dt);
     if (hx.fuel <= 0.0f) hx.eng = false;
     const float thrust = hx.eng ? hx.thr : 0.0f;
     hx.fuel = fmaxf(0.0f, hx.fuel - thrust * dt / HX_BURN);
@@ -272,7 +317,7 @@ static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
     // The thrusters and the engine's swivel do the fast work; the flaps, trimmed by the computer, carry the steady load in the air.
     float cx = hx.ground ? 0.0f : -shape(stick(pad->ly)) * 0.6f, cy = hx.ground ? 0.0f : shape(stick(pad->lx)) * 0.5f, cz = hx.ground ? 0.0f : -shape(stick(pad->rx)) * 0.8f;
     if (hx.ground || fabsf(cx) > 0.005f || fabsf(cy) > 0.005f) hx.fh = pl.f;      // hands off: the computer holds the attitude it had
-    else { cx = clampf(-1.5f * vdot(hx.fh, pl.u), -0.4f, 0.4f); cy = clampf(1.5f * vdot(hx.fh, pl.r), -0.4f, 0.4f); }
+    else { const float lm = guide ? 0.6f : 0.4f; cx = clampf(-1.5f * vdot(hx.fh, pl.u), -lm, lm); cy = clampf(1.5f * vdot(hx.fh, pl.r), -lm, lm); }
     if (hx.ground || fabsf(cz) > 0.005f) hx.uh = pl.u;
     else cz = clampf(-1.5f * vdot(hx.uh, pl.r), -0.5f, 0.5f);
     V3 aair, alair;
@@ -309,7 +354,8 @@ static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
     float gap = 1e9f;
     for (int i = 0; i < 4; i++) {
         const float a = i * (PI_F / 2.0f) + PI_F / 4.0f;
-        const V3 f = MW(7.4f * sinf(a), 7.4f * cosf(a), -25.0f);
+        const float rf = 4.7f + 2.7f * hx.leg;
+        const V3 f = MW(rf * sinf(a), rf * cosf(a), -25.0f);
         const float g = f.y - hx_support(f.x, f.z);
         if (g < gap) gap = g;
         if (f.y < 1.0f && (sea_depth(f.x, f.z) > 0.0f || in_lake(f.x, f.z, 1.0f))) { crash_why("landed in the water"); crash(); return; }
@@ -318,15 +364,18 @@ static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
         const float vv = -pl.vel.y, hs = sqrtf(pl.vel.x * pl.vel.x + pl.vel.z * pl.vel.z), tilt = hx_tilt();
         if (!hx.ground) {                                                              // touching down
             if (gap < -4.0f) { crash_why("hit the mount"); crash(); return; }
+            if (hx.leg < 0.9f) { crash_why("landed without its legs"); crash(); return; }
             if (vv > 4.0f)   { crash_why("came down too fast"); crash(); return; }
             if (hs > 3.0f)   { crash_why("came down sideways"); crash(); return; }
             if (tilt > 0.20f) { crash_why("came down tilted"); crash(); return; }
             hx.td = vv;
+            if (hx.assist) hx.eng = false;                                            // the computer shuts the engines down on touchdown
         }
         pl.pos.y -= gap;
         pl.vel = v3(0.0f, 0.0f, 0.0f);
         hx.ground = true;
     } else hx.ground = false;
+    hx.agl = gap;
     if (hx.ground) {                                                                   // standing: settle upright
         const V3 up = v3(0.0f, 1.0f, 0.0f);
         pl.f = vnorm(vadd(pl.f, vscale(vsub(up, pl.f), fminf(1.0f, 3.0f * dt))));
@@ -376,12 +425,13 @@ static void draw_hx_panel(vita2d_pgf *pgf) {
     // The state of the ship.
     const char *st = hx.ground ? "ON THE GROUND" : "FLYING";
     vita2d_pgf_draw_text(pgf, 560, VIEW_H + 34, hx.ground ? green : white, 0.8f, st);
+    vita2d_pgf_draw_text(pgf, 700, VIEW_H + 34, hx.assist ? green : dim, 0.8f, hx.assist ? (hx.flip ? "ASSIST: FLIPPING" : "ASSIST ON") : "ASSIST OFF");
     if (hx.ground && hx.td > 0.0f) vita2d_pgf_draw_textf(pgf, 560, VIEW_H + 58, dim, 0.62f, "TOUCHDOWN %.1f M/S", hx.td);
     vita2d_pgf_draw_textf(pgf, 560, VIEW_H + 82, white, 0.8f, "%d KT", (int)(pl.speed * 1.94384f + 0.5f));
     vita2d_pgf_draw_text(pgf, 700, VIEW_H + 82, hx.dep ? gold : dim, 0.8f, hx.dep ? "FLAPS OUT" : "FLAPS TUCKED");
-    vita2d_pgf_draw_text(pgf, 560, VIEW_H + 104, dim, 0.62f, "SAFE LANDING: UNDER 4 M/S, UPRIGHT");
-    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 124, dim, 0.62f, "X: engines   Square: flaps   D-pad: throttle   L stick: nose   R stick: bank   Triangle: restart");
-    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 142, dim, 0.62f, "Let go of the sticks and the computer holds the attitude. Flaps work in the air only.");
+    vita2d_pgf_draw_text(pgf, 560, VIEW_H + 104, hx.leg > 0.9f ? green : (hx.leg > 0.05f ? gold : dim), 0.8f, hx.leg > 0.9f ? "LEGS OUT" : (hx.leg > 0.05f ? "LEGS MOVING" : "LEGS FOLDED"));
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 124, dim, 0.62f, "X: engines  Square: flaps  O: legs  D-pad up/down: throttle  left: assist  right: FLIP  Triangle: restart");
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 142, dim, 0.62f, "L stick: nose   R stick: bank.  Safe landing: legs out, upright, under 4 m/s.");
 }
 
 /* ------------------------------------------------------------------ */
