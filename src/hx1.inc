@@ -12,8 +12,18 @@
 #define HX_PAD_LZ   505.0f
 #define HX_PAD_R    34.0f
 
+#define HX_G      9.81f
+#define HX_TWR    2.2f             // thrust over weight at full throttle with full tanks
+#define HX_BURN   70.0f            // seconds of fuel at full throttle
+#define HX_MINTHR 0.30f            // the engines cannot throttle below this
+
 typedef struct {
     float psi;                     // the heading it stands facing (radians)
+    bool  eng, ground;             // the engines are lit; the legs are on something
+    float thr, fuel;               // the throttle setting (0.3 to 1) and the fuel (0 to 1)
+    float wp, wy, wr;              // turn rates: pitch, yaw, roll (radians per second)
+    float maxalt, td, t;           // highest point (m, engines), last touchdown speed (m/s), a clock for the flame
+    V3    pad;                     // the landing pad's center
     float flap[4];                 // fore left, fore right, aft left, aft right: 0 = stowed, 1 = fully out
 } HX;
 static HX hx;
@@ -77,6 +87,21 @@ static void build_hx1(void) {
         (void)fc;
         pf_poly(4, pad, NULL, 50, 52, 60, PF_TWO, 255);
     }
+    if (hx.eng && !pl.crashed) {                                                   // the flame: three cones of fire
+        const float L = (4.0f + 14.0f * hx.thr) * (0.85f + 0.15f * sinf(hx.t * 53.0f) * cosf(hx.t * 31.0f));
+        for (int b = 0; b < 3; b++) {
+            const float a = b * (2.0f * PI_F / 3.0f) + 0.5f, bx = 1.7f * sinf(a), by = 1.7f * cosf(a);
+            const V3 apex = MW(bx, by, -26.6f - L), ap2 = MW(bx, by, -26.6f - L * 0.55f);
+            V3 r0[6], r1[6];
+            for (int k = 0; k < 6; k++) {
+                const float t = k * (PI_F / 3.0f);
+                r0[k] = MW(bx + 1.15f * sinf(t), by + 1.15f * cosf(t), -26.6f);
+                r1[k] = MW(bx + 0.62f * sinf(t), by + 0.62f * cosf(t), -26.7f);
+            }
+            for (int k = 0; k < 6; k++) { const int m = (k + 1) % 6; V3 q[3] = { r0[k], r0[m], apex }; pf_poly(3, q, NULL, 255, 150, 50, PF_TWO | PF_EMIT, 255); }
+            for (int k = 0; k < 6; k++) { const int m = (k + 1) % 6; V3 q[3] = { r1[k], r1[m], ap2 }; pf_poly(3, q, NULL, 255, 235, 170, PF_TWO | PF_EMIT, 255); }
+        }
+    }
     for (int f = 0; f < 4; f++) {                                                  // the four flaps: hinged on the sides, low on the belly side
         const float s = (f & 1) ? 1.0f : -1.0f;                                    // (the belly is the black side; the flaps are on the sides next to it)
         const bool fore = f < 2;
@@ -109,6 +134,9 @@ static void hx_start(void) {
     ntrk = 0; trk_i = 0; trk_t = 0;
     hx.psi = a->hdg;
     for (int i = 0; i < 4; i++) hx.flap[i] = 0.0f;
+    hx.eng = false; hx.ground = true; hx.thr = 0.6f; hx.fuel = 1.0f;
+    hx.wp = hx.wy = hx.wr = 0.0f; hx.maxalt = 0.0f; hx.td = 0.0f; hx.t = 0.0f;
+    hx.pad = ap_pt(a, HX_PAD_LX, 0.0f, HX_PAD_LZ);
     set_axes(hx.psi, HX_UP, 0.0f);
     chase_dir = v3(sinf(hx.psi), 0.0f, cosf(hx.psi));
     look_ang = 0.0f; view_mode = 1;
@@ -118,43 +146,129 @@ static void hx_restart(void) { hx_start(); }
 // Where the chase camera looks from: level with the horizon, from behind the way the ship faces.
 static V3 hx_chase_target(void) { return v3(sinf(hx.psi), 0.12f, cosf(hx.psi)); }
 
-static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
-    (void)pressed;
-    view_mode = 1;
-    const float p = -stick(pad->ly), r = stick(pad->lx);            // the left stick: up opens the flaps; left / right works one side more than the other
-    for (int i = 0; i < 4; i++) {
-        const float s = (i & 1) ? 1.0f : -1.0f;
-        const float want = clampf(p + s * r * 0.6f, 0.0f, 1.0f);
-        hx.flap[i] += (want - hx.flap[i]) * fminf(1.0f, 3.0f * DT);
+// What the legs can stand on at (x, z): the ground, the landing pad, and anything low enough to land on (the launch mount, a roof).
+static float hx_support(float x, float z) {
+    float h = 0.0f;
+    for (int i = 0; i < nboxes; i++) {
+        const Box *b = &boxes[i];
+        if (b->h <= 20.0f && b->h > h && fabsf(x - b->x) < b->w * 0.5f && fabsf(z - b->z) < b->d * 0.5f) h = b->h;
     }
-    set_axes(hx.psi, HX_UP, 0.0f);
-    pl.on_ground = true; pl.gs = 0.0f; pl.vel = v3(0, 0, 0);
-    pl.hdg = pl.hdg_g = hx.psi; pl.pitch = HX_UP; pl.roll = 0.0f;
-    pl.speed = 0.0f; pl.vs = 0.0f; pl.alpha = 0.0f; pl.beta = 0.0f; pl.throttle = 0.0f; pl.rpm = 0.0f;
-    pl.touched = true;
+    const float dx = x - hx.pad.x, dz = z - hx.pad.z, r = sqrtf(dx * dx + dz * dz) / HX_PAD_R;
+    const float ph = r < 0.14f ? 0.66f : r < 0.42f ? 0.54f : r < 0.74f ? 0.42f : r < 1.0f ? 0.30f : 0.0f;
+    return fmaxf(h, ph);
 }
+static float hx_tilt(void) { return acosf(clampf(pl.f.y, -1.0f, 1.0f)); }      // how far the nose is from straight up (radians)
 
-// The ship's height above the sea (feet): the engines, not the middle.
+// The height of the engines above the sea (feet) as the pilot reads it.
 static float hx_alt_ft(void) { return (pl.pos.y - HX_HALF * fabsf(pl.f.y)) * 3.28084f; }
 
+static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
+    const float dt = DT;
+    view_mode = 1;
+    hx.t += dt;
+    // The flaps stay tucked for the hop (hold O to see them open; they come into their own in the belly flop).
+    for (int i = 0; i < 4; i++) hx.flap[i] += (((pad->buttons & SCE_CTRL_CIRCLE) ? 1.0f : 0.0f) - hx.flap[i]) * fminf(1.0f, 3.0f * dt);
+
+    // Engines: X lights or shuts them down, the D-pad up and down sets the throttle.
+    if ((pressed & SCE_CTRL_CROSS) && !hx.eng && hx.fuel > 0.0f) hx.eng = true;
+    else if (pressed & SCE_CTRL_CROSS) hx.eng = false;
+    if (pad->buttons & SCE_CTRL_UP)   hx.thr += 0.5f * dt;
+    if (pad->buttons & SCE_CTRL_DOWN) hx.thr -= 0.5f * dt;
+    hx.thr = clampf(hx.thr, HX_MINTHR, 1.0f);
+    if (hx.fuel <= 0.0f) hx.eng = false;
+    const float thrust = hx.eng ? hx.thr : 0.0f;
+    hx.fuel = fmaxf(0.0f, hx.fuel - thrust * dt / HX_BURN);
+
+    // Attitude: the left stick tilts the nose (up: toward the belly, which is the way the ship faces; sideways: toward that side),
+    // the right stick turns it about its long axis. Let go and the turn stops (the computer holds the rates at zero). Not on the ground.
+    const float k = fminf(1.0f, 4.0f * dt);
+    const float cp = hx.ground ? 0.0f : shape(stick(pad->ly)) * 0.5f, cy = hx.ground ? 0.0f : shape(stick(pad->lx)) * 0.5f, cr = hx.ground ? 0.0f : shape(stick(pad->rx)) * 0.5f;
+    hx.wp += (cp - hx.wp) * k; hx.wy += (cy - hx.wy) * k; hx.wr += (cr - hx.wr) * k;
+    rot_pitch(hx.wp * dt); rot_yaw(hx.wy * dt); rot_roll(hx.wr * dt);
+    orthonormalize();
+
+    // Forces: gravity, thrust along the ship's long axis (lighter as the fuel burns), and a little drag.
+    const float mf = 1.0f / (0.55f + 0.45f * hx.fuel);
+    V3 acc = v3(0.0f, -HX_G, 0.0f);
+    acc = vadd(acc, vscale(pl.f, thrust * HX_TWR * HX_G * mf));
+    const float sp = sqrtf(vdot(pl.vel, pl.vel));
+    acc = vsub(acc, vscale(pl.vel, 0.0004f * sp));
+    pl.vel = vadd(pl.vel, vscale(acc, dt));
+    pl.pos = vadd(pl.pos, vscale(pl.vel, dt));
+
+    // The legs: find the lowest foot above whatever is under it.
+    float gap = 1e9f;
+    for (int i = 0; i < 4; i++) {
+        const float a = i * (PI_F / 2.0f) + PI_F / 4.0f;
+        const V3 f = MW(7.4f * sinf(a), 7.4f * cosf(a), -25.0f);
+        const float g = f.y - hx_support(f.x, f.z);
+        if (g < gap) gap = g;
+        if (f.y < 1.0f && (sea_depth(f.x, f.z) > 0.0f || in_lake(f.x, f.z, 1.0f))) { crash_why("landed in the water"); crash(); return; }
+    }
+    if (gap < -0.001f || (gap < 0.05f && pl.vel.y <= 0.0f)) {                         // on something (or coming down onto it)
+        const float vv = -pl.vel.y, hs = sqrtf(pl.vel.x * pl.vel.x + pl.vel.z * pl.vel.z), tilt = hx_tilt();
+        if (!hx.ground) {                                                              // touching down
+            if (gap < -4.0f) { crash_why("hit the mount"); crash(); return; }
+            if (vv > 4.0f)   { crash_why("came down too fast"); crash(); return; }
+            if (hs > 3.0f)   { crash_why("came down sideways"); crash(); return; }
+            if (tilt > 0.20f) { crash_why("came down tilted"); crash(); return; }
+            hx.td = vv;
+        }
+        pl.pos.y -= gap;
+        pl.vel = v3(0.0f, 0.0f, 0.0f);
+        hx.ground = true;
+    } else hx.ground = false;
+    if (hx.ground) {                                                                   // standing: settle upright
+        const V3 up = v3(0.0f, 1.0f, 0.0f);
+        pl.f = vnorm(vadd(pl.f, vscale(vsub(up, pl.f), fminf(1.0f, 3.0f * dt))));
+        pl.r = vnorm(vsub(pl.r, vscale(pl.f, vdot(pl.r, pl.f))));
+        pl.u = vcross(pl.f, pl.r);
+        if (thrust * HX_TWR * mf <= 1.0f) pl.vel = v3(0.0f, 0.0f, 0.0f);
+    }
+    {                                                                                  // the tower and other tall things
+        const float zs[4] = { -25.0f, -8.0f, 10.0f, 25.0f };
+        for (int j = 0; j < 4; j++) {
+            const V3 q = MW(0.0f, 0.0f, zs[j]);
+            for (int i = 0; i < nboxes; i++) {
+                const Box *b = &boxes[i];
+                if (b->h > 20.0f && fabsf(q.x - b->x) < b->w * 0.5f + HX_R && fabsf(q.z - b->z) < b->d * 0.5f + HX_R && q.y < b->h) { crash_why("hit the tower"); crash(); return; }
+            }
+        }
+    }
+    if (hx_alt_ft() * 0.3048f > hx.maxalt) hx.maxalt = hx_alt_ft() * 0.3048f;
+
+    pl.on_ground = hx.ground; pl.gs = 0.0f; pl.touched = true;
+    pl.hdg = pl.hdg_g = hx.psi; pl.pitch = asinf(clampf(pl.f.y, -1.0f, 1.0f)); pl.roll = 0.0f;
+    pl.speed = sqrtf(vdot(pl.vel, pl.vel)); pl.vs = pl.vel.y; pl.alpha = 0.0f; pl.beta = 0.0f;
+    pl.throttle = thrust; pl.rpm = 0.0f; pl.fuel = hx.fuel;
+}
+
 static void draw_hx_panel(vita2d_pgf *pgf) {
-    const unsigned int white = RGBA8(240, 242, 248, 255), dim = RGBA8(150, 156, 172, 255), gold = RGBA8(255, 206, 130, 255);
+    const unsigned int white = RGBA8(240, 242, 248, 255), dim = RGBA8(150, 156, 172, 255), gold = RGBA8(255, 206, 130, 255), red = RGBA8(255, 110, 100, 255), green = RGBA8(120, 220, 140, 255);
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, SCREEN_H - VIEW_H, RGBA8(30, 32, 40, 255));
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, 3, RGBA8(120, 124, 136, 255));
     vita2d_pgf_draw_text(pgf, 24, VIEW_H + 34, gold, 1.1f, "STRAKE HX-1");
-    vita2d_pgf_draw_text(pgf, 24, VIEW_H + 58, dim, 0.7f, "HOP TEST: PAD VIEW");
+    vita2d_pgf_draw_text(pgf, 24, VIEW_H + 58, dim, 0.7f, "HOP TEST");
     vita2d_pgf_draw_textf(pgf, 24, VIEW_H + 96, white, 1.3f, "%d FT", (int)(hx_alt_ft() + 0.5f));
     vita2d_pgf_draw_text(pgf, 24, VIEW_H + 114, dim, 0.62f, "ABOVE SEA LEVEL");
-    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 34, white, 0.8f, "FLAPS");
-    static const char *const FN[4] = { "FWD L", "FWD R", "AFT L", "AFT R" };
-    for (int i = 0; i < 4; i++) {
-        const float x = 250.0f + i * 92.0f, y = VIEW_H + 46.0f;
-        vita2d_draw_rectangle(x, y, 74, 14, RGBA8(52, 56, 68, 255));
-        vita2d_draw_rectangle(x, y, 74.0f * hx.flap[i], 14, gold);
-        vita2d_pgf_draw_text(pgf, x, y + 32, dim, 0.6f, FN[i]);
-    }
-    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 114, dim, 0.62f, "Left stick: flaps    L / R: look around    Triangle: start over");
-    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 132, dim, 0.62f, "The engines and the flight controls come in the next update.");
+    vita2d_pgf_draw_textf(pgf, 24, VIEW_H + 134, dim, 0.62f, "HIGHEST %d FT", (int)(hx.maxalt * 3.28084f + 0.5f));
+    // Engine, throttle and fuel.
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 34, hx.eng ? green : dim, 0.8f, hx.eng ? "ENGINES ON" : "ENGINES OFF");
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 58, dim, 0.62f, "THROTTLE");
+    vita2d_draw_rectangle(340, VIEW_H + 46, 120, 14, RGBA8(52, 56, 68, 255));
+    vita2d_draw_rectangle(340, VIEW_H + 46, 120.0f * hx.thr, 14, hx.eng ? gold : dim);
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 80, dim, 0.62f, "FUEL");
+    vita2d_draw_rectangle(340, VIEW_H + 68, 120, 14, RGBA8(52, 56, 68, 255));
+    vita2d_draw_rectangle(340, VIEW_H + 68, 120.0f * hx.fuel, 14, hx.fuel > 0.2f ? white : red);
+    vita2d_pgf_draw_textf(pgf, 250, VIEW_H + 104, white, 0.8f, "%+d FPM", (int)(pl.vs * 196.85f));
+    vita2d_pgf_draw_textf(pgf, 410, VIEW_H + 104, hx_tilt() > 0.20f ? gold : white, 0.8f, "TILT %d", (int)(hx_tilt() * 57.2958f + 0.5f));
+    // The state of the ship.
+    const char *st = hx.ground ? "ON THE GROUND" : "FLYING";
+    vita2d_pgf_draw_text(pgf, 560, VIEW_H + 34, hx.ground ? green : white, 0.8f, st);
+    if (hx.ground && hx.td > 0.0f) vita2d_pgf_draw_textf(pgf, 560, VIEW_H + 58, dim, 0.62f, "TOUCHDOWN %.1f M/S", hx.td);
+    vita2d_pgf_draw_text(pgf, 560, VIEW_H + 80, dim, 0.62f, "SAFE LANDING: UNDER 4 M/S, UPRIGHT");
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 124, dim, 0.62f, "X: engines   D-pad up/down: throttle   L stick: tilt   R stick: spin   Triangle: start over");
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 142, dim, 0.62f, "Full throttle lifts it; about half holds it still.");
 }
 
 /* ------------------------------------------------------------------ */
