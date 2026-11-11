@@ -14,7 +14,7 @@
 
 typedef struct {
     float psi;                     // the heading it stands facing (radians)
-    float flap[4];                 // fore left, fore right, aft left, aft right: 0 = stowed, 1 = fully out
+    float flap[4];                 // fore left, fore right, aft left, aft right: 0 = tucked away, 1 = fully out (the rest position)
 } HX;
 static HX hx;
 
@@ -108,7 +108,7 @@ static void hx_start(void) {
     engine_failed = false; eng_on = false; eng_n = 0.0f;
     ntrk = 0; trk_i = 0; trk_t = 0;
     hx.psi = a->hdg;
-    for (int i = 0; i < 4; i++) hx.flap[i] = 0.0f;
+    for (int i = 0; i < 4; i++) hx.flap[i] = 1.0f;                       // the flaps rest in the open position
     set_axes(hx.psi, HX_UP, 0.0f);
     chase_dir = v3(sinf(hx.psi), 0.0f, cosf(hx.psi));
     look_ang = 0.0f; view_mode = 1;
@@ -121,10 +121,10 @@ static V3 hx_chase_target(void) { return v3(sinf(hx.psi), 0.12f, cosf(hx.psi)); 
 static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
     (void)pressed;
     view_mode = 1;
-    const float p = -stick(pad->ly), r = stick(pad->lx);            // the left stick: up opens the flaps; left / right works one side more than the other
+    const float p = -stick(pad->ly), r = stick(pad->lx);            // the left stick: up tucks the flaps away; left / right works one side more than the other
     for (int i = 0; i < 4; i++) {
         const float s = (i & 1) ? 1.0f : -1.0f;
-        const float want = clampf(p + s * r * 0.6f, 0.0f, 1.0f);
+        const float want = 1.0f - clampf(p + s * r * 0.6f, 0.0f, 1.0f);   // out at rest; the stick tucks them away
         hx.flap[i] += (want - hx.flap[i]) * fminf(1.0f, 3.0f * DT);
     }
     set_axes(hx.psi, HX_UP, 0.0f);
@@ -153,7 +153,7 @@ static void draw_hx_panel(vita2d_pgf *pgf) {
         vita2d_draw_rectangle(x, y, 74.0f * hx.flap[i], 14, gold);
         vita2d_pgf_draw_text(pgf, x, y + 32, dim, 0.6f, FN[i]);
     }
-    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 114, dim, 0.62f, "Left stick: flaps    L / R: look around    Triangle: start over");
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 114, dim, 0.62f, "Left stick up: tuck the flaps    L / R: look around    Triangle: start over");
     vita2d_pgf_draw_text(pgf, 250, VIEW_H + 132, dim, 0.62f, "The engines and the flight controls come in the next update.");
 }
 
