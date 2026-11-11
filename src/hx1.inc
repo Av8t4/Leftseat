@@ -16,12 +16,17 @@
 #define HX_TWR    2.2f             // thrust over weight at full throttle with full tanks
 #define HX_BURN   70.0f            // seconds of fuel at full throttle
 #define HX_MINTHR 0.30f            // the engines cannot throttle below this
+#define HX_PITCH_SIGN -1.0f        // the fore flaps push the nose up when they open more, so they open when the nose should come toward the belly less
+#define HX_ROLL_SIGN  1.0f         // and the right flaps the roll
 
 typedef struct {
     float psi;                     // the heading it stands facing (radians)
     bool  eng, ground;             // the engines are lit; the legs are on something
     float thr, fuel;               // the throttle setting (0.3 to 1) and the fuel (0 to 1)
-    float wp, wy, wr;              // turn rates: pitch, yaw, roll (radians per second)
+    float wx, wy, wz;              // turn rates about the ship's own axes: x = right (nose toward the belly), y = back (nose to the right), z = long axis (radians per second)
+    V3    fh, uh;                  // the attitude the computer is holding: where the nose points and which way the back faces
+    bool  dep;                     // the flaps are asked to open
+    float dp, dr;                  // the computer's flap trims for pitch and roll (-1 to 1)
     float maxalt, td, t;           // highest point (m, engines), last touchdown speed (m/s), a clock for the flame
     V3    pad;                     // the landing pad's center
     float flap[4];                 // fore left, fore right, aft left, aft right: 0 = stowed, 1 = fully out
@@ -136,16 +141,26 @@ static void hx_start(void) {
     hx.psi = a->hdg;
     for (int i = 0; i < 4; i++) hx.flap[i] = 0.0f;
     hx.eng = false; hx.ground = true; hx.thr = 0.6f; hx.fuel = 1.0f;
-    hx.wp = hx.wy = hx.wr = 0.0f; hx.maxalt = 0.0f; hx.td = 0.0f; hx.t = 0.0f;
+    hx.wx = hx.wy = hx.wz = 0.0f; hx.dep = false; hx.dp = hx.dr = 0.0f; hx.maxalt = 0.0f; hx.td = 0.0f; hx.t = 0.0f;
     hx.pad = ap_pt(a, HX_PAD_LX, 0.0f, HX_PAD_LZ);
     set_axes(hx.psi, HX_UP, 0.0f);
+    hx.fh = pl.f; hx.uh = pl.u;
     chase_dir = v3(sinf(hx.psi), 0.0f, cosf(hx.psi));
     look_ang = 0.0f; view_mode = 1;
 }
 static void hx_restart(void) { hx_start(); }
 
-// Where the chase camera looks from: level with the horizon, from behind the way the ship faces.
-static V3 hx_chase_target(void) { return v3(sinf(hx.psi), 0.12f, cosf(hx.psi)); }
+// The way the chase camera looks: from behind when the ship stands up, from its right side when it lies flat (so the belly flop shows).
+static V3 hx_chase_target(void) {
+    V3 fh = v3(pl.f.x, 0.0f, pl.f.z);
+    const float l = sqrtf(fh.x * fh.x + fh.z * fh.z);
+    fh = l > 0.05f ? vscale(fh, 1.0f / l) : v3(sinf(hx.psi), 0.0f, cosf(hx.psi));
+    const V3 beh = v3(sinf(hx.psi), 0.0f, cosf(hx.psi)), side = v3(-fh.z, 0.0f, fh.x);
+    const float w = clampf((fabsf(pl.f.y) - 0.35f) / 0.5f, 0.0f, 1.0f);
+    V3 t = vadd(vscale(beh, w), vscale(side, 1.0f - w));
+    t.y = 0.12f;
+    return t;
+}
 
 // What the legs can stand on at (x, z): the ground, the landing pad, and anything low enough to land on (the launch mount, a roof).
 static float hx_support(float x, float z) {
@@ -163,16 +178,88 @@ static float hx_tilt(void) { return acosf(clampf(pl.f.y, -1.0f, 1.0f)); }      /
 // The height of the engines above the sea (feet) as the pilot reads it.
 static float hx_alt_ft(void) { return (pl.pos.y - HX_HALF * fabsf(pl.f.y)) * 3.28084f; }
 
+// ---- The air: the hull and the flaps are flat plates and a drum in the wind. -------------------------------------------------------
+#define HX_M0   120000.0f          // mass with full tanks (kg)
+#define HX_ICG  -2.0f              // the center of gravity along the ship (m): about where the drum's pressure acts, so the hull alone is neutral
+#define HX_CD   0.8f               // the drum, side on
+#define HX_I_T  200.0f             // turning inertia about the cross axes, per kilogram
+#define HX_I_L  15.0f              // about the long axis
+
+static float hx_rho(float h) { return 1.225f * expf(-fmaxf(h, 0.0f) / 8500.0f); }
+
+// A flap's geometry in the ship's own axes: hinge, direction out from the hinge, length along the ship, area, and how far out it is (0 to 1).
+typedef struct { float hx, hy, z0, z1, dx, dy, area, out; } HXFL;
+static void hx_flap_geo(int f, HXFL *g) {
+    const float s = (f & 1) ? 1.0f : -1.0f;
+    const bool fore = f < 2;
+    const float span = fore ? 3.4f : 5.2f;
+    const float th = -0.55f + hx.flap[f] * 2.3f;
+    g->hx = s * HX_R * 0.9f; g->hy = -HX_R * 0.4f;
+    g->z0 = fore ? 6.0f : -20.0f; g->z1 = fore ? 11.5f : -8.0f;
+    g->dx = s * sinf(th); g->dy = cosf(th);
+    g->area = span * (g->z1 - g->z0);
+    g->out = clampf(hx.flap[f] * 1.3f - 0.15f, 0.0f, 1.0f);              // tucked in the hull they do nothing
+}
+
+// The forces and turning moments of the air, in the ship's axes, per kilogram. acc: m/s^2 (x right, y back, z nose); alp: radians/s^2.
+static void hx_air(V3 *acc, V3 *alp) {
+    *acc = v3(0, 0, 0); *alp = v3(0, 0, 0);
+    const float rho = hx_rho(pl.pos.y);
+    const float m = HX_M0 * (0.55f + 0.45f * hx.fuel);
+    const V3 vb = v3(vdot(pl.vel, pl.r), vdot(pl.vel, pl.u), vdot(pl.vel, pl.f)), w = v3(hx.wx, hx.wy, hx.wz);
+    V3 F = v3(0, 0, 0), T = v3(0, 0, 0);
+    // The drum: five stations along the ship, each pushed by the wind across it (this also damps the turning).
+    static const float SZ[5] = { -20.0f, -10.0f, 0.0f, 10.0f, 20.0f }, SD[5] = { 9.0f, 9.0f, 9.0f, 9.0f, 5.0f };
+    for (int k = 0; k < 5; k++) {
+        const V3 p = v3(0.0f, 0.0f, SZ[k] - HX_ICG);
+        const V3 vl = v3(vb.x + (w.y * p.z - w.z * p.y), vb.y + (w.z * p.x - w.x * p.z), 0.0f);
+        const float sl = sqrtf(vl.x * vl.x + vl.y * vl.y);
+        const float c = -0.5f * rho * HX_CD * SD[k] * 10.0f * sl;
+        const V3 fk = v3(c * vl.x, c * vl.y, 0.0f);
+        F = vadd(F, fk);
+        T = vadd(T, vcross(p, fk));
+    }
+    F.z += -0.5f * rho * 0.5f * 63.6f * vb.z * fabsf(vb.z);                       // along the ship: the nose or the engines first
+    for (int f = 0; f < 4; f++) {                                                  // the flaps: a plate in the wind, pushed along its own normal
+        HXFL g; hx_flap_geo(f, &g);
+        if (g.out <= 0.0f) continue;
+        const float sp = (f < 2) ? 3.4f : 5.2f;
+        const V3 p = v3(g.hx + g.dx * sp * 0.5f, g.hy + g.dy * sp * 0.5f, 0.5f * (g.z0 + g.z1) - HX_ICG);
+        const V3 vl = v3(vb.x + (w.y * p.z - w.z * p.y), vb.y + (w.z * p.x - w.x * p.z), vb.z + (w.x * p.y - w.y * p.x));
+        const V3 n = v3(g.dy, -g.dx, 0.0f);
+        const float vn = vl.x * n.x + vl.y * n.y;
+        const float c = -0.5f * rho * 1.4f * g.area * g.out * fabsf(vn);
+        const V3 ff = v3(c * vn * n.x, c * vn * n.y, 0.0f);
+        F = vadd(F, ff);
+        T = vadd(T, vcross(p, ff));
+    }
+    *acc = vscale(F, 1.0f / m);
+    *alp = v3(T.x / (m * HX_I_T), T.y / (m * HX_I_T), T.z / (m * HX_I_L));
+}
+
+static void hx_rotate(V3 wbody, float dt) {                                         // turn the ship's axes by a turn rate given in its own axes
+    const V3 wd = vadd(vadd(vscale(pl.r, wbody.x), vscale(pl.u, wbody.y)), vscale(pl.f, wbody.z));
+    const float ang = sqrtf(vdot(wd, wd)) * dt;
+    if (ang < 1e-7f) return;
+    const V3 ax = vnorm(wd);
+    const float c = cosf(ang), sn = sinf(ang);
+    V3 *v[3] = { &pl.f, &pl.r, &pl.u };
+    for (int i = 0; i < 3; i++) {                                                  // Rodrigues
+        const V3 x = *v[i];
+        *v[i] = vadd(vadd(vscale(x, c), vscale(vcross(ax, x), sn)), vscale(ax, vdot(ax, x) * (1.0f - c)));
+    }
+    orthonormalize();
+}
+
 static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
     const float dt = DT;
     view_mode = 1;
     hx.t += dt;
-    // The flaps stay tucked for the hop (hold O to see them open; they come into their own in the belly flop).
-    for (int i = 0; i < 4; i++) hx.flap[i] += (((pad->buttons & SCE_CTRL_CIRCLE) ? 1.0f : 0.0f) - hx.flap[i]) * fminf(1.0f, 3.0f * dt);
 
-    // Engines: X lights or shuts them down, the D-pad up and down sets the throttle.
+    // Engines: X lights or shuts them down, the D-pad up and down sets the throttle. Square opens or tucks the flaps.
     if ((pressed & SCE_CTRL_CROSS) && !hx.eng && hx.fuel > 0.0f) hx.eng = true;
     else if (pressed & SCE_CTRL_CROSS) hx.eng = false;
+    if (pressed & SCE_CTRL_SQUARE) hx.dep = !hx.dep;
     if (pad->buttons & SCE_CTRL_UP)   hx.thr += 0.5f * dt;
     if (pad->buttons & SCE_CTRL_DOWN) hx.thr -= 0.5f * dt;
     hx.thr = clampf(hx.thr, HX_MINTHR, 1.0f);
@@ -180,20 +267,41 @@ static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
     const float thrust = hx.eng ? hx.thr : 0.0f;
     hx.fuel = fmaxf(0.0f, hx.fuel - thrust * dt / HX_BURN);
 
-    // Attitude: the left stick tilts the nose (up: toward the belly, which is the way the ship faces; sideways: toward that side),
-    // the right stick turns it about its long axis. Let go and the turn stops (the computer holds the rates at zero). Not on the ground.
-    const float k = fminf(1.0f, 4.0f * dt);
-    const float cp = hx.ground ? 0.0f : shape(stick(pad->ly)) * 0.5f, cy = hx.ground ? 0.0f : shape(stick(pad->lx)) * 0.5f, cr = hx.ground ? 0.0f : shape(stick(pad->rx)) * 0.5f;
-    hx.wp += (cp - hx.wp) * k; hx.wy += (cy - hx.wy) * k; hx.wr += (cr - hx.wr) * k;
-    rot_pitch(hx.wp * dt); rot_yaw(hx.wy * dt); rot_roll(hx.wr * dt);
-    orthonormalize();
+    // The pilot asks for turn rates: the left stick tilts the nose (up: toward the belly), sideways: toward that side;
+    // the right stick banks it (rolls it about its long axis). The computer works to hold the rates the sticks ask for.
+    // The thrusters and the engine's swivel do the fast work; the flaps, trimmed by the computer, carry the steady load in the air.
+    float cx = hx.ground ? 0.0f : -shape(stick(pad->ly)) * 0.6f, cy = hx.ground ? 0.0f : shape(stick(pad->lx)) * 0.5f, cz = hx.ground ? 0.0f : -shape(stick(pad->rx)) * 0.8f;
+    if (hx.ground || fabsf(cx) > 0.005f || fabsf(cy) > 0.005f) hx.fh = pl.f;      // hands off: the computer holds the attitude it had
+    else { cx = clampf(-1.5f * vdot(hx.fh, pl.u), -0.4f, 0.4f); cy = clampf(1.5f * vdot(hx.fh, pl.r), -0.4f, 0.4f); }
+    if (hx.ground || fabsf(cz) > 0.005f) hx.uh = pl.u;
+    else cz = clampf(-1.5f * vdot(hx.uh, pl.r), -0.5f, 0.5f);
+    V3 aair, alair;
+    hx_air(&aair, &alair);
+    if (hx.ground) { aair = v3(0, 0, 0); alair = v3(0, 0, 0); }
+    const float amax = 0.30f + (thrust > 0.0f ? 0.40f * thrust : 0.0f);           // turning authority of the thrusters and the swivel (rad/s^2)
+    const float azmax = 0.40f;
+    const float ax = clampf(4.0f * (cx - hx.wx), -amax, amax), ay = clampf(4.0f * (cy - hx.wy), -amax, amax), az = clampf(4.0f * (cz - hx.wz), -azmax, azmax);
+    hx.wx += (alair.x + ax) * dt; hx.wy += (alair.y + ay) * dt; hx.wz += (alair.z + az) * dt;
+    if (hx.ground) hx.wx = hx.wy = hx.wz = 0.0f;
+    hx_rotate(v3(hx.wx, hx.wy, hx.wz), dt);
 
-    // Forces: gravity, thrust along the ship's long axis (lighter as the fuel burns), and a little drag.
+    // The flaps: tucked, or out and trimmed. The trims creep until the turn rate is the one asked for.
+    if (hx.dep && !hx.ground) {
+        hx.dp = clampf(hx.dp + 0.5f * (cx - hx.wx) * dt, -1.0f, 1.0f);
+        hx.dr = clampf(hx.dr + 0.5f * (cz - hx.wz) * dt, -1.0f, 1.0f);
+    } else { hx.dp *= 1.0f - fminf(1.0f, 1.0f * dt); hx.dr *= 1.0f - fminf(1.0f, 1.0f * dt); }
+    for (int f = 0; f < 4; f++) {
+        const float sd = (f & 1) ? 1.0f : -1.0f;                                    // +1: right flaps
+        const float pf = (f < 2) ? HX_PITCH_SIGN : -HX_PITCH_SIGN;                  // fore and aft work against each other
+        const float want = hx.dep ? clampf(0.70f + 0.30f * (pf * hx.dp + sd * HX_ROLL_SIGN * hx.dr), 0.0f, 1.0f) : 0.0f;
+        hx.flap[f] += (want - hx.flap[f]) * fminf(1.0f, 4.0f * dt);
+    }
+
+    // Forces: gravity, thrust along the ship's long axis (lighter as the fuel burns), and the air.
     const float mf = 1.0f / (0.55f + 0.45f * hx.fuel);
     V3 acc = v3(0.0f, -HX_G, 0.0f);
     acc = vadd(acc, vscale(pl.f, thrust * HX_TWR * HX_G * mf));
-    const float sp = sqrtf(vdot(pl.vel, pl.vel));
-    acc = vsub(acc, vscale(pl.vel, 0.0004f * sp));
+    acc = vadd(acc, vadd(vadd(vscale(pl.r, aair.x), vscale(pl.u, aair.y)), vscale(pl.f, aair.z)));
     pl.vel = vadd(pl.vel, vscale(acc, dt));
     pl.pos = vadd(pl.pos, vscale(pl.vel, dt));
 
@@ -226,10 +334,12 @@ static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
         pl.u = vcross(pl.f, pl.r);
         if (thrust * HX_TWR * mf <= 1.0f) pl.vel = v3(0.0f, 0.0f, 0.0f);
     }
-    {                                                                                  // the tower and other tall things
+    {                                                                                  // the hull on the ground (tipped over), the tower and other tall things
         const float zs[4] = { -25.0f, -8.0f, 10.0f, 25.0f };
+        const float side = sqrtf(fmaxf(0.0f, 1.0f - pl.f.y * pl.f.y)) * HX_R;
         for (int j = 0; j < 4; j++) {
             const V3 q = MW(0.0f, 0.0f, zs[j]);
+            if (hx_tilt() > 0.35f && q.y - side < hx_support(q.x, q.z) - 0.2f) { crash_why("hit the ground"); crash(); return; }
             for (int i = 0; i < nboxes; i++) {
                 const Box *b = &boxes[i];
                 if (b->h > 20.0f && fabsf(q.x - b->x) < b->w * 0.5f + HX_R && fabsf(q.z - b->z) < b->d * 0.5f + HX_R && q.y < b->h) { crash_why("hit the tower"); crash(); return; }
@@ -262,14 +372,16 @@ static void draw_hx_panel(vita2d_pgf *pgf) {
     vita2d_draw_rectangle(340, VIEW_H + 68, 120, 14, RGBA8(52, 56, 68, 255));
     vita2d_draw_rectangle(340, VIEW_H + 68, 120.0f * hx.fuel, 14, hx.fuel > 0.2f ? white : red);
     vita2d_pgf_draw_textf(pgf, 250, VIEW_H + 104, white, 0.8f, "%+d FPM", (int)(pl.vs * 196.85f));
-    vita2d_pgf_draw_textf(pgf, 410, VIEW_H + 104, hx_tilt() > 0.20f ? gold : white, 0.8f, "TILT %d", (int)(hx_tilt() * 57.2958f + 0.5f));
+    vita2d_pgf_draw_textf(pgf, 410, VIEW_H + 104, white, 0.8f, "PITCH %d", (int)(asinf(clampf(pl.f.y, -1.0f, 1.0f)) * 57.2958f + 0.5f));
     // The state of the ship.
     const char *st = hx.ground ? "ON THE GROUND" : "FLYING";
     vita2d_pgf_draw_text(pgf, 560, VIEW_H + 34, hx.ground ? green : white, 0.8f, st);
     if (hx.ground && hx.td > 0.0f) vita2d_pgf_draw_textf(pgf, 560, VIEW_H + 58, dim, 0.62f, "TOUCHDOWN %.1f M/S", hx.td);
-    vita2d_pgf_draw_text(pgf, 560, VIEW_H + 80, dim, 0.62f, "SAFE LANDING: UNDER 4 M/S, UPRIGHT");
-    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 124, dim, 0.62f, "X: engines   D-pad up/down: throttle   L stick: tilt   R stick: spin   Triangle: start over");
-    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 142, dim, 0.62f, "Full throttle lifts it; about half holds it still.");
+    vita2d_pgf_draw_textf(pgf, 560, VIEW_H + 82, white, 0.8f, "%d KT", (int)(pl.speed * 1.94384f + 0.5f));
+    vita2d_pgf_draw_text(pgf, 700, VIEW_H + 82, hx.dep ? gold : dim, 0.8f, hx.dep ? "FLAPS OUT" : "FLAPS TUCKED");
+    vita2d_pgf_draw_text(pgf, 560, VIEW_H + 104, dim, 0.62f, "SAFE LANDING: UNDER 4 M/S, UPRIGHT");
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 124, dim, 0.62f, "X: engines   Square: flaps   D-pad: throttle   L stick: nose   R stick: bank   Triangle: restart");
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 142, dim, 0.62f, "Let go of the sticks and the computer holds the attitude. Flaps work in the air only.");
 }
 
 /* ------------------------------------------------------------------ */
