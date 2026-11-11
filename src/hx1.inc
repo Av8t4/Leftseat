@@ -133,6 +133,11 @@ static void draw_plane_shadow_hx1(void) {}
 /* The pad session                                                      */
 /* ------------------------------------------------------------------ */
 
+typedef struct { V3 p, v; float age, life, size; bool dust; } HXPuff;
+#define HX_NPUFF 90
+static HXPuff hx_puffs[HX_NPUFF];
+static int    hx_np;
+
 static void hx_start(void) {
     const Airport *a = &AIRPORTS[AP_SPACE];
     game_mode = MODE_HX; ch_state = CH_IDLE;
@@ -146,6 +151,7 @@ static void hx_start(void) {
     ntrk = 0; trk_i = 0; trk_t = 0;
     hx.psi = a->hdg;
     for (int i = 0; i < 4; i++) hx.flap[i] = 0.0f;
+    hx_np = 0;
     hx.eng = false; hx.ground = true; hx.thr = 0.6f; hx.fuel = 1.0f;
     hx.leg = 0.0f; hx.legc = false; hx.assist = true; hx.flip = false; hx.agl = 0.0f; hx.manual = 0.0f;       // the legs are folded: the ship is held on its mount
     hx.wx = hx.wy = hx.wz = 0.0f; hx.dep = false; hx.dp = hx.dr = 0.0f; hx.maxalt = 0.0f; hx.td = 0.0f; hx.t = 0.0f;
@@ -258,10 +264,65 @@ static void hx_rotate(V3 wbody, float dt) {                                     
     orthonormalize();
 }
 
+// The pad camera stands on the ground a little beyond the landing pad, off to one side.
+static V3 hx_pad_cam(void) { return v3(hx.pad.x + 80.0f, 0.0f, hx.pad.z + 45.0f); }
+
+// ---- Exhaust smoke and the dust the engines blow up near the ground. ----------------------------------------------------------------
+static void hx_puff_add(V3 p, V3 v, float life, float size, bool dust) {
+    if (hx_np >= HX_NPUFF) return;
+    HXPuff *q = &hx_puffs[hx_np++];
+    q->p = p; q->v = vadd(v, v3(kx_rnd() * 1.5f, kx_rnd() * 0.8f, kx_rnd() * 1.5f)); q->age = 0.0f; q->life = life * (0.8f + 0.2f * fabsf(kx_rnd())); q->size = size; q->dust = dust;
+}
+static void hx_puffs_step(void) {
+    int n = 0;
+    for (int i = 0; i < hx_np; i++) {
+        HXPuff q = hx_puffs[i];
+        q.age += DT;
+        if (q.age >= q.life) continue;
+        q.p = vadd(q.p, vscale(q.v, DT));
+        q.v = vscale(q.v, 1.0f - (q.dust ? 1.4f : 1.0f) * DT);
+        if (q.dust) q.v.y += 1.5f * DT;
+        hx_puffs[n++] = q;
+    }
+    hx_np = n;
+    static int tick;
+    tick++;
+    if (!hx.eng || pl.crashed) return;
+    if ((tick & 1) == 0) {                                                         // smoke from the bells
+        const V3 nz = MW(0.0f, 0.0f, -28.0f);
+        hx_puff_add(nz, vadd(pl.vel, vscale(pl.f, -(6.0f + 18.0f * hx.thr))), 1.4f, 0.9f + 0.7f * hx.thr, false);
+    }
+    if (pl.f.y > 0.4f && hx.agl < 70.0f) {                                         // dust and spray blown out from under the engines
+        const float k = (1.0f - hx.agl / 70.0f) * hx.thr;
+        const V3 nz = MW(0.0f, 0.0f, -26.0f);
+        const float gy = hx_support(nz.x, nz.z);
+        for (int i = 0; i < 2; i++) {
+            const float a = (kx_rnd() + 1.0f) * PI_F;
+            hx_puff_add(v3(nz.x + 2.5f * sinf(a), gy + 0.8f, nz.z + 2.5f * cosf(a)), v3(sinf(a) * 28.0f * k, 1.5f, cosf(a) * 28.0f * k), 1.8f, 1.8f + 1.8f * k, true);
+        }
+    }
+}
+static void hx_draw_puffs(void) {
+    for (int i = 0; i < hx_np; i++) {
+        const HXPuff *q = &hx_puffs[i];
+        const float t = q->age / q->life;
+        const float rad = q->size * (0.5f + 1.2f * t);
+        const int a = (int)((q->dust ? 120.0f : 80.0f) * (1.0f - t));
+        if (a < 4) continue;
+        V3 pts[6];
+        for (int k = 0; k < 6; k++) {
+            const float ang = k * (PI_F / 3.0f);
+            pts[k] = vadd(q->p, vadd(vscale(cam.r, cosf(ang) * rad), vscale(cam.u, sinf(ang) * rad)));
+        }
+        draw_world_poly(pts, 6, q->dust ? RGBA8(196, 176, 140, a) : RGBA8(225, 226, 232, a));
+    }
+}
+
 static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
     const float dt = DT;
     view_mode = 1;
     hx.t += dt;
+    hx_puffs_step();
 
     // Engines: X lights or shuts them down, the D-pad up and down sets the throttle. Square opens or tucks the flaps.
     if ((pressed & SCE_CTRL_CROSS) && !hx.eng && hx.fuel > 0.0f) hx.eng = true;
@@ -430,7 +491,11 @@ static void draw_hx_panel(vita2d_pgf *pgf) {
     vita2d_pgf_draw_textf(pgf, 560, VIEW_H + 82, white, 0.8f, "%d KT", (int)(pl.speed * 1.94384f + 0.5f));
     vita2d_pgf_draw_text(pgf, 700, VIEW_H + 82, hx.dep ? gold : dim, 0.8f, hx.dep ? "FLAPS OUT" : "FLAPS TUCKED");
     vita2d_pgf_draw_text(pgf, 560, VIEW_H + 104, hx.leg > 0.9f ? green : (hx.leg > 0.05f ? gold : dim), 0.8f, hx.leg > 0.9f ? "LEGS OUT" : (hx.leg > 0.05f ? "LEGS MOVING" : "LEGS FOLDED"));
-    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 124, dim, 0.62f, "X: engines  Square: flaps  O: legs  D-pad up/down: throttle  left: assist  right: FLIP  Triangle: restart");
+    {                                                                              // the pad: how far, and which way (a compass bearing, like the other challenges)
+        const float dx = hx.pad.x - pl.pos.x, dz = hx.pad.z - pl.pos.z, b = atan2f(dx, dz) * 57.2958f;
+        vita2d_pgf_draw_textf(pgf, 700, VIEW_H + 104, white, 0.8f, "PAD %03d  %d FT", (int)(b < 0.0f ? b + 360.0f : b + 0.5f) % 360, (int)(sqrtf(dx * dx + dz * dz) * 3.28084f + 0.5f));
+    }
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 124, dim, 0.62f, "X: engines  Square: flaps  O: legs  D-pad up/down: throttle  left: assist  right: FLIP  Triangle: restart   SELECT: camera");
     vita2d_pgf_draw_text(pgf, 250, VIEW_H + 142, dim, 0.62f, "L stick: nose   R stick: bank.  Safe landing: legs out, upright, under 4 m/s.");
 }
 
