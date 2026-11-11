@@ -6,7 +6,8 @@ static void draw_overlays(vita2d_pgf *pgf) {
 
     if (view_banner > 0) {
         static const char *names[3] = { "COCKPIT VIEW", "CHASE VIEW", "TOWER VIEW" };
-        vita2d_pgf_draw_text(pgf, 20, 388, white, 0.95f, names[view_mode]);
+        static const char *hxn[3] = { "CHASE VIEW", "PAD CAMERA", "NOSE CAMERA" };
+        vita2d_pgf_draw_text(pgf, 20, 388, white, 0.95f, spec->model == 7 ? hxn[hx_cam % 3] : names[view_mode]);
     }
     kc_draw_hud(pgf);
     if (game_mode == MODE_LANDING && (ch_state == CH_FLYING || ch_state == CH_TOUCHED)) {

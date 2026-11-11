@@ -34,7 +34,10 @@ static void update(const SceCtrlData *pad, unsigned int pressed) {
                 chart_begin(); chart_open = true; sel_used = true; ff_level = 0;
             }
         } else {
-            if (sel_hold > 0 && sel_hold < 18 && !sel_used) {
+            if (sel_hold > 0 && sel_hold < 18 && !sel_used && spec->model == 7) {    // the HX-1: chase -> pad camera -> nose camera
+                hx_cam = (hx_cam + 1) % 3;
+                view_banner = 150;
+            } else if (sel_hold > 0 && sel_hold < 18 && !sel_used) {
                 view_mode = (view_mode + 1) % (ENABLE_TOWER_VIEW ? 3 : 2);   // cockpit -> chase (-> tower)
                 view_banner = 150;
                 chase_dir = pl.f;
