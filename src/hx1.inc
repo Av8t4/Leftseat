@@ -64,7 +64,7 @@ static void build_hx1(void) {
         V3 cap[HXE]; for (int e = 0; e < HXE; e++) cap[e] = ring[0][HXE - 1 - e];
         V3 c0 = cen[0];
         V3 h1[6] = { cap[0], cap[2], cap[4], cap[6], cap[8], cap[10] };
-        pf_poly(6, h1, &c0, HX_SHIELD[0], HX_SHIELD[1], HX_SHIELD[2], 0, 255);
+        pf_poly(6, h1, NULL, HX_SHIELD[0], HX_SHIELD[1], HX_SHIELD[2], PF_TWO, 255);       // (two-sided: its middle is in its own plane, so there is no 'outward' to pick)
         for (int b = 0; b < 3; b++) {
             const float a = b * (2.0f * PI_F / 3.0f) + 0.5f, bx = 1.7f * sinf(a), by = 1.7f * cosf(a);
             V3 r0[6], r1[6], cc = MW(bx, by, -26.0f);
@@ -105,6 +105,7 @@ static void build_hx1(void) {
     for (int f = 0; f < 4; f++) {                                                  // the four flaps: hinged on the sides, low on the belly side
         const float s = (f & 1) ? 1.0f : -1.0f;                                    // (the belly is the black side; the flaps are on the sides next to it)
         const bool fore = f < 2;
+        if (hx.flap[f] < 0.12f) continue;                                          // tucked away: they lie inside the hull, and would show through it
         const float z0 = fore ? 6.0f : -20.0f, z1 = fore ? 11.5f : -8.0f, span = fore ? 3.4f : 5.2f;
         const float th = -0.55f + hx.flap[f] * 2.3f;                               // 0 = stowed, tucked up the side toward the back; 1 = out and a little toward the belly
         const float dx = s * sinf(th), dy = cosf(th);
