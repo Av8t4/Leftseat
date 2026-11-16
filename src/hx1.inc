@@ -13,6 +13,9 @@
 #define HX_PAD_R    34.0f
 
 #define HX_G      9.81f
+#define HX_AP_TILT_HOP  0.50f      // the auto hop climbs tilted this far toward the pad (rad)
+#define HX_AP_TILT_HIGH 0.01f
+#define HX_AP_FLIP_AGL  900.0f     // the auto hop starts the flip this high above the pad
 #define HX_TWR    2.2f             // thrust over weight at full throttle with full tanks
 #define HX_BURN   70.0f            // seconds of fuel at full throttle
 #define HX_MINTHR 0.30f            // the engines cannot throttle below this
@@ -27,6 +30,7 @@ typedef struct {
     V3    fh, uh;                  // the attitude the computer is holding: where the nose points and which way the back faces
     bool  dep;                     // the flaps are asked to open
     float leg; bool legc;          // the landing legs: how far out (0 = folded against the hull, 1 = out) and whether they are asked out
+    int   ap;                      // the auto hop: 0 off, 1 climbing, 2 coasting up, 3 belly flop (the high hop), 4 landing
     bool  assist, flip;            // the computer helps (it does the flip and the landing burn); the flip has been asked for
     float agl, manual;             // how far the legs are above what is under them (m); seconds the pilot has had a hand on the throttle
     float dp, dr;                  // the computer's flap trims for pitch and roll (-1 to 1)
@@ -147,11 +151,11 @@ static const char *const HC_DESC[HC_COUNT] = {
     "Climb 3,000 m (about 9,800 ft), belly flop and land on the pad." };
 static const char *const HC_HOW[HC_COUNT] = {
     "Nothing to beat here. Triangle starts over.",
-    "Cut the engines soon enough or you overshoot. Score: pad, soft landing, fuel left and a clean apogee.",
-    "Reach the height, flop, flip and land. The pad is far from the mount: steer the climb and the flop toward it." };
+    "Assist on: light the engines and the computer flies it (silver at most). Assist off: fly it yourself for gold.",
+    "Assist on: light the engines and the computer climbs, flops, flips and lands (silver at most). Assist off for gold." };
 static const float HC_GAIN[HC_COUNT]     = { 0.0f, 150.0f, 3000.0f };      // how far above the launch height the engines must climb (m)
-static const float HC_MEDAL[3]           = { 85.0f, 70.0f, 50.0f };         // gold, silver, bronze (points out of 100: first guesses, to be tuned on the Vita)
-static const float HC_PAD_FALL[HC_COUNT] = { 1.0f, 120.0f, 600.0f };        // how far off the pad's center the landing points run out (m)
+static const float HC_MEDAL[3]           = { 80.0f, 60.0f, 40.0f };         // gold, silver, bronze (points out of 100: first guesses, to be tuned on the Vita)
+static const float HC_PAD_FALL[HC_COUNT] = { 1.0f, 250.0f, 1200.0f };        // how far off the pad's center the landing points run out (m)
 static const float HC_FUEL_REF[HC_COUNT] = { 1.0f, 0.55f, 0.30f };          // the fuel left (0..1) that earns the full fuel points
 enum { HS_IDLE = 0, HS_READY, HS_RUN, HS_DONE };
 static int   hc_kind, hc_st;
@@ -183,7 +187,7 @@ static void hx_start(void) {
     for (int i = 0; i < 4; i++) hx.flap[i] = 0.0f;
     hx_np = 0;
     hx.eng = false; hx.ground = true; hx.thr = 0.6f; hx.fuel = 1.0f;
-    hx.leg = 0.0f; hx.legc = false; hx.assist = true; hx.flip = false; hx.agl = 0.0f; hx.manual = 0.0f;       // the legs are folded: the ship is held on its mount
+    hx.ap = 0; hx.leg = 0.0f; hx.legc = false; hx.assist = true; hx.flip = false; hx.agl = 0.0f; hx.manual = 0.0f;       // the legs are folded: the ship is held on its mount
     hx.wx = hx.wy = hx.wz = 0.0f; hx.dep = false; hx.dp = hx.dr = 0.0f; hx.maxalt = 0.0f; hx.td = 0.0f; hx.t = 0.0f;
     hx.pad = ap_pt(a, HX_PAD_LX, 0.0f, HX_PAD_LZ);
     set_axes(hx.psi, HX_UP, 0.0f);
@@ -388,7 +392,7 @@ static void hc_update(void) {
     if (hc_st == HS_IDLE || hc_st == HS_DONE) return;
     if (hc_st == HS_READY) { if (!hx.ground) { hc_st = HS_RUN; hc_t = 0.0f; hc_say("LIFTOFF"); } return; }
     hc_t += DT;
-    if (hx.flip) hc_assisted = true;                                    // the computer flew the landing: silver is the most
+    if (hx.flip || hx.ap) hc_assisted = true;                           // the computer flew some of it: silver is the most
     const float gain = hx_alt_ft() * 0.3048f - hc_launch;
     if (gain > hc_apogee) hc_apogee = gain;
     if (!hc_reached && hc_apogee >= HC_GAIN[hc_kind]) { hc_reached = true; snd_event(EV_CONFIRM, 1.0f); hc_say("TARGET HEIGHT REACHED"); }
@@ -422,6 +426,29 @@ static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
     // comes to the pad, lights them when it must to stop in time, holds the descent to what it can stop, and puts the legs out.
     const float mf0 = 1.0f / (0.55f + 0.45f * hx.fuel);
     const bool stirred = fabsf(stick(pad->ly)) > 0.35f || fabsf(stick(pad->lx)) > 0.35f;
+    // The auto hop (a Hop Test with the assist on): light the engines and the computer flies the whole thing: it climbs tilted toward the pad,
+    // cuts the engines so the coast tops out a little over the target, flips (or, for the high hop, belly flops first) and lands.
+    // Moving a stick or the throttle hands the ship back to the pilot.
+    if (hx.ap > 0 && (stirred || (pad->buttons & (SCE_CTRL_UP | SCE_CTRL_DOWN)) || !hx.assist || hc_kind == HC_FREE)) hx.ap = 0;
+    if (hx.ap == 0 && hx.ground && hx.eng && hx.assist && hc_kind != HC_FREE && hc_st != HS_DONE) hx.ap = 1;
+    if (hx.ap > 0) {
+        const float gain = hx_alt_ft() * 0.3048f - hc_launch, tgt = HC_GAIN[hc_kind];
+        if (hx.ap == 1) {                                                          // climbing, tilted toward the pad
+            const float ex = hx.pad.x - pl.pos.x, ez = hx.pad.z - pl.pos.z, d = sqrtf(ex * ex + ez * ez), th = hc_kind == HC_HOP ? HX_AP_TILT_HOP : HX_AP_TILT_HIGH;
+            hx.fh = d > 1.0f ? vnorm(v3(sinf(th) * ex / d, cosf(th), sinf(th) * ez / d)) : v3(0.0f, 1.0f, 0.0f);
+            hx.thr = 1.0f; hx.manual = 0.0f;
+            const float vup = fmaxf(pl.vel.y, 0.0f);
+            if (!hx.ground && gain + 0.92f * vup * vup / (2.0f * HX_G) >= tgt * 1.08f) { hx.eng = false; hx.ap = 2; }
+        } else if (hx.ap == 2) {                                                   // coasting up
+            if (pl.vel.y < 0.0f) {
+                if (hc_kind == HC_HOP) { hx.ap = 4; hx.flip = true; }
+                else { hx.ap = 3; hx.fh = vnorm(v3(-pl.u.x, 0.0f, -pl.u.z)); }       // nose over toward the belly side: the belly faces the ground
+            }
+        } else if (hx.ap == 3) {                                                   // belly flop
+            if (pl.f.y < 0.5f) hx.dep = true;
+            if (hx.agl < HX_AP_FLIP_AGL && pl.vel.y < -30.0f) { hx.ap = 4; hx.flip = true; }
+        } else if (hx.ground) hx.ap = 0;                                           // landed
+    }
     if (hx.flip && (hx.ground || stirred)) hx.flip = false;                       // touched down, or the pilot takes over
     const bool guide = hx.assist && hx.flip && !hx.ground;
     if (guide) {
@@ -568,7 +595,7 @@ static void draw_hx_panel(vita2d_pgf *pgf) {
     // The state of the ship.
     const char *st = hx.ground ? "ON THE GROUND" : "FLYING";
     vita2d_pgf_draw_text(pgf, 560, VIEW_H + 34, hx.ground ? green : white, 0.8f, st);
-    vita2d_pgf_draw_text(pgf, 700, VIEW_H + 34, hx.assist ? green : dim, 0.8f, hx.assist ? (hx.flip ? "ASSIST: FLIPPING" : "ASSIST ON") : "ASSIST OFF");
+    vita2d_pgf_draw_text(pgf, 700, VIEW_H + 34, hx.assist ? green : dim, 0.8f, hx.assist ? (hx.ap == 1 ? "AUTO: CLIMB" : hx.ap == 2 ? "AUTO: COAST" : hx.ap == 3 ? "AUTO: FLOP" : hx.flip ? "ASSIST: FLIPPING" : "ASSIST ON") : "ASSIST OFF");
     if (hx.ground && hx.td > 0.0f) vita2d_pgf_draw_textf(pgf, 560, VIEW_H + 58, dim, 0.62f, "TOUCHDOWN %.1f M/S", hx.td);
     vita2d_pgf_draw_textf(pgf, 560, VIEW_H + 82, white, 0.8f, "%d KT", (int)(pl.speed * 1.94384f + 0.5f));
     vita2d_pgf_draw_text(pgf, 700, VIEW_H + 82, hx.dep ? gold : dim, 0.8f, hx.dep ? "FLAPS OUT" : "FLAPS TUCKED");
@@ -577,8 +604,8 @@ static void draw_hx_panel(vita2d_pgf *pgf) {
         const float dx = hx.pad.x - pl.pos.x, dz = hx.pad.z - pl.pos.z, b = atan2f(dx, dz) * 57.2958f;
         vita2d_pgf_draw_textf(pgf, 700, VIEW_H + 104, white, 0.8f, "PAD %03d  %d FT", (int)(b < 0.0f ? b + 360.0f : b + 0.5f) % 360, (int)(sqrtf(dx * dx + dz * dz) * 3.28084f + 0.5f));
     }
-    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 124, dim, 0.62f, "X: engines  Square: flaps  O: legs  D-pad up/down: throttle  left: assist  right: FLIP  Triangle: restart   SELECT: camera");
-    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 142, dim, 0.62f, "L stick: nose   R stick: bank.  Safe landing: legs out, upright, under 4 m/s.");
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 124, dim, 0.62f, "X: engines  Square: flaps  O: legs  D-pad up/down: throttle  left: assist  right: FLIP  SELECT: camera");
+    vita2d_pgf_draw_text(pgf, 250, VIEW_H + 142, dim, 0.62f, "Assist on: X and it flies the hop; move a stick to take over.  Safe landing: legs out, upright, under 4 m/s.");
 }
 
 static void hc_time_text(char *b, size_t n, float s) { const int m = (int)(s / 60.0f); snprintf(b, n, "%d:%05.2f", m, s - m * 60.0f); }
@@ -595,7 +622,7 @@ static void hc_draw_hud(vita2d_pgf *pgf) {
         if (hc_bestp()[hc_kind] > 0) vita2d_pgf_draw_textf(pgf, 400, 50, RGBA8(190, 205, 235, 255), 0.65f, "BEST %d PTS", (hc_bestp()[hc_kind] + 50) / 100);
         if (hc_assisted && hc_st == HS_RUN) vita2d_pgf_draw_text(pgf, 400, 70, RGBA8(120, 210, 255, 255), 0.62f, "ASSISTED LANDING: SILVER IS THE MOST");
         if (hc_st == HS_RUN) { hc_time_text(b, sizeof(b), hc_t); vita2d_pgf_draw_text(pgf, 860, 28, white, 0.8f, b); }
-        else if (hc_st == HS_READY) vita2d_pgf_draw_text(pgf, 480 - vita2d_pgf_text_width(pgf, 0.9f, "Light the engines (X) and lift off") / 2, 250, gold, 0.9f, "Light the engines (X) and lift off");
+        else if (hc_st == HS_READY) { const char *rm = hx.assist ? "Press X: the assist flies the hop (D-pad left turns it off)" : "Press X to light the engines, D-pad up to add throttle"; vita2d_pgf_draw_text(pgf, 480 - vita2d_pgf_text_width(pgf, 0.9f, rm) / 2, 250, gold, 0.9f, rm); }
     }
     if (hc_msg_t > 0) vita2d_pgf_draw_text(pgf, 480 - vita2d_pgf_text_width(pgf, 1.1f, hc_msg) / 2, 160, gold, 1.1f, hc_msg);
 }
