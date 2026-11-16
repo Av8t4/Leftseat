@@ -82,7 +82,7 @@ static int prof_n = 0;
 static unsigned long long prof_last = 0;
 
 int main(void) {
-    logfile = fopen("ux0:data/skyhawk.log", "w");           // (the old file name is kept)
+    logfile = fopen(LOG_PATH, "w");                         // (the old file name is kept)
     if (logfile) { fputs("start\n", logfile); fflush(logfile); }
     vita2d_init();
     if (logfile) { fputs("vita2d_init ok\n", logfile); fflush(logfile); }

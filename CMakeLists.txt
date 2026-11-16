@@ -15,9 +15,23 @@ set(VITA_APP_NAME "Left Seat")
 set(VITA_TITLEID  "SKYH00001")
 set(VITA_VERSION  "02.00")
 
+# The Galactic Detour edition installs beside Left Seat: its own title ID (so it is a separate app on the home screen), its own
+# name and pictures (made by tools/make_detour_art.py), and its own score and log files. Use:  cmake -DLS_DETOUR=ON ..
+option(LS_DETOUR "Build the Galactic Detour edition (installs beside Left Seat)" OFF)
+set(ART_DIR "sce_sys")
+if(LS_DETOUR)
+  set(VITA_APP_NAME "Left Seat: Galactic Detour")
+  set(VITA_TITLEID  "SKYH00002")
+  set(ART_DIR "sce_sys/detour")
+endif()
+
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -O2 -std=gnu99")
 
 add_executable(${PROJECT_NAME} src/main.c src/pad.c)
+
+if(LS_DETOUR)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE LS_DETOUR=1)
+endif()
 
 target_link_libraries(${PROJECT_NAME}
   vita2d
@@ -41,7 +55,7 @@ target_link_libraries(${PROJECT_NAME}
 # time CMake runs (needs python3; if it is missing the images are left as they are).
 find_program(PYTHON3_EXE python3)
 if(PYTHON3_EXE)
-  foreach(img sce_sys/icon0.png sce_sys/livearea/contents/bg0.png sce_sys/livearea/contents/startup.png)
+  foreach(img ${ART_DIR}/icon0.png ${ART_DIR}/livearea/contents/bg0.png ${ART_DIR}/livearea/contents/startup.png)
     execute_process(COMMAND ${PYTHON3_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/strip_png.py
                             ${CMAKE_CURRENT_SOURCE_DIR}/${img} ${CMAKE_CURRENT_SOURCE_DIR}/${img}
                     OUTPUT_QUIET ERROR_QUIET)
@@ -52,8 +66,8 @@ vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME})
 vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self
   VERSION ${VITA_VERSION}
   NAME ${VITA_APP_NAME}
-  FILE sce_sys/icon0.png sce_sys/icon0.png
-  FILE sce_sys/livearea/contents/bg0.png sce_sys/livearea/contents/bg0.png
-  FILE sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
+  FILE ${ART_DIR}/icon0.png sce_sys/icon0.png
+  FILE ${ART_DIR}/livearea/contents/bg0.png sce_sys/livearea/contents/bg0.png
+  FILE ${ART_DIR}/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
   FILE sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
 )

@@ -3,10 +3,16 @@ name: Build VPK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, galactic-detour ]
     tags: [ 'v*' ]
   pull_request:
   workflow_dispatch:
+    inputs:
+      edition:
+        description: "Which app to build: auto picks Galactic Detour for galactic-detour and pull requests into it"
+        type: choice
+        options: [ auto, left-seat, galactic-detour ]
+        default: auto
 
 permissions:
   contents: write
@@ -33,21 +39,42 @@ jobs:
           fi
           ls "$VITASDK/arm-vita-eabi/include/vita2d.h"
 
-      - name: Build leftseat.vpk
+      - name: Pick the app to build
+        id: ed
+        env:
+          WANT: ${{ inputs.edition || 'auto' }}
+          BASE: ${{ github.base_ref }}
+          REF: ${{ github.ref_name }}
+        run: |
+          # Galactic Detour is its own app (its own title ID, name and icon), so it installs beside Left Seat.
+          if [ "$WANT" = "galactic-detour" ] || { [ "$WANT" = "auto" ] && { [ "$BASE" = "galactic-detour" ] || [ "$REF" = "galactic-detour" ]; }; }; then
+            echo "flags=-DLS_DETOUR=ON" >> "$GITHUB_OUTPUT"
+            echo "artifact=galactic-detour-vpk" >> "$GITHUB_OUTPUT"
+            echo "file=leftseat-galactic-detour.vpk" >> "$GITHUB_OUTPUT"
+            echo "Building: Left Seat: Galactic Detour (SKYH00002)"
+          else
+            echo "flags=" >> "$GITHUB_OUTPUT"
+            echo "artifact=leftseat-vpk" >> "$GITHUB_OUTPUT"
+            echo "file=leftseat.vpk" >> "$GITHUB_OUTPUT"
+            echo "Building: Left Seat (SKYH00001)"
+          fi
+
+      - name: Build the VPK
         run: |
           export VITASDK="${VITASDK:-/usr/local/vitasdk}"
           export PATH="$VITASDK/bin:$PATH"
           mkdir build
           cd build
-          cmake ..
+          cmake ${{ steps.ed.outputs.flags }} ..
           bash ../fixpad.sh
-          ls -l leftseat.vpk
+          [ "${{ steps.ed.outputs.file }}" = leftseat.vpk ] || cp leftseat.vpk "${{ steps.ed.outputs.file }}"
+          ls -l *.vpk
 
       - name: Upload the VPK (Actions tab -> the run -> Artifacts)
         uses: actions/upload-artifact@v7
         with:
-          name: leftseat-vpk
-          path: build/leftseat.vpk
+          name: ${{ steps.ed.outputs.artifact }}
+          path: build/${{ steps.ed.outputs.file }}
           if-no-files-found: error
 
       - name: Attach the VPK to the Release (tags only)

@@ -6,8 +6,16 @@
 /* touchdown (sink rate, center line, touchdown point, attitude).       */
 /* ------------------------------------------------------------------ */
 
+#ifdef LS_DETOUR                                                /* the Galactic Detour edition keeps its own files, so the two apps never mix their saves */
+#define SCORE_PATH "ux0:data/leftseat_detour_scores.txt"
+#define SCORE_SEED "ux0:data/skyhawk_scores.txt"                /* (the first time it runs it starts from Left Seat's scores and settings) */
+#define LOG_PATH   "ux0:data/leftseat_detour.log"
+#endif
 #ifndef SCORE_PATH
 #define SCORE_PATH "ux0:data/skyhawk_scores.txt"      /* (the old file name is kept so saved scores carry over) */
+#endif
+#ifndef LOG_PATH
+#define LOG_PATH   "ux0:data/skyhawk.log"
 #endif
 enum { MODE_FREE = 0, MODE_LANDING = 1, MODE_KX = 2 };       // (MODE_KX: a KX-1 session at Strake Proving Ground: kxchal.inc)
 enum { CH_IDLE = 0, CH_FLYING, CH_TOUCHED, CH_DONE };
@@ -50,6 +58,9 @@ static void kc_assist_changed(void);     // (kxchal.inc)
 
 static void scores_load(void) {
     FILE *f = fopen(SCORE_PATH, "r");
+#ifdef SCORE_SEED
+    if (!f) f = fopen(SCORE_SEED, "r");
+#endif
     if (!f) return;
     char key[40];
     int v;
