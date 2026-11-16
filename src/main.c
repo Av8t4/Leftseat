@@ -163,7 +163,7 @@ int main(void) {
             }
             if (act == 6) {                                           // the HX-1 at Gulf Point Spaceport
                 { int pick = (menu_wx == WX_COUNT) ? (frame_count / 3) % WX_COUNT : menu_wx; wx_start(pick, menu_wx == WX_COUNT); wx_dirty = false; }
-                hx_start(); flight_world = 0;
+                hx_begin(menu_hc_pick); flight_world = 0;
                 tod = menu_tod;
                 gyro_recenter();
                 game_state = ST_FLY;
@@ -195,7 +195,7 @@ int main(void) {
             menu_quit_t = 0;
             menu_stick = 0;
         } else if (game_state == ST_RESULT) {                         // landing score card over the frozen scene
-            if (pressed & SCE_CTRL_CROSS)       { snd_event(EV_CONFIRM, 1.0f); if (game_mode == MODE_KX) kc_restart(); else start_challenge(); game_state = ST_FLY; }
+            if (pressed & SCE_CTRL_CROSS)       { snd_event(EV_CONFIRM, 1.0f); if (game_mode == MODE_KX) kc_restart(); else if (game_mode == MODE_HX) hx_start(); else start_challenge(); game_state = ST_FLY; }
             else if (pressed & (SCE_CTRL_CIRCLE | SCE_CTRL_START)) { snd_event(EV_CLICK, 1.0f); ch_state = CH_IDLE; game_state = ST_MENU; menu_quit_t = 0; menu_stick = 0; }
 
             vita2d_start_drawing();
@@ -203,7 +203,7 @@ int main(void) {
             draw_scene();
             draw_overlays(pgf);
             draw_panel(pgf);
-            if (game_mode == MODE_KX) kc_draw_result(pgf); else draw_result(pgf);
+            if (game_mode == MODE_KX) kc_draw_result(pgf); else if (game_mode == MODE_HX) hc_draw_result(pgf); else draw_result(pgf);
             vita2d_end_drawing();
             vita2d_swap_buffers();
         } else {
@@ -223,6 +223,7 @@ int main(void) {
             if (pl.crashed || (pressed & SCE_CTRL_TRIANGLE)) ff_level = 0;
             if (game_mode == MODE_LANDING && ch_state == CH_DONE) { game_state = ST_RESULT; ff_level = 0; }
             if (game_mode == MODE_KX && kc_kind != KC_FREE && kc_st == KS_DONE) { game_state = ST_RESULT; ff_level = 0; }
+            if (game_mode == MODE_HX && hc_kind != HC_FREE && hc_st == HS_DONE) { game_state = ST_RESULT; ff_level = 0; }
 
             unsigned long long pt1 = sceKernelGetProcessTimeWide();
             vita2d_start_drawing();
@@ -231,7 +232,7 @@ int main(void) {
             unsigned long long pt2 = sceKernelGetProcessTimeWide();
             draw_overlays(pgf);
             draw_panel(pgf);
-            if (game_state == ST_RESULT) { if (game_mode == MODE_KX) kc_draw_result(pgf); else draw_result(pgf); }
+            if (game_state == ST_RESULT) { if (game_mode == MODE_KX) kc_draw_result(pgf); else if (game_mode == MODE_HX) hc_draw_result(pgf); else draw_result(pgf); }
             unsigned long long pt3 = sceKernelGetProcessTimeWide();
             vita2d_end_drawing();
             vita2d_swap_buffers();

@@ -138,6 +138,36 @@ typedef struct { V3 p, v; float age, life, size; bool dust; } HXPuff;
 static HXPuff hx_puffs[HX_NPUFF];
 static int    hx_np;
 
+// ---- The Hop Test missions: climb past the target height, then land the ship back on the pad. -------------------------------------------
+enum { HC_FREE = 0, HC_HOP, HC_HIGH, HC_COUNT };
+static const char *const HC_NAMES[HC_COUNT] = { "PRACTICE", "HOP TEST", "HIGH HOP" };
+static const char *const HC_DESC[HC_COUNT] = {
+    "Fly it with no score. Try the flip and the legs.",
+    "Climb 150 m (about 490 ft) and land on the pad.",
+    "Climb 3,000 m (about 9,800 ft), belly flop and land on the pad." };
+static const char *const HC_HOW[HC_COUNT] = {
+    "Nothing to beat here. Triangle starts over.",
+    "Cut the engines soon enough or you overshoot. Score: pad, soft landing, fuel left and a clean apogee.",
+    "Reach the height, flop, flip and land. The pad is far from the mount: steer the climb and the flop toward it." };
+static const float HC_GAIN[HC_COUNT]     = { 0.0f, 150.0f, 3000.0f };      // how far above the launch height the engines must climb (m)
+static const float HC_MEDAL[3]           = { 85.0f, 70.0f, 50.0f };         // gold, silver, bronze (points out of 100: first guesses, to be tuned on the Vita)
+static const float HC_PAD_FALL[HC_COUNT] = { 1.0f, 120.0f, 600.0f };        // how far off the pad's center the landing points run out (m)
+static const float HC_FUEL_REF[HC_COUNT] = { 1.0f, 0.55f, 0.30f };          // the fuel left (0..1) that earns the full fuel points
+enum { HS_IDLE = 0, HS_READY, HS_RUN, HS_DONE };
+static int   hc_kind, hc_st;
+static float hc_t, hc_launch, hc_apogee, hc_result, hc_dist, hc_td, hc_fuel_left;
+static bool  hc_reached, hc_assisted, hc_fail, hc_newbest;
+static int   hc_p[4];                       // the points: apogee, pad, landing, fuel
+static char  hc_why[56], hc_msg[40];
+static int   hc_msg_t;
+static float hx_alt_ft(void);                                       // (below)
+static void hc_say(const char *s) { snprintf(hc_msg, sizeof(hc_msg), "%s", s); hc_msg_t = 150; }
+static void hc_reset(void) {
+    hc_st = hc_kind == HC_FREE ? HS_IDLE : HS_READY;
+    hc_t = 0.0f; hc_apogee = 0.0f; hc_reached = false; hc_assisted = false; hc_fail = false; hc_newbest = false; hc_why[0] = 0; hc_msg_t = 0;
+    hc_launch = hx_alt_ft() * 0.3048f; last_crash[0] = 0;
+}
+
 static void hx_start(void) {
     const Airport *a = &AIRPORTS[AP_SPACE];
     game_mode = MODE_HX; ch_state = CH_IDLE;
@@ -160,8 +190,9 @@ static void hx_start(void) {
     hx.fh = pl.f; hx.uh = pl.u;
     chase_dir = v3(sinf(hx.psi), 0.0f, cosf(hx.psi));
     look_ang = 0.0f; view_mode = 1;
+    hc_reset();
 }
-static void hx_restart(void) { hx_start(); }
+static void hx_begin(int kind) { hc_kind = kind; hx_start(); }
 
 // The way the chase camera looks: from behind when the ship stands up, from its right side when it lies flat (so the belly flop shows).
 static V3 hx_chase_target(void) {
@@ -318,7 +349,58 @@ static void hx_draw_puffs(void) {
     }
 }
 
+// 0 = none, 1 = bronze, 2 = silver, 3 = gold, for a score in hundredths of a point.
+static int hc_medal_for(int hundredths) {
+    const float p = hundredths / 100.0f;
+    return p >= HC_MEDAL[0] ? 3 : (p >= HC_MEDAL[1] ? 2 : (p >= HC_MEDAL[2] ? 1 : 0));
+}
+static int hc_medal_best(int k) {                                   // the best medal on the menu: the unassisted best, or the assisted best (silver at most)
+    const int a = hc_medal_for(hc_best[k]); int b = hc_medal_for(hc_best_as[k]); if (b > 2) b = 2;
+    return a > b ? a : b;
+}
+static int *hc_bestp(void) { return hc_assisted ? hc_best_as : hc_best; }
+static const char *const HC_MEDAL_NAME[4] = { "NO MEDAL", "BRONZE", "SILVER", "GOLD" };
+static unsigned int hc_medal_color(int m) { return m == 3 ? RGBA8(255, 206, 80, 255) : (m == 2 ? RGBA8(214, 220, 232, 255) : (m == 1 ? RGBA8(214, 140, 80, 255) : RGBA8(110, 130, 180, 255))); }
+
+static void hc_finish(bool fail, const char *why) {
+    hc_st = HS_DONE; hc_fail = fail;
+    snprintf(hc_why, sizeof(hc_why), "%s", why ? why : "");
+    hc_newbest = false;
+    if (fail) return;
+    const float target = HC_GAIN[hc_kind], ratio = hc_apogee / target;
+    const float dx = pl.pos.x - hx.pad.x, dz = pl.pos.z - hx.pad.z;
+    hc_dist = sqrtf(dx * dx + dz * dz); hc_td = hx.td; hc_fuel_left = hx.fuel;
+    hc_p[0] = (int)(15.0f * (ratio <= 1.5f ? 1.0f : clampf(1.0f - (ratio - 1.5f) / 2.5f, 0.0f, 1.0f)) + 0.5f);       // a clean apogee: over the target but not wildly
+    hc_p[1] = (int)(40.0f * clampf(1.0f - fmaxf(hc_dist - 5.0f, 0.0f) / HC_PAD_FALL[hc_kind], 0.0f, 1.0f) + 0.5f);   // how close to the center of the pad
+    hc_p[2] = (int)(25.0f * clampf((4.0f - hc_td) / 3.5f, 0.0f, 1.0f) + 0.5f);                                        // how soft
+    hc_p[3] = (int)(20.0f * clampf(hc_fuel_left / HC_FUEL_REF[hc_kind], 0.0f, 1.0f) + 0.5f);                          // fuel left
+    hc_result = (float)(hc_p[0] + hc_p[1] + hc_p[2] + hc_p[3]);
+    const int h = (int)(hc_result * 100.0f + 0.5f);
+    int *bp = hc_bestp();
+    if (h > bp[hc_kind]) { bp[hc_kind] = h; hc_newbest = true; }
+    scores_save();
+}
+
+// Once a frame while a Hop Test is on.
+static void hc_update(void) {
+    if (game_mode != MODE_HX) return;
+    if (hc_msg_t > 0) hc_msg_t--;
+    if (hc_st == HS_IDLE || hc_st == HS_DONE) return;
+    if (hc_st == HS_READY) { if (!hx.ground) { hc_st = HS_RUN; hc_t = 0.0f; hc_say("LIFTOFF"); } return; }
+    hc_t += DT;
+    if (hx.flip) hc_assisted = true;                                    // the computer flew the landing: silver is the most
+    const float gain = hx_alt_ft() * 0.3048f - hc_launch;
+    if (gain > hc_apogee) hc_apogee = gain;
+    if (!hc_reached && hc_apogee >= HC_GAIN[hc_kind]) { hc_reached = true; snd_event(EV_CONFIRM, 1.0f); hc_say("TARGET HEIGHT REACHED"); }
+    if (pl.crashed) { hc_finish(true, last_crash[0] ? last_crash : "Crashed"); return; }
+    if (hx.ground && hc_t > 2.0f) {
+        if (!hc_reached) { char b[56]; snprintf(b, sizeof(b), "Landed short: the climb was %d ft of %d", (int)(hc_apogee * 3.28084f), (int)(HC_GAIN[hc_kind] * 3.28084f)); hc_finish(true, b); return; }
+        hc_finish(false, ""); return;
+    }
+}
+
 static void hx_update(const SceCtrlData *pad, unsigned int pressed) {
+    hc_update();
     const float dt = DT;
     view_mode = 1;
     hx.t += dt;
@@ -469,7 +551,7 @@ static void draw_hx_panel(vita2d_pgf *pgf) {
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, SCREEN_H - VIEW_H, RGBA8(30, 32, 40, 255));
     vita2d_draw_rectangle(0, VIEW_H, SCREEN_W, 3, RGBA8(120, 124, 136, 255));
     vita2d_pgf_draw_text(pgf, 24, VIEW_H + 34, gold, 1.1f, "STRAKE HX-1");
-    vita2d_pgf_draw_text(pgf, 24, VIEW_H + 58, dim, 0.7f, "HOP TEST");
+    vita2d_pgf_draw_text(pgf, 24, VIEW_H + 58, dim, 0.7f, HC_NAMES[hc_kind]);
     vita2d_pgf_draw_textf(pgf, 24, VIEW_H + 96, white, 1.3f, "%d FT", (int)(hx_alt_ft() + 0.5f));
     vita2d_pgf_draw_text(pgf, 24, VIEW_H + 114, dim, 0.62f, "ABOVE SEA LEVEL");
     vita2d_pgf_draw_textf(pgf, 24, VIEW_H + 134, dim, 0.62f, "HIGHEST %d FT", (int)(hx.maxalt * 3.28084f + 0.5f));
@@ -497,6 +579,49 @@ static void draw_hx_panel(vita2d_pgf *pgf) {
     }
     vita2d_pgf_draw_text(pgf, 250, VIEW_H + 124, dim, 0.62f, "X: engines  Square: flaps  O: legs  D-pad up/down: throttle  left: assist  right: FLIP  Triangle: restart   SELECT: camera");
     vita2d_pgf_draw_text(pgf, 250, VIEW_H + 142, dim, 0.62f, "L stick: nose   R stick: bank.  Safe landing: legs out, upright, under 4 m/s.");
+}
+
+static void hc_time_text(char *b, size_t n, float s) { const int m = (int)(s / 60.0f); snprintf(b, n, "%d:%05.2f", m, s - m * 60.0f); }
+
+static void hc_draw_hud(vita2d_pgf *pgf) {
+    if (game_mode != MODE_HX) return;
+    const unsigned int gold = RGBA8(255, 206, 130, 255), white = RGBA8(255, 255, 255, 255), green = RGBA8(120, 220, 140, 255);
+    if (hc_kind != HC_FREE) {
+        char b[64];
+        const int tgt = (int)((hc_launch + HC_GAIN[hc_kind]) * 3.28084f + 0.5f);
+        if (hc_reached) snprintf(b, sizeof(b), "%s    TARGET REACHED: LAND ON THE PAD", HC_NAMES[hc_kind]);
+        else snprintf(b, sizeof(b), "%s    CLIMB TO %d FT", HC_NAMES[hc_kind], tgt);
+        vita2d_pgf_draw_text(pgf, 400, 28, hc_reached ? green : gold, 0.8f, b);
+        if (hc_bestp()[hc_kind] > 0) vita2d_pgf_draw_textf(pgf, 400, 50, RGBA8(190, 205, 235, 255), 0.65f, "BEST %d PTS", (hc_bestp()[hc_kind] + 50) / 100);
+        if (hc_assisted && hc_st == HS_RUN) vita2d_pgf_draw_text(pgf, 400, 70, RGBA8(120, 210, 255, 255), 0.62f, "ASSISTED LANDING: SILVER IS THE MOST");
+        if (hc_st == HS_RUN) { hc_time_text(b, sizeof(b), hc_t); vita2d_pgf_draw_text(pgf, 860, 28, white, 0.8f, b); }
+        else if (hc_st == HS_READY) vita2d_pgf_draw_text(pgf, 480 - vita2d_pgf_text_width(pgf, 0.9f, "Light the engines (X) and lift off") / 2, 250, gold, 0.9f, "Light the engines (X) and lift off");
+    }
+    if (hc_msg_t > 0) vita2d_pgf_draw_text(pgf, 480 - vita2d_pgf_text_width(pgf, 1.1f, hc_msg) / 2, 160, gold, 1.1f, hc_msg);
+}
+
+static void hc_draw_result(vita2d_pgf *pgf) {
+    const unsigned int gold = RGBA8(255, 206, 130, 255), white = RGBA8(255, 255, 255, 255), card = RGBA8(10, 22, 56, 255), pale = RGBA8(190, 205, 235, 255);
+    vita2d_draw_rectangle(250, 40, 460, 300, gold);
+    vita2d_draw_rectangle(254, 44, 452, 292, card);
+    vita2d_pgf_draw_text(pgf, 280, 90, white, 1.3f, HC_NAMES[hc_kind]);
+    char b[64];
+    if (hc_fail) {
+        vita2d_pgf_draw_text(pgf, 280, 150, RGBA8(255, 120, 100, 255), 1.4f, "NO SCORE");
+        vita2d_pgf_draw_text(pgf, 280, 190, pale, 0.85f, hc_why);
+    } else {
+        snprintf(b, sizeof(b), "%d POINTS", (int)(hc_result + 0.5f));
+        vita2d_pgf_draw_text(pgf, 280, 160, white, 2.0f, b);
+        int m = hc_medal_for((int)(hc_result * 100.0f + 0.5f));
+        if (hc_assisted && m > 2) m = 2;
+        vita2d_pgf_draw_text(pgf, 280, 205, hc_medal_color(m), 1.3f, HC_MEDAL_NAME[m]);
+        if (hc_newbest) vita2d_pgf_draw_text(pgf, 280, 238, gold, 0.95f, "NEW BEST");
+        else if (hc_bestp()[hc_kind] > 0) vita2d_pgf_draw_textf(pgf, 280, 238, pale, 0.9f, "BEST %d POINTS", (hc_bestp()[hc_kind] + 50) / 100);
+        vita2d_pgf_draw_textf(pgf, 280, 264, pale, 0.7f, "CLIMB %d FT   LANDED %.1f M/S   %d M FROM THE CENTER", (int)(hc_apogee * 3.28084f), hc_td, (int)(hc_dist + 0.5f));
+        vita2d_pgf_draw_textf(pgf, 280, 286, pale, 0.7f, "CLIMB %d   PAD %d   LANDING %d   FUEL %d", hc_p[0], hc_p[1], hc_p[2], hc_p[3]);
+        if (hc_assisted) vita2d_pgf_draw_text(pgf, 280, 308, RGBA8(120, 210, 255, 255), 0.75f, "ASSISTED LANDING: SILVER IS THE MOST");
+    }
+    vita2d_pgf_draw_text(pgf, 280, 328, pale, 0.85f, "X: try again     O: menu");
 }
 
 /* ------------------------------------------------------------------ */
