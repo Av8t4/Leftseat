@@ -60,6 +60,8 @@ def main():
             d.text(((w - tw) / 2, 134), t, font=ft, fill=(255, 206, 130))
         elif f.endswith("bg0.png"):
             star(d, 90, 80, 14, (255, 206, 130)); star(d, 770, 420, 10, (255, 206, 130)); star(d, 700, 60, 7, (255, 255, 255))
+        if not f.endswith("startup.png"):                              # the Vita wants the icon and the background as 256-color (indexed) PNGs, like the Left Seat ones
+            im = im.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE if f == "icon0.png" else Image.Dither.FLOYDSTEINBERG)
         im.save(os.path.join(DST, f))
         print("wrote", os.path.join(DST, f))
 
