@@ -167,6 +167,7 @@ static void plane_glow(V3 c, float px, unsigned int col) {
 static bool kx_braking;                                       // (the KX-1 brake lights: set in kx1.inc)
 static void draw_plane_lights(void) {
     if (pl.crashed || !sw.batt) return;
+    if (spec->model == 7) return;                                                     // the HX-1: no lights yet
     if (spec->model == 6) {                                                           // the KX-1: headlights and tail lights, nothing else
         const bool hl = lt_head(), br = kx_braking;
         for (int s = -1; s <= 1; s += 2) {

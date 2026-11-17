@@ -120,11 +120,15 @@ static void snd_game_update(const SceCtrlData *pad) {
         case 6:                                                     // the KX-1: an electric motor, a soft whine that rises with speed
             in.engine_kind = SND_JET; in.n1 = clampf(0.20f + 0.70f * pl.rpm / 100.0f, 0.0f, 1.0f); in.load = clampf(pl.throttle, 0.0f, 1.0f) * 0.5f;
             break;
+        case 7:                                                     // the HX-1: a deep rumble that grows with the throttle
+            in.engine_kind = SND_JET; in.n1 = clampf(0.30f + 0.70f * pl.throttle, 0.0f, 1.0f); in.load = clampf(pl.throttle, 0.0f, 1.0f);
+            break;
         default:
             in.engine_kind = SND_PISTON; in.blades = 2; in.rpm = pl.rpm;
             in.load = clampf((pl.rpm - 600.0f) / 1800.0f, 0.0f, 1.0f);
     }
     in.engine_ok = ((!dead || spinning) && !pl.crashed) ? 1 : 0;
+    if (spec->model == 7) in.engine_ok = (hx.eng && !pl.crashed) ? 1 : 0;
     if (dead && eng_piston() && fail_t < 2.5f && !pl.crashed) { in.engine_ok = 1; in.misfire = 1.0f - fail_t / 2.5f; }
     if (eng_cranking && eng_piston() && !pl.crashed) in.misfire = 0.85f;                         // the engine chugs while the starter turns it over    // sputtering, then silence
 

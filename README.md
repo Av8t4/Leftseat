@@ -48,7 +48,7 @@ By Kyle Knowles. Written in C with [VitaSDK](https://vitasdk.org) and vita2d. Th
 
 Your best scores and settings are kept in `ux0:data/skyhawk_scores.txt`, so updating the game doesn't lose them.
 
-**Galactic Detour edition.** The test builds of the Galactic Detour branch install as a separate app, "Left Seat: Galactic Detour" (title ID `SKYH00002`, violet icon), so it sits beside your regular Left Seat instead of replacing it. It keeps its own scores in `ux0:data/leftseat_detour_scores.txt` and its own log in `ux0:data/leftseat_detour.log`; the first time it runs it starts from your Left Seat scores and settings. To build it yourself: `cmake -DLS_DETOUR=ON ..`. The pictures come from `tools/make_detour_art.py`.
+**Galactic Detour edition.** The test builds of the Galactic Detour branch install as a separate app, "Left Seat - Galactic Detour" (title ID `SKYH00002`, violet icon), so it sits beside your regular Left Seat instead of replacing it. It keeps its own scores in `ux0:data/leftseat_detour_scores.txt` and its own log in `ux0:data/leftseat_detour.log`; the first time it runs it starts from your Left Seat scores and settings. To build it yourself: `cmake -DLS_DETOUR=ON ..`. The pictures come from `tools/make_detour_art.py`.
 
 ## Quick start
 

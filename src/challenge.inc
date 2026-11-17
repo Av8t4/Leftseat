@@ -17,7 +17,7 @@
 #ifndef LOG_PATH
 #define LOG_PATH   "ux0:data/skyhawk.log"
 #endif
-enum { MODE_FREE = 0, MODE_LANDING = 1, MODE_KX = 2 };       // (MODE_KX: a KX-1 session at Strake Proving Ground: kxchal.inc)
+enum { MODE_FREE = 0, MODE_LANDING = 1, MODE_KX = 2, MODE_HX = 3 };       // (MODE_KX: a KX-1 session at Strake Proving Ground: kxchal.inc)
 enum { CH_IDLE = 0, CH_FLYING, CH_TOUCHED, CH_DONE };
 
 typedef struct {
@@ -51,6 +51,7 @@ static int      ch_best_a[AC_COUNT][CK_COUNT], ch_att_a[AC_COUNT][CK_COUNT];    
 #define ch_attempts ch_att_a[ac_flying][ch_kind]
 static ChResult chr;
 static int kc_best[8];                   // the KX-1 challenges: best result in hundredths (a time for the speed run), 0 = none yet
+static int hc_best[4], hc_best_as[4];   // the HX-1 Hop Tests: best score in hundredths of a point (the same, with the assisted landing)
 static int kc_best_as[8];                // the same, with the computer assist on (silver is the most it can earn)
 static bool kx_assist;                   // the KX-1's computer assist switch
 static void kc_restart(void);            // (kxchal.inc)
@@ -74,6 +75,7 @@ static void scores_load(void) {
         if (!strcmp(key, "panel_tap")) { if (v >= 0 && v < 4) sw_dt = v; continue; }
         if (!strcmp(key, "sound")) { if (v >= 0 && v < 4) snd_level = v; continue; }            // the volume setting
         for (int k = 0; k < 8; k++) { char b[24]; snprintf(b, sizeof(b), "kx%d_best", k); if (!strcmp(key, b)) kc_best[k] = v; snprintf(b, sizeof(b), "kx%d_best_as", k); if (!strcmp(key, b)) kc_best_as[k] = v; }
+        for (int k = 0; k < 4; k++) { char b[24]; snprintf(b, sizeof(b), "hc%d_best", k); if (!strcmp(key, b)) hc_best[k] = v; snprintf(b, sizeof(b), "hc%d_best_as", k); if (!strcmp(key, b)) hc_best_as[k] = v; }
         if (!strcmp(key, "kx_assist")) { kx_assist = v != 0; continue; }
         for (int a = 0; a < AC_COUNT; a++)
             for (int k = 0; k < CK_COUNT; k++) {
@@ -91,6 +93,7 @@ static void scores_save(void) {
     fprintf(f, "gyro=%d\ngyro_roll_rev=%d\ngyro_pitch_rev=%d\ngyro_sens=%d\npanel_tap=%d\n", gy_mode, gy_rinv, gy_pinv, gy_sens, sw_dt);
     fprintf(f, "found_gps=%d\n", ap_found);
     for (int k = 0; k < 8; k++) fprintf(f, "kx%d_best=%d\nkx%d_best_as=%d\n", k, kc_best[k], k, kc_best_as[k]);
+    for (int k = 0; k < 4; k++) fprintf(f, "hc%d_best=%d\nhc%d_best_as=%d\n", k, hc_best[k], k, hc_best_as[k]);
     fprintf(f, "kx_assist=%d\n", kx_assist);
     for (int a = 0; a < AC_COUNT; a++)
         for (int k = 0; k < CK_COUNT; k++)

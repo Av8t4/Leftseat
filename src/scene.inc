@@ -240,6 +240,7 @@ static void draw_scene(void) {
     }
 
     if (spec->model == 6) kx_draw_puffs();
+    if (spec->model == 7) hx_draw_puffs();
     if (view_mode != 0) draw_plane_lights();                 // the aircraft's own lights, on top of everything (seen from outside only)
     flush_batch();
     draw_rain();

@@ -176,9 +176,10 @@ static void ar_draw(vita2d_pgf *pgf) {
         spec = &SPECS[ar_ac]; ac_flying = ar_ac; tod = TOD_DAY; fog_vis = 35000.0f;
         memset(&pl, 0, sizeof pl);
         pl.pos = v3(0.0f, 0.0f, 0.0f); pl.gear = 1.0f; pl.gear_cmd = true; pl.on_ground = true; pl.rpm = 700.0f;
-        set_axes(ar_ang, 0.0f, 0.0f);
+        set_axes(ar_ang, spec->model == 7 ? HX_UP : 0.0f, 0.0f);
+        if (spec->model == 7) pl.pos.y = HX_HALF;
         g_focal = ar_focal() * 2.0f; g_near = 0.3f;                                          // the screen is twice as wide as the picture
-        float rm = fmaxf(spec->tip_x, fmaxf(-spec->tail_z, spec->model == 6 ? 2.3f : 4.5f));
+        float rm = fmaxf(spec->tip_x, fmaxf(-spec->tail_z, spec->model == 7 ? 34.0f : (spec->model == 6 ? 2.3f : 4.5f)));
         ar_set_cam(2.0f * rm / ar_size);
         hangar_draw_model();
         pl = sv_pl; cam = sv_cam; spec = sv_spec; ac_flying = sv_ac; tod = sv_tod; g_focal = sv_f; g_near = sv_n; fog_vis = sv_vis; prop_phase = sv_ph;

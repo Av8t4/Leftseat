@@ -150,6 +150,21 @@ static void sp_box(const Airport *a, float lx, float lz, float w, float d, float
     add_box_rot(c0.x, c0.z, w, d, y0, y1, a, r, g, b);
 }
 
+// A box on a catch tower's arm: starts at (lx, lz), runs len along a direction swung ang radians out from straight toward the mounts (-x).
+static void sp_arm(const Airport *a, float lx, float lz, float len, float wid, float y0, float y1, float ang, float r, float g, float b) {
+    const float ax = -cosf(ang), az = sinf(ang), px = -az, pz = ax;                                          // along (ax, az), across (px, pz)
+    float cxs[4] = { lx - px * wid / 2, lx + px * wid / 2, lx + px * wid / 2 + ax * len, lx - px * wid / 2 + ax * len };
+    float czs[4] = { lz - pz * wid / 2, lz + pz * wid / 2, lz + pz * wid / 2 + az * len, lz - pz * wid / 2 + az * len };
+    V3 q[4];
+    for (int i = 0; i < 4; i++) q[i] = ap_pt(a, cxs[i], 0.0f, czs[i]);
+    for (int i = 0; i < 4; i++) {
+        int j = (i + 1) & 3;
+        V3 f[4] = { v3(q[i].x, y0, q[i].z), v3(q[j].x, y0, q[j].z), v3(q[j].x, y1, q[j].z), v3(q[i].x, y1, q[i].z) };
+        add_face(4, f, r, g, b);
+    }
+    V3 roof[4] = { v3(q[0].x, y1, q[0].z), v3(q[1].x, y1, q[1].z), v3(q[2].x, y1, q[2].z), v3(q[3].x, y1, q[3].z) };
+    add_face(4, roof, r * 1.15f, g * 1.15f, b * 1.15f);
+}
 // A catch tower: a tall steel tower with a band every 14 m, and the two arms that catch a booster.
 static void sp_tower(const Airport *a, float lx, float lz) {
     const float H = 146.0f;
@@ -160,9 +175,9 @@ static void sp_tower(const Airport *a, float lx, float lz) {
     sp_box(a, lx, lz, 9.0f, 9.0f, H, H + 4.0f, 150, 154, 164);
     sp_box(a, lx, lz, 0.7f, 0.7f, H + 4.0f, H + 18.0f, 200, 60, 50);                                       // mast
     sp_box(a, lx, lz, 7.0f, 25.0f, 76.0f, 81.0f, 150, 154, 166);                                           // the carriage
-    for (int s = -1; s <= 1; s += 2) {
-        sp_box(a, lx - 16.0f, lz + s * 10.0f, 22.0f, 3.2f, 77.0f, 80.4f, 190, 194, 204);                  // the arms, open
-        sp_box(a, lx - 28.5f, lz + s * 8.8f, 3.0f, 3.4f, 76.5f, 80.9f, 120, 124, 136);                    // their tips
+    for (int s = -1; s <= 1; s += 2) {                                                                      // the chopsticks, swung wide open
+        sp_arm(a, lx - 4.0f, lz + s * 10.0f, 22.0f, 3.2f, 77.0f, 80.4f, s * 0.95f, 190, 194, 204);          // each arm
+        sp_arm(a, lx - 4.0f - 22.0f * cosf(0.95f), lz + s * (10.0f + 22.0f * sinf(0.95f)), 3.2f, 3.4f, 76.5f, 80.9f, s * 0.95f, 120, 124, 136);   // and its tip
     }
     sp_col(a, lx, lz, 12.0f, 12.0f, H);
 }
@@ -192,6 +207,7 @@ static void sp_rocket(const Airport *a, float lx, float lz) {
 /* The spaceport                                                        */
 /* ------------------------------------------------------------------ */
 
+static void hx_build_pad(const Airport *a);                                                                 // (hx1.inc)
 static void build_spaceport(void) {
     const Airport *a = &AIRPORTS[AP_SPACE];
     // The airfield: a hangar, a small terminal and the tower, on the east side of the runway.
@@ -205,6 +221,7 @@ static void build_spaceport(void) {
     // The launch site, on the beach side: two mounts with their towers; the rocket is on the first.
     sp_mount(a, 1160.0f, -120.0f); sp_tower(a, 1196.0f, -120.0f); sp_rocket(a, 1160.0f, -120.0f);
     sp_mount(a, 1160.0f, 130.0f);  sp_tower(a, 1196.0f, 130.0f);
+    hx_build_pad(a);                                                                                        // the HX-1's landing pad
     for (int i = 0; i < 8; i++) {                                                                           // the tank farm
         float lx = 1100.0f + (i & 1) * 18.0f, lz = -340.0f + (i >> 1) * 22.0f;
         V3 c = ap_pt(a, lx, 0.0f, lz);
