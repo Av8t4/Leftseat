@@ -75,8 +75,10 @@ static void build_hx1(void) {
     {                                                                              // the tail: a dark cap and three engine bells
         V3 cap[HXE]; for (int e = 0; e < HXE; e++) cap[e] = ring[0][HXE - 1 - e];
         V3 c0 = cen[0];
-        V3 h1[6] = { cap[0], cap[2], cap[4], cap[6], cap[8], cap[10] };
-        pf_poly(6, h1, NULL, HX_SHIELD[0], HX_SHIELD[1], HX_SHIELD[2], PF_TWO, 255);       // (two-sided: its middle is in its own plane, so there is no 'outward' to pick)
+        for (int k = 0; k < 4; k++) {                                              // the whole 12-sided end, as four pie slices (a polygon holds 8 points at most; a hexagon left slivers of sky at the rim)
+            V3 h1[5] = { c0, cap[3 * k], cap[3 * k + 1], cap[3 * k + 2], cap[(3 * k + 3) % HXE] };
+            pf_poly(5, h1, NULL, HX_SHIELD[0], HX_SHIELD[1], HX_SHIELD[2], PF_TWO, 255);   // (two-sided: its middle is in its own plane, so there is no 'outward' to pick)
+        }
         for (int b = 0; b < 3; b++) {
             const float a = b * (2.0f * PI_F / 3.0f) + 0.5f, bx = 1.7f * sinf(a), by = 1.7f * cosf(a);
             V3 r0[6], r1[6], cc = MW(bx, by, -26.0f);
@@ -655,10 +657,23 @@ static void hc_draw_result(vita2d_pgf *pgf) {
 /* The landing pad, south of the launch mounts                          */
 /* ------------------------------------------------------------------ */
 
+// One layer of the pad. All of a layer's faces are sorted as if they sat at the pad's center, at the layer's height, so the layers
+// are drawn bottom to top from any side (sorted by their own centers, a big disc's faces could land after a small disc's and cover it).
+// And they count as big (not as 0.66 m tall) when the scene decides whether a face is worth drawing from afar: before, the whole pad
+// vanished beyond about 140 m.
+static void hx_pad_layer(V3 c, float r, float y0, float y1, float cr, float cg, float cb) {
+    const int n0 = nfaces;
+    sp_cyl(c.x, c.z, r, y0, y1, cr, cg, cb, 0);
+    for (int i = n0; i < nfaces; i++) {
+        faces[i].c = v3(c.x, y1, c.z);
+        faces[i].rad = r + 1.0f;
+        faces[i].top = r;
+    }
+}
 static void hx_build_pad(const Airport *a) {
     V3 c = ap_pt(a, HX_PAD_LX, 0.0f, HX_PAD_LZ);
-    sp_cyl(c.x, c.z, HX_PAD_R, 0.0f, 0.3f, 150, 150, 146, 0);               // the concrete
-    sp_cyl(c.x, c.z, HX_PAD_R * 0.74f, 0.3f, 0.42f, 92, 94, 100, 0);        // the dark landing ring
-    sp_cyl(c.x, c.z, HX_PAD_R * 0.42f, 0.42f, 0.54f, 150, 150, 146, 0);
-    sp_cyl(c.x, c.z, HX_PAD_R * 0.14f, 0.54f, 0.66f, 226, 176, 40, 0);      // the bullseye
+    hx_pad_layer(c, HX_PAD_R, 0.0f, 0.3f, 150, 150, 146);                    // the concrete
+    hx_pad_layer(c, HX_PAD_R * 0.74f, 0.3f, 0.42f, 92, 94, 100);             // the dark landing ring
+    hx_pad_layer(c, HX_PAD_R * 0.42f, 0.42f, 0.54f, 150, 150, 146);
+    hx_pad_layer(c, HX_PAD_R * 0.14f, 0.54f, 0.66f, 226, 176, 40);           // the bullseye
 }
